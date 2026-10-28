@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>Pages Hub — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="assets/hub.css"/>
+</head>
+<body>
+<header class="bar"><div class="wrap">
+  <a class="logo" href="index.html" style="color:inherit;text-decoration:none">aniketqw <span>/ admin</span></a>
+  <div class="spacer"></div>
+  <div class="who" id="who"></div>
+  <button class="btn" id="theme" title="Switch theme" aria-label="Switch theme"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg></button>
+</div></header>
+
+<!-- sign-in -->
+<main class="wrap" id="loginView" hidden>
+  <div class="login">
+    <div class="panel">
+      <div class="kick">Admin console</div>
+      <h3 style="font-size:22px;margin:6px 0 4px">Sign in</h3>
+      <p class="sub">Only allow-listed GitHub accounts with push access to this repo can manage pages.</p>
+
+      <div id="oauthBox">
+        <button class="btn primary" id="ghLogin" style="width:100%;justify-content:center;padding:11px">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Sign in with GitHub
+        </button>
+        <p class="note">You sign in on github.com itself, with your passkey, security key or password and 2FA. This page never sees your GitHub password.</p>
+        <div class="or">or use a token</div>
+      </div>
+
+      <div class="field">
+        <label for="tok">Fine-grained personal access token</label>
+        <input id="tok" type="password" placeholder="github_pat_…" autocomplete="off"/>
+        <span class="hint">Scope it to the <b id="repoName"></b> repo only, with <i>Contents: read and write</i>. Add <i>Pages: read</i> on all repos for Discover.
+          <a id="patLink" href="#" target="_blank" rel="noopener">Create one →</a></span>
+      </div>
+      <label class="check"><input type="checkbox" id="remember"/> Keep me signed in on this device</label>
+      <button class="btn" id="tokGo" style="width:100%;justify-content:center">Sign in with token</button>
+      <div class="err" id="loginErr"></div>
+    </div>
+  </div>
+</main>
+
+<!-- console -->
+<main class="wrap" id="appView" hidden>
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-tab="pages">All pages</button>
+    <button class="tab" data-tab="add">Add page</button>
+    <button class="tab" data-tab="discover">Discover</button>
+  </div>
+
+  <!-- all pages -->
+  <section data-pane="pages">
+    <div class="controls">
+      <input class="search" id="aq" type="search" placeholder="Filter…" autocomplete="off"/>
+      <button class="btn" id="reload">↻ Reload</button>
+    </div>
+    <div class="panel" style="padding:6px 10px">
+      <div class="tablewrap"><table class="table">
+        <thead><tr><th></th><th>Page</th><th>Repo / group</th><th>Visibility</th><th>Actions</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table></div>
+    </div>
+    <p class="note">Hidden pages are left off the public hub, but they're still listed in the public <code>routes.json</code> and reachable by URL. Hiding isn't access control.</p>
+  </section>
+
+  <!-- add page -->
+  <section data-pane="add" hidden>
+    <div class="panel">
+      <h3>Publish a new page</h3>
+      <p class="sub">Uploaded files are committed to <code id="pagesPath"></code> and go live once GitHub Pages redeploys, usually within a minute.</p>
+      <div class="row">
+        <div class="field"><label for="fTitle">Title</label><input id="fTitle" placeholder="ML / DL Workbook"/></div>
+        <div class="field"><label for="fSlug">Slug (URL)</label><input id="fSlug" placeholder="ml-dl-workbook"/>
+          <span class="hint" id="slugHint"></span></div>
+      </div>
+      <div class="row">
+        <div class="field"><label for="fGroup">Group</label><input id="fGroup" list="groups" placeholder="Interview prep"/><datalist id="groups"></datalist></div>
+        <div class="field"><label for="fTags">Tags (comma separated)</label><input id="fTags" placeholder="ml, notes"/></div>
+        <div class="field"><label for="fVis">Visibility</label>
+          <select id="fVis"><option value="public">Listed on hub</option><option value="hidden">Hidden (admin only)</option></select></div>
+      </div>
+      <div class="field"><label for="fDesc">Description</label><input id="fDesc" placeholder="One line shown on the card"/></div>
+
+      <div class="seg" id="srcSeg">
+        <button class="on" data-src="upload">Upload files</button>
+        <button data-src="paste">Paste HTML</button>
+        <button data-src="link">Link existing URL</button>
+      </div>
+
+      <div data-src-pane="upload">
+        <div class="drop" id="drop">
+          Drop an <b>.html</b> file (or a whole folder) here, or <u>click to choose</u>
+          <div class="filelist" id="fileList"></div>
+        </div>
+        <input type="file" id="fileIn" multiple hidden/>
+        <input type="file" id="dirIn" webkitdirectory multiple hidden/>
+        <p class="note">A single HTML file becomes <code>index.html</code>. For a folder, its <code>index.html</code> is the entry page and the other files keep their relative paths. <a href="#" id="pickDir">Choose a folder instead</a></p>
+      </div>
+      <div data-src-pane="paste" hidden>
+        <div class="field"><label for="fHtml">HTML</label><textarea id="fHtml" placeholder="<!DOCTYPE html>…"></textarea></div>
+      </div>
+      <div data-src-pane="link" hidden>
+        <div class="row">
+          <div class="field"><label for="fUrl">URL or site path</label><input id="fUrl" placeholder="/some-repo/page.html"/></div>
+          <div class="field"><label for="fRepo">Repo</label><input id="fRepo" placeholder="some-repo"/></div>
+        </div>
+      </div>
+
+      <div class="actions" style="margin-top:6px">
+        <button class="btn primary" id="publish">Publish</button>
+        <span class="err" id="addErr" style="margin:6px 0 0"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- discover -->
+  <section data-pane="discover" hidden>
+    <div class="panel">
+      <h3>Discover every Pages route</h3>
+      <p class="sub">Checks each of your repos for a GitHub Pages site, then lists every HTML file that site serves. Tick the ones to add to the hub.</p>
+      <div class="actions">
+        <button class="btn primary" id="scan">Scan my repos</button>
+        <button class="btn" id="addFound" disabled>Add selected</button>
+        <span class="note" id="scanMsg" style="margin:6px 0 0"></span>
+      </div>
+    </div>
+    <div id="found"></div>
+  </section>
+</main>
+
+<div id="modalHost"></div>
+
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/admin.js"></script>
+</body>
+</html>

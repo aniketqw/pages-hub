@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Pages Hub — Aniket Saxena</title>
+<meta name="description" content="Every page published across Aniket Saxena's GitHub Pages sites, in one place."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="assets/hub.css"/>
+</head>
+<body>
+<header class="bar"><div class="wrap">
+  <div class="logo">aniketqw <span>/ pages</span></div>
+  <div class="spacer"></div>
+  <button class="btn" id="theme" title="Switch theme"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg><span class="hide-sm">Theme</span></button>
+  <a class="btn" href="admin.html">Admin</a>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="kick">GitHub Pages directory</div>
+    <h1>Every page, <span>one place</span></h1>
+    <p>All the routes published across my GitHub Pages sites: courses, interview notes, workbooks and design previews. A green dot means the page answered just now.</p>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <div class="controls">
+    <input class="search" id="q" type="search" placeholder="Search titles, repos, tags…" autocomplete="off"/>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div id="list"><div class="empty">Loading routes…</div></div>
+</main>
+
+<footer><div class="wrap">
+  Registry: <a href="routes.json">routes.json</a> · Source: <a id="srclink" href="#">GitHub</a>
+</div></footer>
+
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script>
+(function(){
+  var H = window.Hub, esc = H.esc;
+  H.initTheme(document.getElementById("theme"));
+  document.getElementById("srclink").href = "https://github.com/" + H.config.owner + "/" + H.config.repo;
+
+  var all = [], group = "All", status = {};
+  var q = document.getElementById("q");
+
+  function matches(r){
+    var s = q.value.trim().toLowerCase();
+    if(group !== "All" && r.group !== group) return false;
+    if(!s) return true;
+    return [r.title, r.description, r.repo, r.url, (r.tags || []).join(" ")].join(" ").toLowerCase().indexOf(s) !== -1;
+  }
+
+  function card(r){
+    var pending = r.status === "pending";
+    var tags = (r.tags || []).map(function(t){ return '<span class="tag">' + esc(t) + '</span>'; }).join("");
+    if(pending) tags = '<span class="tag pend">coming soon</span>' + tags;
+    var st = status[r.id] || "";
+    var inner =
+      '<div class="t"><span class="dot ' + st + '" data-dot="' + esc(r.id) + '"></span><span class="name">' + esc(r.title) + '</span></div>' +
+      (r.description ? '<div class="d">' + esc(r.description) + '</div>' : '') +
+      '<div class="u">' + esc(r.repo) + ' · ' + esc(r.url) + '</div>' +
+      '<div class="tags">' + tags + '</div>';
+    return pending ? '<div class="card pending">' + inner + '</div>'
+                   : '<a class="card" href="' + esc(H.href(r.url)) + '">' + inner + '</a>';
+  }
+
+  function render(){
+    var shown = all.filter(matches), groups = {};
+    shown.forEach(function(r){ (groups[r.group || "Other"] = groups[r.group || "Other"] || []).push(r); });
+    var html = Object.keys(groups).map(function(g){
+      return '<section class="group"><h2>' + esc(g) + ' <span class="n">' + groups[g].length + '</span></h2>' +
+             '<div class="grid">' + groups[g].map(card).join("") + '</div></section>';
+    }).join("");
+    document.getElementById("list").innerHTML = html || '<div class="empty">No pages match.</div>';
+  }
+
+  function chips(){
+    var names = ["All"];
+    all.forEach(function(r){ if(names.indexOf(r.group) === -1) names.push(r.group); });
+    var el = document.getElementById("chips");
+    el.innerHTML = names.map(function(n){
+      return '<button class="chip' + (n === group ? ' on' : '') + '" data-g="' + esc(n) + '">' + esc(n) + '</button>';
+    }).join("");
+    el.onclick = function(e){
+      var b = e.target.closest(".chip"); if(!b) return;
+      group = b.getAttribute("data-g"); chips(); render();
+    };
+  }
+
+  function stats(){
+    var repos = {}; all.forEach(function(r){ repos[r.repo] = 1; });
+    var up = Object.keys(status).filter(function(k){ return status[k] === "ok"; }).length;
+    document.getElementById("stats").innerHTML =
+      '<div class="stat"><b>' + all.length + '</b><small>pages</small></div>' +
+      '<div class="stat"><b>' + Object.keys(repos).length + '</b><small>sites</small></div>' +
+      (H.onSite ? '<div class="stat"><b>' + up + '</b><small>responding</small></div>' : '');
+  }
+
+  q.addEventListener("input", render);
+
+  H.loadRoutes().then(function(data){
+    all = (data.routes || []).filter(function(r){ return r.visibility !== "hidden"; });
+    chips(); render(); stats();
+    H.checkStatus(all.filter(function(r){ return r.status !== "pending"; }), function(r, s){
+      status[r.id] = s;
+      var d = document.querySelector('[data-dot="' + CSS.escape(r.id) + '"]');
+      if(d) d.className = "dot " + s;
+      stats();
+    });
+  }).catch(function(e){
+    document.getElementById("list").innerHTML = '<div class="empty">Could not load routes.json: ' + esc(e.message) + '</div>';
+  });
+})();
+</script>
+</body>
+</html>

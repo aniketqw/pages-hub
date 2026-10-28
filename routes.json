@@ -1,0 +1,392 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "id": "portfolio",
+      "title": "Portfolio",
+      "url": "/",
+      "repo": "aniketqw.github.io",
+      "group": "Portfolio",
+      "description": "Personal site: projects, experience, skills, contact.",
+      "tags": [
+        "home"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "portfolio-admin",
+      "title": "Portfolio Admin: Repo Manager",
+      "url": "/admin.html",
+      "repo": "aniketqw.github.io",
+      "group": "Portfolio",
+      "description": "Pin and exclude repos and export projects_config.json for the portfolio.",
+      "tags": [
+        "admin",
+        "tool"
+      ],
+      "visibility": "hidden",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "ui-kit-portfolio",
+      "title": "Portfolio UI Kit",
+      "url": "/ui_kits/portfolio/",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "React UI kit for the public portfolio.",
+      "tags": [
+        "design"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "ui-kit-admin",
+      "title": "Admin UI Kit",
+      "url": "/ui_kits/admin/",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "React UI kit for the admin surface.",
+      "tags": [
+        "design"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-01-gradient",
+      "title": "Preview: Gradient",
+      "url": "/preview/01-gradient.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-02-primary-accent",
+      "title": "Preview: Primary accent",
+      "url": "/preview/02-primary-accent.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-03-neutrals",
+      "title": "Preview: Neutrals",
+      "url": "/preview/03-neutrals.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-04-semantic-status",
+      "title": "Preview: Semantic status",
+      "url": "/preview/04-semantic-status.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-05-tags",
+      "title": "Preview: Tags",
+      "url": "/preview/05-tags.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-06-type-display",
+      "title": "Preview: Type: display",
+      "url": "/preview/06-type-display.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-07-type-body",
+      "title": "Preview: Type: body",
+      "url": "/preview/07-type-body.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-08-type-mono-label",
+      "title": "Preview: Type: mono label",
+      "url": "/preview/08-type-mono-label.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-09-radii",
+      "title": "Preview: Radii",
+      "url": "/preview/09-radii.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-10-spacing",
+      "title": "Preview: Spacing",
+      "url": "/preview/10-spacing.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-11-glow-elevation",
+      "title": "Preview: Glow & elevation",
+      "url": "/preview/11-glow-elevation.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-12-buttons",
+      "title": "Preview: Buttons",
+      "url": "/preview/12-buttons.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-13-project-cards",
+      "title": "Preview: Project cards",
+      "url": "/preview/13-project-cards.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-14-icon-frames",
+      "title": "Preview: Icon frames",
+      "url": "/preview/14-icon-frames.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-15-skills-cards",
+      "title": "Preview: Skills cards",
+      "url": "/preview/15-skills-cards.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-16-textures",
+      "title": "Preview: Textures",
+      "url": "/preview/16-textures.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "preview-17-logo",
+      "title": "Preview: Logo",
+      "url": "/preview/17-logo.html",
+      "repo": "aniketqw.github.io",
+      "group": "Design system",
+      "description": "Design-token preview card.",
+      "tags": [
+        "design",
+        "preview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "agentic",
+      "title": "Agentic: Consolidated Course v3",
+      "url": "/agentic/",
+      "repo": "agentic",
+      "group": "Agentic course",
+      "description": "Single-file consolidated course: guided, grounded and complete reading.",
+      "tags": [
+        "course"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "agentic-v2",
+      "title": "Agentic: Course reader v2",
+      "url": "/agentic/v2/",
+      "repo": "agentic",
+      "group": "Agentic course",
+      "description": "React course reader with on-demand lessons.",
+      "tags": [
+        "course",
+        "reader"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "agentic-v3",
+      "title": "Agentic: Course reader v3",
+      "url": "/agentic/v3/",
+      "repo": "agentic",
+      "group": "Agentic course",
+      "description": "React reader with the updated, audited course.",
+      "tags": [
+        "course",
+        "reader"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "interview-prep",
+      "title": "Interview Prep",
+      "url": "/interview-prep/",
+      "repo": "interview-prep",
+      "group": "Interview prep",
+      "description": "Marvell internship walkthrough, 100 Q&A, Tally 100. Behind a key.",
+      "tags": [
+        "interview",
+        "keyed"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": false
+    },
+    {
+      "id": "ml-dl-workbook",
+      "title": "ML / DL Workbook",
+      "url": "/pages-hub/pages/ml-dl-workbook/",
+      "repo": "pages-hub",
+      "group": "Interview prep",
+      "description": "Machine learning and deep learning workbook.",
+      "tags": [
+        "ml",
+        "dl",
+        "interview"
+      ],
+      "visibility": "public",
+      "status": "pending",
+      "managed": true
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+name = "pages-hub-oauth"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+ADMIN_URL = "https://aniketqw.github.io/pages-hub/admin.html"
+# SCOPE = "repo"   # use this instead of public_repo if Discover should see private repos
