@@ -374,18 +374,19 @@
     },
     {
       "id": "ml-dl-workbook",
-      "title": "ML / DL Workbook",
+      "title": "Machine Learning Atlas",
       "url": "/pages-hub/pages/ml-dl-workbook/",
       "repo": "pages-hub",
       "group": "Interview prep",
-      "description": "Machine learning and deep learning workbook.",
+      "description": "Machine learning and deep learning workbook: 157 sections covering classical ML through deep nets, with worked derivations and runnable examples.",
       "tags": [
         "ml",
         "dl",
-        "interview"
+        "interview",
+        "reference"
       ],
       "visibility": "public",
-      "status": "pending",
+      "status": "live",
       "managed": true
     }
   ]
