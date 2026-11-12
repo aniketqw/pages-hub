@@ -9,7 +9,9 @@
 
   H.initTheme($("theme"));
   $("repoName").textContent = C.owner + "/" + C.repo;
-  $("patLink").href = "https://github.com/settings/personal-access-tokens/new";
+  $("patLink").href = "https://github.com/settings/personal-access-tokens/new?" + new URLSearchParams({
+    name: C.repo + " admin", target_name: C.owner, contents: "write"
+  });
   $("pagesPath").textContent = "pages/<slug>/";
 
   // ---------- GitHub API ----------
@@ -26,6 +28,13 @@
       return r.json().catch(function(){ return null; }).then(function(j){
         if(!r.ok){
           var e = new Error((j && j.message) || ("HTTP " + r.status));
+          // Account push access does not imply that this token can write contents.
+          // Keep rate limits and branch-policy failures distinct from token scope failures.
+          if(r.status === 403 && /Resource not accessible by (personal access token|integration)/i.test(e.message)){
+            e.message = "This token cannot access the required repository resource. In GitHub token settings, select " +
+              C.owner + "/" + C.repo + " and set Contents to Read and write. Save the token settings, then sign in again. " +
+              "For Discover, also grant Pages: read on the repositories you want to scan.";
+          }
           e.status = r.status; throw e;
         }
         return j;
@@ -116,6 +125,11 @@
       return gh(repoPath(""));
     }).then(function(repo){
       if(!repo.permissions || !repo.permissions.push) throw new Error("This sign-in can't push to " + C.owner + "/" + C.repo + ".");
+      $("loginErr").textContent = "Checking Contents write permission…";
+      // Creating an unattached empty blob exercises the same write permission used
+      // by publishing without changing any files, branches, or Pages deployments.
+      return gh(repoPath("/git/blobs"), {method:"POST", body:{content:"", encoding:"utf-8"}});
+    }).then(function(){
       H.set(TOKEN_KEY, t, remember ? "local" : "session");
       $("loginErr").textContent = "";
       $("who").innerHTML = '<img alt="" src="' + esc(me.avatar_url) + '"/><span class="hide-sm">@' + esc(me.login) +

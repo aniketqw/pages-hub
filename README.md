@@ -32,9 +32,22 @@ them. Use **Admin → Discover** to scan every repo and add what it finds.
 - **Sign in with GitHub** sends you to github.com, so your passkey or 2FA applies. It needs the
   worker in `oauth-worker/`. Until that's deployed, you can sign in with a fine-grained token instead.
 - The console accepts only logins listed in `config.js` → `allowedUsers` that also have push access.
+- Sign-in also verifies the token's **Contents: Read and write** permission by creating an
+  unattached empty Git blob. It does not create a commit, change files, or trigger a deployment.
 - Each save is **one commit** made through the GitHub Git Data API (files plus `routes.json`
   together). Pages redeploys in about a minute.
 - The token stays in your browser (session storage, or local storage if you tick *keep me signed in*).
+
+### Fix “Resource not accessible by personal access token”
+
+GitHub account push access and token permissions are separate. A token can identify the owner
+and read a public repo while still being unable to publish. In
+[fine-grained token settings](https://github.com/settings/personal-access-tokens), edit the token:
+choose resource owner **aniketqw**, include **pages-hub** under repository access, and set
+**Repository permissions → Contents → Read and write**. Save, then sign in again in the admin
+console. The “Create a publishing token” link pre-fills the owner and Contents permission;
+you must select the repository yourself. Discover additionally needs **Pages: read** and access
+to the repositories being scanned. No token is committed to this repository.
 
 ## Honest limits
 

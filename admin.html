@@ -37,12 +37,14 @@
       <div class="field">
         <label for="tok">Fine-grained personal access token</label>
         <input id="tok" type="password" placeholder="github_pat_…" autocomplete="off"/>
-        <span class="hint">Scope it to the <b id="repoName"></b> repo only, with <i>Contents: read and write</i>. Add <i>Pages: read</i> on all repos for Discover.
-          <a id="patLink" href="#" target="_blank" rel="noopener">Create one →</a></span>
+        <span class="hint">Select <b id="repoName"></b> under <i>Only select repositories</i>, with <i>Contents: Read and write</i>. The link below pre-fills the owner and permission; select the repository yourself. For Discover, also include the repositories to scan and grant <i>Pages: read</i>.
+          <a id="patLink" href="#" target="_blank" rel="noopener">Create a publishing token →</a>
+          <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener">Edit an existing token →</a></span>
       </div>
       <label class="check"><input type="checkbox" id="remember"/> Keep me signed in on this device</label>
       <button class="btn" id="tokGo" style="width:100%;justify-content:center">Sign in with token</button>
       <div class="err" id="loginErr"></div>
+      <p class="note">Sign-in checks Contents write access by creating an empty Git blob. This does not change any published files or create a commit.</p>
     </div>
   </div>
 </main>
