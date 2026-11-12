@@ -419,6 +419,20 @@
       "visibility": "public",
       "status": "live",
       "managed": true
+    },
+    {
+      "id": "microntallystyle",
+      "title": "microntallystyle",
+      "url": "/pages-hub/pages/microntallystyle/",
+      "repo": "pages-hub",
+      "group": "Other",
+      "description": "similar to tally prep resume grind",
+      "tags": [
+        "interview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": true
     }
   ]
 }
