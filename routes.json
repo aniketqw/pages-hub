@@ -119,21 +119,6 @@
       "managed": false
     },
     {
-      "id": "preview-05-tags",
-      "title": "Preview: Tags",
-      "url": "/preview/05-tags.html",
-      "repo": "aniketqw.github.io",
-      "group": "Design system",
-      "description": "Design-token preview card.",
-      "tags": [
-        "design",
-        "preview"
-      ],
-      "visibility": "public",
-      "status": "live",
-      "managed": false
-    },
-    {
       "id": "preview-06-type-display",
       "title": "Preview: Type: display",
       "url": "/preview/06-type-display.html",
