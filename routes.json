@@ -420,6 +420,20 @@
       "visibility": "public",
       "status": "live",
       "managed": true
+    },
+    {
+      "id": "micron-resume-prep",
+      "title": "micron_resume_prep",
+      "url": "/pages-hub/pages/micron-resume-prep/",
+      "repo": "pages-hub",
+      "group": "Other",
+      "description": "",
+      "tags": [
+        "interview"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": true
     }
   ]
 }
