@@ -388,6 +388,23 @@
       "visibility": "public",
       "status": "live",
       "managed": true
+    },
+    {
+      "id": "micronjdprep",
+      "title": "Micron AI for Silicon Design Prep",
+      "url": "/pages-hub/pages/micronjdprep/",
+      "repo": "pages-hub",
+      "group": "Interview prep",
+      "description": "Interactive chip-routing guide for Micron AI for Silicon Design interview preparation.",
+      "tags": [
+        "micron",
+        "interview",
+        "silicon-design",
+        "algorithms"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": true
     }
   ]
 }

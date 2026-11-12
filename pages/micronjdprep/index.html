@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chip Routing, Step by Step: Micron AI for Silicon Design prep</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f3f5f1;--surface:#ffffff;--surface2:#e9eee8;--text:#17212b;--muted:#566370;--border:#cfd7ce;
+  --m1:#2456c8;--m1soft:#dde7fb;--m2:#b92f83;--m2soft:#f8e0ef;--via:#c47d00;--viasoft:#fdefc9;
+  --good:#1b7a4f;--goodsoft:#d8f0e3;--bad:#b3302a;--badsoft:#f9dcda;--wall:#2b3138;
+  --grid:rgba(23,33,43,.07);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1419;--surface:#161e25;--surface2:#1f2932;--text:#e6ecf1;--muted:#9aa7b3;--border:#2e3a45;
+    --m1:#7fa6ff;--m1soft:#1c2b4d;--m2:#f08cc6;--m2soft:#43203a;--via:#f0b43c;--viasoft:#443411;
+    --good:#58d19a;--goodsoft:#173a2b;--bad:#ff8b84;--badsoft:#47211f;--wall:#7e8b97;
+    --grid:rgba(230,236,241,.06);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1419;--surface:#161e25;--surface2:#1f2932;--text:#e6ecf1;--muted:#9aa7b3;--border:#2e3a45;
+  --m1:#7fa6ff;--m1soft:#1c2b4d;--m2:#f08cc6;--m2soft:#43203a;--via:#f0b43c;--viasoft:#443411;
+  --good:#58d19a;--goodsoft:#173a2b;--bad:#ff8b84;--badsoft:#47211f;--wall:#7e8b97;
+  --grid:rgba(230,236,241,.06);
+  color-scheme:dark;
+}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 118px);height:100%;scroll-behavior:smooth}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:17px/1.62 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px;
+  -webkit-text-size-adjust:100%;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:30}
+button,select,input,summary,.ui{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+a{color:var(--m1)}
+a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--via);outline-offset:2px;border-radius:4px}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
+.top-in{max-width:1040px;margin:0 auto;padding:10px 18px 0}
+.top-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brand{font:700 15px/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.01em}
+.brand small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{font-size:13px;line-height:1;padding:8px 11px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:7px;cursor:pointer}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--m1);border-color:var(--m1);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0b1220}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#0b1220}}
+.btn[aria-pressed="true"]{background:var(--m1soft);border-color:var(--m1)}
+.btn:disabled{opacity:.45;cursor:default}
+.prog{display:flex;align-items:center;gap:8px;font:12px system-ui,sans-serif;color:var(--muted)}
+.prog-bar{width:110px;height:7px;background:var(--surface2);border-radius:5px;overflow:hidden}
+.prog-bar i{display:block;height:100%;width:0;background:var(--good);transition:width .25s}
+.nav{display:flex;gap:6px;overflow-x:auto;padding:8px 0 9px;scrollbar-width:thin}
+.nav a{flex:none;text-decoration:none;font:600 12.5px system-ui,sans-serif;color:var(--muted);padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg)}
+.nav a:hover{color:var(--text);border-color:var(--m1)}
+.nav a.done{border-color:var(--good);color:var(--good)}
+
+main{max-width:1040px;margin:0 auto;padding:26px 18px 70px}
+.hero{padding:22px 0 8px;max-width:760px}
+.hero h1{font-size:clamp(30px,5.2vw,46px);line-height:1.08;margin:0 0 12px;letter-spacing:-.02em}
+.hero p{margin:0 0 10px;color:var(--muted);font-size:18px}
+.hero .who{font:13px system-ui,sans-serif;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:18px 0}
+.legend-metal{display:flex;gap:14px;flex-wrap:wrap;font:13px system-ui,sans-serif;color:var(--muted);margin-top:10px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+
+h2{font-size:clamp(24px,3.6vw,31px);line-height:1.15;margin:0;letter-spacing:-.01em}
+h3{font-size:19px;margin:0 0 6px}
+section.module,section.plain{margin:44px 0;scroll-margin-top:120px}
+.mod-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}
+.badge{flex:none;font:700 15px system-ui,sans-serif;background:var(--m1);color:#fff;border-radius:9px;padding:8px 11px;min-width:46px;text-align:center}
+:root[data-theme="dark"] .badge{color:#0b1220}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .badge{color:#0b1220}}
+.one{margin:6px 0 0;color:var(--muted)}
+
+/* stepper */
+.stepper{border-left:3px solid var(--border);margin:0 0 6px 10px;padding-left:18px}
+.step{display:none;margin:0 0 18px;position:relative}
+.step.shown{display:block}
+.step.latest{animation:rise .28s ease-out}
+@keyframes rise{from{opacity:.3;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.step.latest{animation:none}html{scroll-behavior:auto}}
+.step::before{content:"";position:absolute;left:-26px;top:7px;width:13px;height:13px;border-radius:50%;background:var(--surface);border:3px solid var(--m1)}
+.step-h{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
+.step-h b{font:700 12px system-ui,sans-serif;color:var(--m1);white-space:nowrap}
+.step-h h3{margin:0;font-size:19px}
+.step p{margin:6px 0}
+.step ul{margin:6px 0;padding-left:22px}
+.step li{margin:3px 0}
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 12px 10px;padding-left:21px}
+.dots{display:flex;gap:5px}
+.dots i{width:9px;height:9px;border-radius:50%;background:var(--border)}
+.dots i.on{background:var(--m1)}
+.ctrl .count{font:12.5px system-ui,sans-serif;color:var(--muted)}
+.all .step{display:block}
+.all .ctrl{display:none}
+
+/* widgets */
+.widget{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin:10px 0 6px}
+.widget-title{font:600 13px system-ui,sans-serif;color:var(--muted);margin:0 0 9px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.row label{font:13px system-ui,sans-serif;color:var(--muted)}
+select,input[type="range"]{accent-color:var(--m1)}
+select{padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-right:1px solid var(--border);background:var(--surface);color:var(--text);padding:7px 11px;font-size:13px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--m1);color:#fff}
+:root[data-theme="dark"] .seg button[aria-pressed="true"]{color:#0b1220}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button[aria-pressed="true"]{color:#0b1220}}
+.status{font:13.5px/1.45 system-ui,sans-serif;min-height:40px;padding:8px 10px;border-radius:8px;background:var(--surface2)}
+.split{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:720px){.split{grid-template-columns:1fr}}
+
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;max-width:340px;touch-action:manipulation}
+.cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:5px;background:var(--surface2);font:600 12px system-ui,sans-serif;color:var(--muted);cursor:pointer;user-select:none;border:1px solid transparent}
+.cell.wall{background:var(--wall);cursor:pointer}
+.cell.closed{background:var(--m1soft);color:var(--m1)}
+.cell.front{background:var(--viasoft);color:var(--via);border-color:var(--via)}
+.cell.cur{background:var(--m1);color:#fff;border-color:var(--m1)}
+:root[data-theme="dark"] .cell.cur{color:#0b1220}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cell.cur{color:#0b1220}}
+.cell.path{background:var(--good);color:#fff;border-color:var(--good)}
+:root[data-theme="dark"] .cell.path{color:#08140e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cell.path{color:#08140e}}
+.cell.src,.cell.tgt{font-weight:800;font-size:14px}
+.cell.src{background:var(--m1);color:#fff}
+.cell.tgt{background:var(--m2);color:#fff}
+:root[data-theme="dark"] .cell.src,:root[data-theme="dark"] .cell.tgt{color:#0b1220}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cell.src,:root:not([data-theme="light"]) .cell.tgt{color:#0b1220}}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font:12px system-ui,sans-serif;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.bars{display:grid;gap:7px;margin-top:8px}
+.bar{display:grid;grid-template-columns:110px 1fr 38px;gap:8px;align-items:center;font:12.5px system-ui,sans-serif}
+.bar div{height:14px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.bar div i{display:block;height:100%;background:var(--m1);border-radius:4px}
+.bar.hl div i{background:var(--m2)}
+.bar span:last-child{text-align:right;font-weight:700}
+
+svg{max-width:100%;height:auto;display:block}
+.svgbox{background:var(--surface);border-radius:8px}
+svg text{font:12px system-ui,sans-serif;fill:var(--text)}
+svg .mut{fill:var(--muted)}
+.tag{display:inline-block;font:700 12px system-ui,sans-serif;padding:3px 8px;border-radius:6px;margin:2px 4px 2px 0}
+.tag.good{background:var(--goodsoft);color:var(--good)}
+.tag.bad{background:var(--badsoft);color:var(--bad)}
+.tag.warn{background:var(--viasoft);color:var(--via)}
+.tag.blue{background:var(--m1soft);color:var(--m1)}
+
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0;font:600 13px system-ui,sans-serif}
+.flow span{padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.flow span.hot{background:var(--m1);border-color:var(--m1);color:#fff}
+:root[data-theme="dark"] .flow span.hot{color:#0b1220}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .flow span.hot{color:#0b1220}}
+.flow b{color:var(--muted)}
+
+table{border-collapse:collapse;width:100%;font:14px/1.45 system-ui,sans-serif;margin:8px 0}
+th,td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--surface2)}
+.tbl{overflow-x:auto}
+pre{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:8px 0}
+code{font:0.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.termgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin:8px 0}
+.term{border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:9px 11px;font-size:14.5px;line-height:1.45}
+.term b{font-family:system-ui,sans-serif;color:var(--m1)}
+.note{border-left:4px solid var(--via);background:var(--viasoft);padding:9px 12px;border-radius:0 8px 8px 0;margin:10px 0;font-size:15.5px}
+.say{border-left:4px solid var(--m2);background:var(--m2soft);padding:9px 12px;border-radius:0 8px 8px 0;margin:10px 0;font-size:15.5px}
+
+details{border:1px solid var(--border);border-radius:9px;background:var(--surface);margin:7px 0}
+summary{cursor:pointer;padding:10px 12px;font-weight:600;font-size:14.5px;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+";display:inline-block;width:18px;color:var(--m1);font-weight:800}
+details[open] summary::before{content:"\2212"}
+details .body{padding:0 14px 12px 30px;font-size:15.5px}
+.qa-title,.edu-title{font:700 14px system-ui,sans-serif;margin:20px 0 6px}
+.edu ul{margin:4px 0;padding-left:20px;font:14px/1.6 system-ui,sans-serif}
+.done-row{display:flex;gap:9px;align-items:center;margin-top:18px;font:600 14px system-ui,sans-serif}
+.done-row input{width:18px;height:18px}
+
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.chips button{font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--m1);border-color:var(--m1);color:#fff}
+:root[data-theme="dark"] .chips button[aria-pressed="true"]{color:#0b1220}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chips button[aria-pressed="true"]{color:#0b1220}}
+.ev{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:10px}
+.evc{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:12px 14px;font-size:15px;line-height:1.5}
+.evc h4{margin:0 0 4px;font:700 14px system-ui,sans-serif}
+.evc .id{display:inline-block;font:700 11.5px system-ui,sans-serif;background:var(--m1soft);color:var(--m1);padding:2px 7px;border-radius:5px;margin-right:6px}
+.evc .why{color:var(--muted);margin-top:6px}
+.evc a{font:13px system-ui,sans-serif;word-break:break-all}
+.drill{text-align:left}
+.drill .q{font-size:19px;margin:10px 0}
+.drill .a{display:none;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:16px}
+.drill .a.show{display:block}
+.cp{font-size:12px;padding:5px 9px;margin-top:6px}
+footer{margin-top:50px;font:13px system-ui,sans-serif;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="top-row">
+      <div class="brand">Chip routing, step by step<small>Micron AI for Silicon Design: Tier A</small></div>
+      <div class="tools">
+        <div class="prog" aria-live="polite"><span id="progtxt">0 of 8 modules done</span><div class="prog-bar"><i id="progbar"></i></div></div>
+        <button class="btn" id="revBtn" aria-pressed="false" title="Show every step of every module at once">Revision mode</button>
+        <button class="btn" id="themeBtn" title="Switch between light and dark">Theme</button>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Sections">
+      <a href="#how">Start</a><a href="#evidence">Evidence</a>
+      <a href="#A6" data-m="A6">A6 Problem</a><a href="#A1" data-m="A1">A1 Graphs</a><a href="#A2" data-m="A2">A2 BFS</a>
+      <a href="#A3" data-m="A3">A3 Dijkstra</a><a href="#A4" data-m="A4">A4 A*</a><a href="#A5" data-m="A5">A5 Steiner</a>
+      <a href="#A7" data-m="A7">A7 Routers</a><a href="#A8" data-m="A8">A8 Hardness</a>
+      <a href="#cheat">Cheat sheet</a><a href="#drill">Drill</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<div class="hero">
+  <h1>How a chip router finds its way, one step at a time</h1>
+  <p>Eight modules that take you from “what is routing” to negotiated congestion. Every module opens one step at a time, has a live demo you can poke, and ends with interview questions.</p>
+  <p class="who">Prepared for Aniket Saxena, M.E. Software Systems, BITS Pilani. Micron AI for Silicon Design intern interview (campus hiring for M.E. students).</p>
+  <div class="legend-metal"><span><i class="sw" style="background:var(--m1)"></i>source, expanded cells, layer 0</span><span><i class="sw" style="background:var(--m2)"></i>target, second net, layer 1</span><span><i class="sw" style="background:var(--via)"></i>frontier, vias, warnings</span><span><i class="sw" style="background:var(--good)"></i>final path, success</span></div>
+</div>
+
+<section class="plain" id="how">
+  <div class="card">
+    <h3>How to use this page</h3>
+    <ul>
+      <li>Read each module top to bottom. Press <b>Next step</b> to reveal the next idea. Short on time? Switch on <b>Revision mode</b> in the header to show every step.</li>
+      <li>Read order: A6, A1, A2, A3, A4, A5, A7, A8. A6 sets up the problem, A1 to A5 are the building blocks, A7 shows how real routers combine them.</li>
+      <li>Calibration: you are applying as an M.E. intern, so expect fundamentals asked properly (write BFS or Dijkstra, explain why A* is optimal, compare two approaches). Domain depth beyond that is a bonus.</li>
+      <li>Numbers in the demos come from the same grids and examples as the written guide. Nothing here is ticked off for you: tick a module when you can answer its questions out loud.</li>
+    </ul>
+    <p class="ui" style="font-size:13.5px;color:var(--muted);margin:8px 0 4px">Wrapper prompt for ChatGPT or Claude. Paste it once, then paste any “Go deeper” topic line from a module.</p>
+<pre id="wrapper">You are my tutor for a Micron “AI for Silicon Design” internship interview.
+I am an M.E. Software Systems student: comfortable with Python, graph
+algorithms and ML basics, new to VLSI. For each topic I send, teach in this
+order: (1) intuition using a tiny 5x5 routing grid, (2) formal definition,
+(3) pseudocode with time and space complexity, (4) how it is used in chip
+routing, (5) trade-offs against two alternatives, (6) five interview
+questions from easy to hard, asked one at a time, waiting for my answer
+before giving yours. Stay under 600 words before the questions. If I send a
+paper link, summarise its problem, method, result and one weakness first.</pre>
+    <button class="btn cp" data-copy="wrapper">Copy prompt</button>
+  </div>
+</section>
+
+<!-- ============ EVIDENCE ============ -->
+<section class="plain" id="evidence">
+  <div class="mod-head"><span class="badge">E</span><div><h2>What the team likely works on</h2><p class="one">Every claim carries a source. “Fact” means the source says it. “Inference” is my reading, and you should say so in an interview.</p></div></div>
+  <div class="note"><b>Inference.</b> Putting Micron’s postings next to the JD, the internship is most likely about routing inside custom or semi-custom memory layout, where constraints such as symmetry, matching and pitch matter as much as raw wirelength. The JD itself does not say “memory layout”.</div>
+  <div class="chips" id="evFilter" role="group" aria-label="Filter evidence by module"></div>
+  <div class="ev" id="evGrid"></div>
+  <div class="say"><b>Model answer to “What do you think this team does?”</b><br>“From the JD and Micron’s public postings, my understanding is that the team applies search, optimisation and ML to physical design problems in memory chips, with routing as the focus. Classical routers are built from graph search such as maze routing and A*, Steiner trees for multi-pin nets, and rip-up-and-reroute with congestion costs. The AI part usually sits around that core: predicting congestion or rule violations early, learning decisions like net ordering, or searching the design space. My guess is that memory layout adds constraints like matching and pitch that make it more custom than standard digital routing. I’d like to hear how close that is.”</div>
+</section>
+
+<!-- ============ A6 ============ -->
+<section class="module" id="A6" data-mod="A6">
+  <div class="mod-head"><span class="badge">A6</span><div><h2>Physical design and the routing problem</h2><p class="one">Routing connects the pins of every net with wires on stacked metal layers so nothing shorts, every design rule holds, and wirelength, vias and congestion stay low. Read this module first.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="Where routing sits in the flow">
+      <p>Routing is the stage after placement. The two flows you should be able to name:</p>
+      <div class="flow"><span>RTL</span><b>›</b><span>Synthesis</span><b>›</b><span>Netlist</span><b>›</b><span>Floorplan</span><b>›</b><span>Placement</span><b>›</b><span>Clock tree</span><b>›</b><span class="hot">Global routing</span><b>›</b><span class="hot">Detailed routing</span><b>›</b><span>Signoff (DRC, LVS, timing)</span></div>
+      <p><b>Digital flow</b> above. The <b>custom and memory flow</b> (the one in Micron’s Hyderabad layout postings) looks like this:</p>
+      <div class="flow"><span>Schematic</span><b>›</b><span>Layout in an editor such as Virtuoso</span><b>›</b><span class="hot">Wiring and routing</span><b>›</b><span>DRC and LVS (Calibre)</span><b>›</b><span>Parasitic extraction</span><b>›</b><span>Post-layout simulation</span></div>
+    </div>
+    <div class="step" data-title="Vocabulary you must be able to say">
+      <div class="termgrid">
+        <div class="term"><b>Net, pin.</b> A net is a set of pins that must be connected. A 2-pin net needs a path, a multi-pin net needs a tree.</div>
+        <div class="term"><b>Metal layers.</b> M1, M2, … stacked wiring layers. Each has a preferred direction, alternating horizontal and vertical.</div>
+        <div class="term"><b>Via.</b> A vertical connection between adjacent layers. It adds resistance and area, so routers penalise it.</div>
+        <div class="term"><b>Track, pitch.</b> Tracks are the legal lines for wires. Pitch is the distance between neighbouring tracks.</div>
+        <div class="term"><b>G-cell.</b> A rectangular chip region used as one vertex in global routing.</div>
+        <div class="term"><b>Capacity, demand.</b> How many wires can cross a G-cell boundary, and how many want to.</div>
+        <div class="term"><b>Overflow.</b> max(0, demand − capacity) on an edge. Total overflow is the standard congestion measure.</div>
+        <div class="term"><b>Design rules, DRC.</b> Manufacturing limits (width, spacing, area, via enclosure). DRC checks them. A violation is a DRV.</div>
+        <div class="term"><b>LVS.</b> Layout versus schematic: does the drawn layout implement the same circuit as the netlist.</div>
+        <div class="term"><b>Parasitics.</b> Unwanted wire resistance and capacitance. They decide delay, noise and power.</div>
+        <div class="term"><b>PPA.</b> Power, performance (timing), area. Every design decision trades these off.</div>
+        <div class="term"><b>Slack.</b> Required arrival time minus actual arrival time. Negative slack is a timing violation.</div>
+      </div>
+    </div>
+    <div class="step" data-title="Global routing is a graph problem">
+      <ul>
+        <li><b>Input:</b> a grid graph G = (V, E). Each vertex is a G-cell (per layer in 3D). Each edge joins adjacent cells and has a capacity. A set of nets, each a set of pins mapped to G-cells.</li>
+        <li><b>Output:</b> for each net, a tree in G that connects all its pins.</li>
+        <li><b>Objective:</b> minimise a weighted sum of wirelength, via count and total overflow.</li>
+        <li><b>Hardness:</b> NP-hard. One multi-pin net alone is the Steiner tree problem. Many 2-pin nets under capacities contain the edge-disjoint paths problem.</li>
+      </ul>
+      <p><b>Detailed routing</b> then works on a far finer 3D grid of track intersections. It takes each net’s global route as a guide and must produce exact wires and vias with zero shorts and zero rule violations. Only after that does it minimise wirelength and vias.</p>
+      <p><b>Why two stages?</b> A chip has millions of nets and billions of track points. Global routing plans coarse corridors on a small graph so congestion is spread out. Detailed routing then solves many small local problems inside those corridors.</p>
+    </div>
+    <div class="step" data-title="Worked example: overflow versus wirelength">
+      <p>A 5×5 grid of G-cells, every edge has capacity 1. Net A runs from (0,2) to (4,2). Net C runs from (1,2) to (3,2). Choose how C is routed:</p>
+      <div class="widget" id="w-overflow"></div>
+      <p>The router paid 2 extra units of wire to remove 2 units of overflow. Two nets <i>crossing</i> inside a G-cell is not a conflict in global routing: they conflict only when they want the same edge beyond its capacity.</p>
+    </div>
+    <div class="step" data-title="Why routing is hard">
+      <ol>
+        <li>Nets compete for shared capacity, so the best path for one net depends on all the others.</li>
+        <li>Sequential routing is order-dependent: early nets block late nets (you will see this in A7).</li>
+        <li>Design rules make “is this wire legal” depend on nearby shapes, not only on the cell itself.</li>
+        <li>Objectives conflict: the shortest wire may cross a congested region or use too many vias.</li>
+      </ol>
+      <div class="note"><b>Micron angle.</b> Micron’s Hyderabad layout postings describe full-custom DRAM and LPDDR layout: bit cells, pitch matching, decoders, Calibre DRC and LVS. <i>Inference:</i> in a memory chip the cell array is extremely regular, and the circuits around it must fit the array’s pitch. Sensitive signals also need matched or symmetric wiring. So routing quality here includes constraint satisfaction, not only short wires.</div>
+    </div>
+  </div>
+  <div class="qa" data-mod="A6"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><p class="ui" style="font:14px system-ui,sans-serif;margin:2px 0">None. The catalog has no VLSI course. Use the prompt below.</p></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A6">VLSI physical design for a software engineer: netlist, floorplan, placement,
+clock tree, global routing, detailed routing, signoff. Define net, pin, metal
+layer, via, track, G-cell, capacity, overflow, congestion, DRC, LVS, and
+power-performance-area. Then define global and detailed routing as graph
+problems. Reference: https://arxiv.org/pdf/2202.13564v1.pdf</pre><button class="btn cp" data-copy="p-A6">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A6"> Mark A6 as done</label>
+</section>
+
+<!-- ============ A1 ============ -->
+<section class="module" id="A1" data-mod="A1">
+  <div class="mod-head"><span class="badge">A1</span><div><h2>Graphs, and grids as graphs</h2><p class="one">A routing region is a graph you never store explicitly: cells are vertices, legal moves are edges, and the edge weight encodes everything the router cares about.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="Three ways to hold a graph">
+      <ul>
+        <li><b>Adjacency list:</b> O(V + E) memory, iterate neighbours in O(degree). Right for sparse graphs, which is almost everything in routing.</li>
+        <li><b>Adjacency matrix:</b> O(V²) memory, O(1) edge lookup. Only for small dense graphs.</li>
+        <li><b>Implicit grid graph:</b> a vertex is (x, y, layer). Neighbours are computed on the fly, so the graph costs no memory beyond per-cell arrays (cost, occupancy, blocked).</li>
+      </ul>
+    </div>
+    <div class="step" data-title="Try it: neighbours in a 3D routing grid">
+      <p>Layer 0 routes horizontally, layer 1 routes vertically (preferred direction). Tap any vertex to see its legal moves: wire steps along the layer’s direction, and a via to the other layer.</p>
+      <div class="widget" id="w-layers"></div>
+    </div>
+    <div class="step" data-title="How big is a real grid?">
+      <p>A 1000×1000 grid with 6 layers has 6 million vertices. With strict preferred directions each layer has about 1 million wire edges (999 × 1000), so about 6 million wire edges, plus 5 million via edges between the 6 layers. About 11 million edges for 6 million vertices: very sparse, and trivially generated on demand.</p>
+      <p>Keep per-cell data in flat arrays indexed by <code>(z·H + y)·W + x</code> (NumPy in Python), not in a dictionary keyed by tuples.</p>
+    </div>
+    <div class="step" data-title="Modelling choices: how each rule becomes graph data">
+      <div class="tbl"><table>
+        <tr><th>Real-world thing</th><th>In the graph</th></tr>
+        <tr><td>Blockage</td><td>Remove the vertex, or give it infinite cost</td></tr>
+        <tr><td>Preferred direction</td><td>Only generate moves along the layer’s direction, or add a wrong-way penalty</td></tr>
+        <tr><td>Via</td><td>Edge between (x, y, z) and (x, y, z±1) with its own cost</td></tr>
+        <tr><td>Capacity</td><td>Attribute of an edge (global routing) or occupancy of a cell (detailed routing). Overuse is turned into cost (A7)</td></tr>
+      </table></div>
+<pre>def neighbours3d(x, y, z, W, H, L, blocked):
+    # even layers route horizontally, odd layers vertically
+    steps = [(1, 0, 0), (-1, 0, 0)] if z % 2 == 0 else [(0, 1, 0), (0, -1, 0)]
+    steps += [(0, 0, 1), (0, 0, -1)]              # vias up and down
+    for dx, dy, dz in steps:
+        n = (x + dx, y + dy, z + dz)
+        if 0 &lt;= n[0] &lt; W and 0 &lt;= n[1] &lt; H and 0 &lt;= n[2] &lt; L and n not in blocked:
+            yield n</pre>
+      <div class="note"><b>Micron angle.</b> Every paper in the research map starts by defining this graph. If you are asked to “formulate the problem”, begin here: say what a vertex is, what an edge is, what the weight means and what the constraints are.</div>
+    </div>
+  </div>
+  <div class="qa" data-mod="A1"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><ul>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/graphs">Graphs</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/adjacency-list">Adjacency List</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/adjacency-matrix">Adjacency Matrix</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/weighted-graphs">Weighted Graphs</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/graph-representations">Graph Representations</a></li></ul></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A1">Graph representations for grid routing: adjacency list vs matrix vs implicit
+grid graphs, flat indexing of a 3D grid, and how to model blockages, vias,
+preferred direction and edge capacity as vertices, edges and weights.</pre><button class="btn cp" data-copy="p-A1">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A1"> Mark A1 as done</label>
+</section>
+
+<!-- ============ A2 ============ -->
+<section class="module" id="A2" data-mod="A2">
+  <div class="mod-head"><span class="badge">A2</span><div><h2>BFS and DFS, and Lee’s maze router</h2><p class="one">BFS explores in rings of equal distance, so on an unweighted grid the first time it touches the target it has found a shortest path. That is Lee’s maze routing algorithm.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="The idea: a wave spreading from the source">
+      <ul>
+        <li><b>BFS:</b> queue, O(V + E) time, O(V) memory. Shortest path in number of edges.</li>
+        <li><b>DFS:</b> stack or recursion, O(V + E). Not shortest. Used for connectivity, cycle detection, topological order.</li>
+        <li><b>Lee’s algorithm (1961)</b> has two phases: <i>wave expansion</i> (BFS labels each cell with its distance from the source) and <i>backtrace</i> (walk from the target to any neighbour with a label one smaller, until you reach the source).</li>
+        <li>It finds a path if one exists, and the path is shortest. The weakness: time and memory grow with the whole area searched, for every net.</li>
+      </ul>
+    </div>
+    <div class="step" data-title="Watch the wave: step through Lee on a 7×7 grid">
+      <p>Press ▶ to dequeue one cell at a time. Blue cells are labelled with their distance from S. Amber cells are in the queue. When T is dequeued, the green backtrace appears. Tap cells to add or remove walls.</p>
+      <div class="widget" id="w-bfs"></div>
+      <p>On the default grid, T gets label 8. The straight-line (Manhattan) distance is 4. The wall forces 2 steps away from the target and each must be undone: 4 + 2·2 = 8. BFS had to label every cell closer than 8 before it reached T. Remember how many that was, because A4 beats it.</p>
+    </div>
+    <div class="step" data-title="The code (tested)">
+<pre>from collections import deque
+
+def neighbours(grid, x, y):
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nx, ny = x + dx, y + dy
+        if 0 &lt;= ny &lt; len(grid) and 0 &lt;= nx &lt; len(grid[0]) and grid[ny][nx] != "#":
+            yield nx, ny
+
+def lee_route(grid, src, dst):
+    """Lee's maze router = BFS wave expansion + backtrace. O(W*H) time and memory."""
+    parent = {src: None}
+    queue = deque([src])
+    while queue:
+        cell = queue.popleft()
+        if cell == dst:                       # backtrace phase
+            path = []
+            while cell is not None:
+                path.append(cell)
+                cell = parent[cell]
+            return path[::-1]
+        for nxt in neighbours(grid, *cell):
+            if nxt not in parent:             # label each cell once
+                parent[nxt] = cell
+                queue.append(nxt)
+    return None                               # no path exists</pre>
+    </div>
+    <div class="step" data-title="Extending it: many pins, and why it does not scale alone">
+      <ul>
+        <li><b>Multi-pin nets:</b> connect two pins, then run a multi-source BFS that starts from every cell of the partial tree and stops at the nearest unconnected pin. Repeat. This gives a valid tree, not the minimum one (A5).</li>
+        <li><b>Memory trick from Lee’s paper:</b> a repeating label pattern (Akers’ 1, 1, 2, 2) needs only two bits per cell.</li>
+        <li><b>Fixes for scale:</b> a bounding box around the pins, A* to steer the wave (A4), searching from both ends, global routing first so detailed search stays inside a narrow guide, and cheap pattern routes where no search is needed (A7).</li>
+      </ul>
+      <div class="note"><b>Micron angle.</b> BFS on a grid is the first thing a routing team can ask you to code. The follow-ups are predictable: “what if moves have different costs” (A3), “how do you make it faster” (A4), “what about a five-pin net” (A5), “what about the second net” (A7).</div>
+    </div>
+  </div>
+  <div class="qa" data-mod="A2"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><ul>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/breadth-first-search">Breadth-First Search</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/shortest-paths-in-unweighted-digraphs">Shortest Paths in Unweighted Digraphs</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/depth-first-search">Depth-First Search</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/whatever-first-search">Whatever-First Search</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/graph-reductions-flood-fill">Graph Reductions: Flood Fill</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/from-python-to-numpy/coding-example-find-shortest-path-in-a-maze-breadth-first-approach">Shortest path in a maze, BFS approach</a> (closest to Lee’s algorithm)</li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/algorithms-coding-interviews-python/challenge-implement-breadth-first-graph-traversal">Practice: BFS traversal</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/decode-coding-interview-python/diy-rotting-oranges">Practice: grid BFS (Rotting Oranges)</a></li></ul></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A2">BFS and DFS on grids: Lee's maze routing algorithm (wave expansion and
+backtrace), its O(W*H) cost, multi-source BFS for multi-pin nets,
+bidirectional BFS, and iterative DFS for connectivity checks.</pre><button class="btn cp" data-copy="p-A2">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A2"> Mark A2 as done</label>
+</section>
+
+<!-- ============ A3 ============ -->
+<section class="module" id="A3" data-mod="A3">
+  <div class="mod-head"><span class="badge">A3</span><div><h2>Weighted shortest paths: Dijkstra, Bellman-Ford, DAGs</h2><p class="one">Once moves have different costs (a via costs more than a wire step, a congested cell costs more than a free one), BFS is wrong and Dijkstra is the default.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="Pick the algorithm by the graph">
+      <div class="tbl"><table>
+        <tr><th>Algorithm</th><th>Works when</th><th>Time</th><th>Note</th></tr>
+        <tr><td>BFS</td><td>all edges cost the same</td><td>O(V + E)</td><td>A2</td></tr>
+        <tr><td>Dijkstra</td><td>weights ≥ 0</td><td>O((V + E) log V), binary heap</td><td>The standard maze-routing engine with costs</td></tr>
+        <tr><td>Dial’s buckets</td><td>small integer weights up to C</td><td>O(E + V·C)</td><td>Array of buckets replaces the heap</td></tr>
+        <tr><td>Bellman-Ford</td><td>negative weights allowed</td><td>O(V·E)</td><td>One extra pass detects a negative cycle</td></tr>
+        <tr><td>DAG relaxation</td><td>graph is acyclic</td><td>O(V + E)</td><td>Topological order. Also longest paths</td></tr>
+      </table></div>
+      <p>Routing costs (wire, via, wrong-way, congestion) are all non-negative, so Dijkstra applies. “Uniform-cost search” in AI textbooks is Dijkstra.</p>
+    </div>
+    <div class="step" data-title="Try it: the cost model decides the route">
+      <p>One net, two candidate routes. Route 1 stays on the layer and goes around a blockage: 7 wire steps, 0 vias. Route 2 goes up through a via, runs 3 steps, and comes back down: 3 wire steps, 2 vias. Move the slider.</p>
+      <div class="widget" id="w-via"></div>
+      <p>BFS counts hops, so it would always pick Route 2 (5 hops against 7). The right answer depends on the cost model, and the cost model is a design decision you tune.</p>
+    </div>
+    <div class="step" data-title="Watch Dijkstra on a four-node graph">
+      <p>Press Next on the widget. Each pop is final (its distance can no longer improve). Stale heap entries are skipped: Python’s heapq has no decrease-key, so you push a duplicate with the better distance instead.</p>
+      <div class="widget" id="w-dij"></div>
+<pre>import heapq
+
+def dijkstra(adj, src):
+    """adj[u] = [(v, w), ...] with w &gt;= 0. Returns dist dict. O((V+E) log V)."""
+    dist = {src: 0}
+    heap = [(0, src)]
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d &gt; dist[u]:                       # stale entry (lazy deletion)
+            continue
+        for v, w in adj[u]:
+            nd = d + w
+            if nd &lt; dist.get(v, float("inf")):
+                dist[v] = nd
+                heapq.heappush(heap, (nd, v))
+    return dist</pre>
+    </div>
+    <div class="step" data-title="Why negative weights break Dijkstra, and what Bellman-Ford does">
+      <p>Dijkstra finalises a vertex when popped, assuming nothing cheaper can appear later. Example: A→B costs 2, A→C costs 3, C→B costs −2. Dijkstra finalises B at 2, but the true shortest is A→C→B = 1.</p>
+<pre>dist[src] = 0, all others infinity
+repeat V - 1 times:
+    for every edge (u, v, w):  dist[v] = min(dist[v], dist[u] + w)
+one more pass: if any dist still improves, there is a negative cycle</pre>
+    </div>
+    <div class="step" data-title="Where this shows up at Micron: edge costs and timing">
+      <ul>
+        <li><b>Router cost:</b> cost = wire + via penalty + wrong-way penalty + congestion penalty (+ a timing weight for critical nets). “How would you make the router avoid congestion” is answered by changing weights, not the algorithm (A7).</li>
+        <li><b>Timing analysis</b> is a longest-path computation on a DAG: process gates in topological order, arrival = max over inputs of (arrival + delay), slack = required − arrival. This is the “timing” in the JD’s “congestion, timing, power, or area trade-offs”.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="qa" data-mod="A3"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><ul>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/the-shortest-paths-problem">The Shortest-Paths Problem</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/dijkstras-algorithm">Dijkstra’s Algorithm</a> and <a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/exercise-dijkstras-algorithm">Exercise</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/thought-exercise-negative-weights">Thought Exercise: Negative Weights</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/the-bellman-ford-algorithm">The Bellman-Ford Algorithm</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/an-immediate-algorithm-for-dags">An Immediate Algorithm for DAGs</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/thought-exercise-longest-paths-in-dag">Thought Exercise: Longest Paths in DAG</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/topological-sorting">Topological Sorting</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/best-first-dijkstras-algorithm">Best-First: Dijkstra’s Algorithm</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/relax-all-the-edges-bellman-ford">Relax ALL the Edges: Bellman-Ford</a></li></ul></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A3">Weighted shortest paths for routing: Dijkstra with a binary heap and lazy
+deletion, why negative weights break it, Dial's bucket queue for small
+integer costs, Bellman-Ford, and longest path in a DAG as used in static
+timing analysis (arrival time, required time, slack).</pre><button class="btn cp" data-copy="p-A3">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A3"> Mark A3 as done</label>
+</section>
+
+<!-- ============ A4 ============ -->
+<section class="module" id="A4" data-mod="A4">
+  <div class="mod-head"><span class="badge">A4</span><div><h2>A* search and heuristics</h2><p class="one">A* is Dijkstra with a compass: it orders the frontier by f = g + h, where g is the cost so far and h estimates the cost still to go, so it searches toward the target instead of in all directions.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="The formula and two special cases">
+      <ul>
+        <li><b>f(n) = g(n) + h(n).</b> g is the exact cost from the source. h is the estimate to the target.</li>
+        <li>h = 0 gives <b>Dijkstra</b>: optimal, but explores in all directions.</li>
+        <li>Ordering by h alone gives <b>greedy best-first search</b>: fast, not optimal.</li>
+        <li>A* expands every vertex with f &lt; C*, where C* is the optimal cost. A better heuristic means fewer such vertices.</li>
+      </ul>
+    </div>
+    <div class="step" data-title="Admissible and consistent heuristics">
+      <ul>
+        <li><b>Admissible:</b> h never overestimates. h(n) ≤ true remaining cost. Gives an optimal path.</li>
+        <li><b>Consistent:</b> h(n) ≤ cost(n, n′) + h(n′) for every edge (the triangle inequality). Implies admissible, and guarantees each vertex is expanded at most once, so a simple closed set is safe.</li>
+        <li><b>Manhattan distance</b> |dx| + |dy| is admissible and consistent on a 4-connected grid when every step costs at least 1: one step changes it by at most 1.</li>
+        <li>Congestion penalties only add cost, so Manhattan stays admissible. It stops being admissible if some step can cost less than 1 per unit of distance. Fix: multiply h by the smallest per-step cost.</li>
+        <li>In 3D, add (minimum via cost) × |dz| as long as that is a true lower bound.</li>
+      </ul>
+    </div>
+    <div class="step" data-title="Race the algorithms on the same grid">
+      <p>Switch between BFS, Dijkstra (h = 0) and A*. Step through, or press ⏭ to finish and read the expansion counts. The bars at the bottom compare all three on the current grid. Try the other grid presets.</p>
+      <div class="widget" id="w-astar"></div>
+      <p>On the default grid, A* expands far fewer cells than BFS or Dijkstra and still finds the same length-8 path. Why: cells 1 and 2 have f = 4, cells 3 to 7 have f = 6, and all of those (f &lt; 8) must be expanded. Then tie-breaking walks straight along the cells with f = 8 to the target. Check one: cell 8 is (2,1), g = 3, h = |5−2| + |3−1| = 5, f = 8.</p>
+    </div>
+    <div class="step" data-title="Weighted A* and tie-breaking">
+      <ul>
+        <li><b>Weighted A*:</b> f = g + w·h with w &gt; 1. Fewer expansions. The path costs at most w times the optimum. Use it when runtime matters more than the last few percent of wirelength, for example in early rip-up iterations. Try the weight selector in the widget above.</li>
+        <li><b>Tie-breaking:</b> grids have many equal-f paths. Prefer the entry with larger g (deeper), so you do not expand a whole diamond of ties.</li>
+        <li><b>Memory:</b> bounding box, bidirectional search, or IDA* (O(depth) memory, repeated depth-limited passes).</li>
+      </ul>
+    </div>
+    <div class="step" data-title="The code (tested) and the optimality proof sketch">
+<pre>import heapq
+
+def astar_route(grid, src, dst):
+    """A* with Manhattan heuristic on a unit-cost grid. Returns (path, cells expanded)."""
+    h = lambda c: abs(c[0] - dst[0]) + abs(c[1] - dst[1])
+    g = {src: 0}
+    parent = {src: None}
+    heap = [(h(src), 0, src)]                 # (f, -g for tie-break, cell)
+    closed = set()
+    while heap:
+        _, _, cell = heapq.heappop(heap)
+        if cell in closed:
+            continue
+        closed.add(cell)
+        if cell == dst:
+            path = []
+            while cell is not None:
+                path.append(cell)
+                cell = parent[cell]
+            return path[::-1], len(closed)
+        for nxt in neighbours(grid, *cell):
+            ng = g[cell] + 1
+            if ng &lt; g.get(nxt, float("inf")):
+                g[nxt] = ng
+                parent[nxt] = cell
+                heapq.heappush(heap, (ng + h(nxt), -ng, nxt))
+    return None, len(closed)</pre>
+      <p><b>Proof sketch (admissible h).</b> Suppose A* pops a goal G2 with cost g(G2) &gt; C*. Some vertex n on an optimal path is still on the frontier with its optimal g. Then f(n) = g(n) + h(n) ≤ g(n) + (true remaining cost) = C* &lt; g(G2) = f(G2). So n would have been popped before G2. Contradiction.</p>
+      <div class="note"><b>Micron angle.</b> A published deep-RL global router is evaluated against sequential A* (R4). So A* is the reference baseline in this field. A good line: “before proposing a learned method, I would implement the A* baseline with a clear cost function, because that is what the learned method has to beat on quality and runtime.”</div>
+    </div>
+  </div>
+  <div class="qa" data-mod="A4"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><ul>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/ai-fundamentals/search-algorithms">Search Algorithms</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/ai-fundamentals/puzzle-solving-with-a-search">Puzzle Solving with A* Search</a></li>
+    <li>Catalog gap: admissibility and consistency proofs, weighted and bidirectional A*, IDA*. Use the prompt below.</li></ul></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A4">A* search: admissible versus consistent heuristics, why Manhattan distance
+is admissible on a routing grid, optimality proof sketch, weighted A*,
+bidirectional A*, tie-breaking on grids, IDA*, and when A* degrades to
+Dijkstra.</pre><button class="btn cp" data-copy="p-A4">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A4"> Mark A4 as done</label>
+</section>
+
+<!-- ============ A5 ============ -->
+<section class="module" id="A5" data-mod="A5">
+  <div class="mod-head"><span class="badge">A5</span><div><h2>Spanning trees and Steiner trees</h2><p class="one">A net with more than two pins needs a tree, and the cheapest tree is usually not a spanning tree of the pins: adding extra branch points (Steiner points) saves wire.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="Two kinds of tree">
+      <ul>
+        <li><b>MST</b> over the pins (edge weight = Manhattan distance): easy. Prim O(n²) on the complete graph, or Kruskal O(E log E) with union-find.</li>
+        <li><b>Rectilinear Steiner minimal tree (RSMT):</b> the shortest tree using horizontal and vertical segments, allowed to branch anywhere. NP-hard.</li>
+        <li><b>HPWL</b> (half-perimeter wirelength): width + height of the pins’ bounding box. Exact for 2 and 3 pins, a lower bound otherwise. Placers use it because it is trivial to compute.</li>
+      </ul>
+    </div>
+    <div class="step" data-title="See the saving: MST versus Steiner">
+      <div class="widget" id="w-steiner"></div>
+    </div>
+    <div class="step" data-title="Hanan grid, the 1.5 bound, FLUTE, and timing">
+      <ul>
+        <li><b>Hanan grid:</b> draw a horizontal and a vertical line through every pin. An optimal RSMT exists using only the intersections of these lines, so the search space is finite: at most n² candidate Steiner points.</li>
+        <li><b>Bound:</b> MST length ≤ 1.5 × RSMT length in the rectilinear plane. The plus-sign example above hits exactly 1.5. (On general graphs the MST-based bound is 2.)</li>
+        <li><b>FLUTE:</b> a lookup-table method that returns optimal RSMTs for nets up to 9 pins very fast and splits larger nets. Widely used inside academic routers.</li>
+        <li><b>Net decomposition:</b> global routers usually build an RSMT, split it into 2-pin segments, and route each segment (A7).</li>
+        <li><b>Timing:</b> the minimum-wire tree can give a long driver-to-sink path. A shortest-path tree minimises each driver-to-sink length but uses more wire. Real tools blend the two (the Prim-Dijkstra trade-off).</li>
+      </ul>
+    </div>
+    <div class="step" data-title="Kruskal with union-find (tested)">
+<pre>def kruskal(n, edges):
+    """edges = [(w, u, v)]. Returns (total weight, chosen edges). O(E log E)."""
+    parent = list(range(n))
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]     # path compression
+            x = parent[x]
+        return x
+    total, chosen = 0, []
+    for w, u, v in sorted(edges):
+        ru, rv = find(u), find(v)
+        if ru != rv:                          # joins two components, no cycle
+            parent[ru] = rv
+            total += w
+            chosen.append((u, v, w))
+    return total, chosen</pre>
+      <div class="note"><b>Micron angle.</b> A published benchmark paper lists rectilinear Steiner trees as the standard tool for multi-terminal nets in global routing (R11). <i>Inference:</i> in memory layout many important nets are high-fanout and regular (a wordline or control signal reaching a whole row of cells), so tree topology matters for both wire and delay.</div>
+    </div>
+  </div>
+  <div class="qa" data-mod="A5"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><ul>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/whats-an-mst">What’s an MST?</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/prims-algorithm">Prim’s Algorithm</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/kruskals-algorithm">Kruskal’s Algorithm</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/implementation-of-disjoint-set-data-structure">Implementation of Disjoint-Set Data Structure</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/thought-exercise-msts-and-shortest-paths">Thought Exercise: MSTs and Shortest Paths</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/the-only-minimum-spanning-tree-algorithm">The Only Minimum Spanning Tree Algorithm</a></li>
+    <li>Catalog gap: Steiner trees, Hanan grid, FLUTE. Use the prompt below.</li></ul></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A5">Steiner trees for multi-pin nets: MST versus rectilinear Steiner minimal
+tree, why RSMT is NP-hard, the Hanan grid, the 1.5 ratio bound, half-
+perimeter wirelength, what FLUTE does, and the Prim-Dijkstra trade-off
+between wirelength and source-to-sink delay.</pre><button class="btn cp" data-copy="p-A5">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A5"> Mark A5 as done</label>
+</section>
+
+<!-- ============ A7 ============ -->
+<section class="module" id="A7" data-mod="A7">
+  <div class="mod-head"><span class="badge">A7</span><div><h2>How routers actually work</h2><p class="one">A router is a loop: decompose nets, route each one with a cheap pattern or a shortest-path search, find the conflicts, raise the cost of the contested resources, and reroute until the conflicts are gone.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="The maze-routing family">
+      <div class="tbl"><table>
+        <tr><th>Method</th><th>Idea</th><th>Shortest?</th><th>Cost</th></tr>
+        <tr><td>Lee (1961)</td><td>BFS wave from the source</td><td>Yes</td><td>O(W·H) time and memory</td></tr>
+        <tr><td>Hadlock (1977)</td><td>Order by “detour number” (steps taken away from the target). Length = Manhattan distance + 2 × detours</td><td>Yes</td><td>Far fewer cells than Lee. Equivalent to A* with Manhattan</td></tr>
+        <tr><td>Soukup (1978)</td><td>Run straight toward the target, fall back to BFS around obstacles</td><td>Not guaranteed</td><td>Fast in practice</td></tr>
+        <tr><td>Line search (Mikami-Tabuchi, Hightower)</td><td>Store line segments instead of cells</td><td>No</td><td>Very low memory</td></tr>
+      </table></div>
+      <p>Hadlock’s formula matches the A2 example: Manhattan distance 4, two detour steps, length 4 + 2·2 = 8.</p>
+      <p><b>Pattern routing.</b> For a 2-pin connection, try fixed shapes before searching: an L-shape (one bend, two candidates) or a Z-shape (two bends). Evaluation is a handful of cost lookups. Routers use patterns for the first solution and keep maze routing for the nets that fail.</p>
+    </div>
+    <div class="step" data-title="Why net order matters">
+      <p>One layer, each cell holds one wire. Net A connects (1,0) to (3,0), net B connects (0,1) to (4,1), and there is a blockage at (2,0). Switch the routing order:</p>
+      <div class="widget" id="w-order"></div>
+      <p>Common ordering heuristics: constrained or short nets first, nets with fewer alternatives first, timing-critical nets first. None is always right, which is why learning the order is an active research topic.</p>
+    </div>
+    <div class="step" data-title="Rip-up and reroute">
+      <p>Route everything, find overflowed edges or shorts, remove (“rip up”) some of the nets involved, raise the cost there, and reroute them.</p>
+      <p><b>Weakness:</b> the outcome still depends on which nets you rip up and in what order, and the loop can cycle between the same conflicting solutions.</p>
+    </div>
+    <div class="step" data-title="Negotiated congestion (PathFinder): the fix">
+      <p>Let nets overlap at first, but price the overlap. The cost of using resource n is:</p>
+      <p style="font:600 18px system-ui,sans-serif;text-align:center;margin:10px 0">c(n) = ( b(n) + h(n) ) × p(n)</p>
+      <ul>
+        <li><b>b(n):</b> base cost (wire length or delay).</li>
+        <li><b>p(n):</b> present-sharing penalty. Grows with how many nets want n right now.</li>
+        <li><b>h(n):</b> history. Rises after every iteration in which n was overused, and never resets.</li>
+      </ul>
+      <p>Each iteration, every net is ripped up and rerouted by shortest path under the current costs. Stop when no resource is overused. History is needed because with only the present penalty, two nets can keep swapping between the same two contested resources forever.</p>
+    </div>
+    <div class="step" data-title="Three iterations, computed">
+      <p>Nets A and B both want resource M (capacity 1, base cost 1). A’s detour costs 3, B’s detour costs 5. Present factor 0.5 per unit of overuse (0 in iteration 1), history increment 0.6 per unit of overuse. Step through:</p>
+      <div class="widget" id="w-pf"></div>
+      <p>A, whose alternative was cheap, gave way. B, whose alternative was expensive, kept M. No ordering rule was needed.</p>
+    </div>
+    <div class="step" data-title="A modern global router, and where ML fits">
+      <ol>
+        <li>Build a Steiner tree per net and split it into 2-pin segments (A5).</li>
+        <li>Initial routing with L and Z patterns, picking the cheapest under estimated congestion.</li>
+        <li>Assign layers (often by dynamic programming over the tree).</li>
+        <li>Iterate: find overflowed regions, rip up segments there, reroute with maze routing or A* under history-based costs.</li>
+        <li>Stop at zero overflow or an iteration limit, then hand routing guides to the detailed router.</li>
+      </ol>
+      <p>Names to know: FastRoute and NTHU-Route (global), CUGR and Dr.CU (CUHK), TritonRoute (the detailed router in OpenROAD), InstantGR (GPU global router).</p>
+      <div class="tbl"><table>
+        <tr><th>Where ML plugs in</th><th>Example</th></tr>
+        <tr><td>Before routing</td><td>Predict congestion or DRC hotspots from the placement so costs start in the right place (RouteNet, R8)</td></tr>
+        <tr><td>Inside the loop</td><td>Learn net ordering or rip-up selection (R5), or learn the cost parameters</td></tr>
+        <tr><td>Instead of search</td><td>An RL agent that routes directly (R4). Works on small cases, does not yet scale (R6)</td></tr>
+        <tr><td>Around the loop</td><td>Learn guidance from human layouts for constraint-heavy analog or memory blocks (R9)</td></tr>
+      </table></div>
+      <div class="note"><b>Micron angle.</b> If asked “how would you improve an existing router with AI”, the safest strong answer is: keep the search core, learn the parts that are hand-tuned heuristics today (ordering, cost weights, where to detour), then measure against the unmodified router on wirelength, vias, overflow or DRVs, and runtime.</div>
+    </div>
+  </div>
+  <div class="qa" data-mod="A7"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><p class="ui" style="font:14px system-ui,sans-serif;margin:2px 0">None on routing itself. The building blocks are in A2, A3 and A4.</p></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A7">Lee's maze routing algorithm and its memory cost, Hadlock and Soukup
+speedups, pattern routing with L and Z shapes, net ordering, rip-up-and-
+reroute, and PathFinder negotiated congestion with its cost formula
+(base + history) x present sharing. Walk through three iterations on two
+conflicting nets. Reference:
+https://www.esa.informatik.tu-darmstadt.de/archive/twiki/pub/Lectures/AlgorithmenImChipEntwurfDe/router-pathfinder.pdf</pre><button class="btn cp" data-copy="p-A7">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A7"> Mark A7 as done</label>
+</section>
+
+<!-- ============ A8 ============ -->
+<section class="module" id="A8" data-mod="A8">
+  <div class="mod-head"><span class="badge">A8</span><div><h2>Hardness and algorithm paradigms</h2><p class="one">Most routing problems are NP-hard, so the real skill is choosing between exact methods, approximation algorithms, heuristics and metaheuristics, and knowing which classical paradigm each building block uses.</p></div></div>
+  <div class="stepper">
+    <div class="step" data-title="Complexity classes in plain words">
+      <ul>
+        <li><b>P:</b> solvable in polynomial time (shortest path, MST).</li>
+        <li><b>NP:</b> a proposed solution can be checked in polynomial time.</li>
+        <li><b>NP-hard:</b> at least as hard as every problem in NP. No polynomial algorithm is known.</li>
+        <li><b>NP-complete:</b> NP-hard and in NP (decision problems).</li>
+        <li><b>Routing examples:</b> minimum Steiner tree, routing many nets under capacities (edge-disjoint paths), optimal net ordering. All NP-hard.</li>
+      </ul>
+    </div>
+    <div class="step" data-title="Five ways to attack an NP-hard problem">
+      <p>These are the JD’s words, so keep the distinctions sharp.</p>
+      <div class="tbl"><table>
+        <tr><th>Approach</th><th>Guarantee</th><th>Example in routing</th></tr>
+        <tr><td>Exact (ILP, branch and bound)</td><td>Optimal, exponential worst case</td><td>ILP on a small routing window</td></tr>
+        <tr><td>Approximation algorithm</td><td>Proven bound, polynomial time</td><td>MST as a 1.5-approximation of the Steiner tree</td></tr>
+        <tr><td>Heuristic</td><td>None, problem-specific rule</td><td>Route short nets first. L-shape before maze</td></tr>
+        <tr><td>Metaheuristic</td><td>None, general search strategy</td><td>Simulated annealing, genetic algorithms, large neighbourhood search (B2)</td></tr>
+        <tr><td>Learned policy</td><td>None, learned from data or reward</td><td>RL for net ordering (B3)</td></tr>
+      </table></div>
+    </div>
+    <div class="step" data-title="Paradigms and where each appears">
+      <ul>
+        <li><b>Greedy:</b> make the locally best choice and never undo it. Correct only with a proof (exchange argument). Dijkstra, Prim, Kruskal. Sequential net-by-net routing is greedy and not optimal.</li>
+        <li><b>Dynamic programming:</b> optimal substructure plus overlapping subproblems. Bellman-Ford, Floyd-Warshall, knapsack, longest path in a DAG, layer assignment along a routing tree.</li>
+        <li><b>Backtracking:</b> build step by step, undo when a constraint breaks. N-queens, constraint satisfaction.</li>
+        <li><b>Branch and bound:</b> backtracking plus a bound that prunes branches which cannot beat the best so far. A* is best-first branch and bound with the heuristic as the bound.</li>
+        <li><b>Divide and conquer, hierarchy:</b> global then detailed routing. Partition the chip into windows.</li>
+      </ul>
+    </div>
+    <div class="step" data-title="Try it: when greedy fails (0/1 knapsack)">
+      <p>Capacity: 4 tracks. Pick nets to keep, maximising value. Greedy takes the best value-per-track first. Dynamic programming checks every capacity.</p>
+      <div class="widget" id="w-knap"></div>
+      <div class="note"><b>Micron angle.</b> The JD line “compare solution quality, runtime, scalability, and robustness” is about exactly this trade-off. A complete answer to “how would you approach problem X” has this shape: formulate it as a graph or optimisation problem, state its complexity, build a simple baseline, solve small instances exactly for ground truth, then compare heuristics or learned methods against both.</div>
+    </div>
+  </div>
+  <div class="qa" data-mod="A8"></div>
+  <div class="edu"><div class="edu-title">Educative lessons</div><ul>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/big-o-notation-for-interviews-and-beyond/np-complete-and-np-hard">NP-Complete and NP-Hard</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-graph-algorithms/big-o-notation">Big-O Notation</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/the-general-pattern">Backtracking: The General Pattern</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/n-queens">N Queens</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/mastering-algorithms-for-problem-solving-in-python/subset-sum-dynamic-programming">Subset Sum, Dynamic Programming</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/algorithms-coding-interviews-python/challenge-the-0-1-knapsack-problem">Challenge: The 0/1 Knapsack Problem</a></li>
+    <li><a target="_blank" rel="noopener" href="https://www.educative.io/courses/algorithms-coding-interviews-python/greedy-approach-a-deep-dive">Greedy Approach: A Deep Dive</a></li>
+    <li>Catalog gap: branch and bound, approximation algorithms. Use the prompt below.</li></ul></div>
+  <details class="prompt"><summary>Go deeper: prompt for ChatGPT or Claude</summary><div class="body"><pre id="p-A8">NP-hardness for a routing engineer: P, NP, NP-hard, NP-complete, why Steiner
+tree and capacitated multi-net routing are NP-hard, and the difference
+between exact methods, approximation algorithms, heuristics and
+metaheuristics. Then greedy, dynamic programming, backtracking and branch
+and bound, each with one routing example.</pre><button class="btn cp" data-copy="p-A8">Copy prompt</button></div></details>
+  <label class="done-row"><input type="checkbox" data-done="A8"> Mark A8 as done</label>
+</section>
+
+<!-- ============ CHEAT SHEET ============ -->
+<section class="plain" id="cheat">
+  <div class="mod-head"><span class="badge">Σ</span><div><h2>Cheat sheet</h2><p class="one">Read this the night before.</p></div></div>
+  <h3>Complexity</h3>
+  <div class="tbl"><table>
+    <tr><th>Algorithm</th><th>Time</th><th>Space</th><th>Optimal?</th><th>Condition</th></tr>
+    <tr><td>BFS / Lee</td><td>O(V + E)</td><td>O(V)</td><td>Yes</td><td>Unit edge costs</td></tr>
+    <tr><td>DFS</td><td>O(V + E)</td><td>O(V)</td><td>No</td><td>Reachability only</td></tr>
+    <tr><td>Dijkstra (binary heap)</td><td>O((V + E) log V)</td><td>O(V)</td><td>Yes</td><td>Weights ≥ 0</td></tr>
+    <tr><td>Bellman-Ford</td><td>O(V·E)</td><td>O(V)</td><td>Yes</td><td>No negative cycle</td></tr>
+    <tr><td>DAG relaxation</td><td>O(V + E)</td><td>O(V)</td><td>Yes</td><td>Acyclic</td></tr>
+    <tr><td>A*</td><td>O((V + E) log V) worst case</td><td>O(V)</td><td>Yes</td><td>Admissible h (consistent h for a simple closed set)</td></tr>
+    <tr><td>Weighted A*</td><td>Same, fewer expansions</td><td>O(V)</td><td>Within factor w</td><td>Admissible h</td></tr>
+    <tr><td>Kruskal</td><td>O(E log E)</td><td>O(V)</td><td>Yes (MST)</td><td>Needs union-find</td></tr>
+    <tr><td>Prim</td><td>O(E log V) or O(V²)</td><td>O(V)</td><td>Yes (MST)</td><td>Connected graph</td></tr>
+    <tr><td>Rectilinear Steiner tree</td><td>NP-hard</td><td></td><td></td><td>MST is within 1.5×</td></tr>
+  </table></div>
+  <h3 style="margin-top:18px">Which tool for which routing sub-problem</h3>
+  <div class="tbl"><table>
+    <tr><th>Sub-problem</th><th>Tool</th></tr>
+    <tr><td>Connect 2 pins, all moves equal</td><td>BFS (Lee)</td></tr>
+    <tr><td>Connect 2 pins with via and congestion costs</td><td>Dijkstra or A*</td></tr>
+    <tr><td>Make the search faster</td><td>A* with Manhattan heuristic, bounding box, weighted A*</td></tr>
+    <tr><td>Connect many pins of one net</td><td>Steiner tree (FLUTE or MST heuristic), then 2-pin segments</td></tr>
+    <tr><td>Quick first solution</td><td>L and Z pattern routing</td></tr>
+    <tr><td>Many nets fighting for space</td><td>Rip-up-and-reroute with negotiated congestion</td></tr>
+    <tr><td>Check a net is fully connected</td><td>DFS or union-find</td></tr>
+    <tr><td>Timing of a path</td><td>Longest path in a DAG</td></tr>
+  </table></div>
+  <h3 style="margin-top:18px">Three likely openers</h3>
+  <details><summary>“Explain chip routing to a software engineer.”</summary><div class="body">“You have a 3D grid of wiring tracks and thousands to millions of nets, each a set of pins that must be connected. Every net needs a tree of wires. Wires of different nets cannot touch, and every wire must obey manufacturing rules. You want short wires, few vias and no congested regions. One net alone is a shortest-path or Steiner-tree problem. All nets together compete for the same space, which makes it NP-hard, so routers iterate: route, find conflicts, raise costs, reroute.”</div></details>
+  <details><summary>“Two nets want the same track. What do you do?”</summary><div class="body">“If I route them one after another, the result depends on the order, and the second net may fail. A better approach is negotiated congestion: let both use the track at first, charge a cost that grows with present sharing and with the history of conflict on that track, and reroute both. The net that has a cheap alternative moves, the one that really needs the track keeps it.”</div></details>
+  <details><summary>“Where does AI actually help in routing?”</summary><div class="body">“Mostly around the search core rather than replacing it. Predicting congestion or DRC hotspots before routing, learning decisions that are hand-tuned today such as net ordering, and searching tool parameters. End-to-end RL routers exist in papers but they are evaluated on small problems. So I would start from a classical baseline, add a learned component at one decision point, and measure wirelength, vias, violations and runtime against the baseline.”</div></details>
+  <h3 style="margin-top:18px">Still to come</h3>
+  <p class="ui" style="font:14.5px/1.6 system-ui,sans-serif">B1 LP, ILP and flows. B2 metaheuristics. B3 reinforcement learning for routing. B4 multi-agent path finding. B5 evaluation. C1 to C5 awareness topics. Then the Marvell internship and project primers.</p>
+</section>
+
+<!-- ============ DRILL ============ -->
+<section class="plain" id="drill">
+  <div class="mod-head"><span class="badge">?</span><div><h2>Drill: answer out loud, then check</h2><p class="one">Questions from every module in random order. Say your answer first, then reveal. Missed questions come back later.</p></div></div>
+  <div class="card drill" id="drillBox"></div>
+</section>
+
+<footer>Sources and context for every research item are in the Evidence section. Educative lesson links come from the course catalog file you provided and were not opened, so some may need a subscription.</footer>
+</main>
+
+<script>
+/* ===================== helpers ===================== */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+function h(tag,attrs,...kids){
+  const e=document.createElement(tag);
+  for(const k in (attrs||{})){
+    const v=attrs[k];
+    if(k==="class")e.className=v;
+    else if(k.slice(0,2)==="on")e.addEventListener(k.slice(2),v);
+    else e.setAttribute(k,v);
+  }
+  kids.flat().forEach(c=>{if(c==null||c===false)return;e.append(c.nodeType?c:document.createTextNode(String(c)))});
+  return e;
+}
+const NS="http://www.w3.org/2000/svg";
+function sv(tag,attrs,...kids){
+  const e=document.createElementNS(NS,tag);
+  for(const k in (attrs||{}))e.setAttribute(k,attrs[k]);
+  kids.flat().forEach(c=>{if(c==null||c===false)return;e.append(c.nodeType?c:document.createTextNode(String(c)))});
+  return e;
+}
+function seg(options,current,onPick){
+  const wrap=h("div",{class:"seg",role:"group"});
+  const btns=options.map(([val,label])=>{
+    const b=h("button",{type:"button","aria-pressed":String(val===current),onclick:()=>{btns.forEach((x,i)=>x.setAttribute("aria-pressed",String(options[i][0]===val)));onPick(val)}},label);
+    return b;
+  });
+  btns.forEach(b=>wrap.append(b));
+  return wrap;
+}
+
+/* ===================== search engine (tested separately) ===================== */
+//#SOLVE-START
+const NB=[[1,0],[-1,0],[0,1],[0,-1]];
+function solveGrid(walls,W,H,S,T,mode,wt){
+  const key=(x,y)=>y*W+x;
+  const nbrs=(x,y)=>{
+    const r=[];
+    for(const d of NB){
+      const nx=x+d[0],ny=y+d[1];
+      if(nx>=0&&nx<W&&ny>=0&&ny<H&&!walls.has(key(nx,ny)))r.push([nx,ny]);
+    }
+    return r;
+  };
+  const events=[];
+  const sk=key(S[0],S[1]),tk=key(T[0],T[1]);
+  const par=new Map();
+  let reached=false;
+  if(mode==="bfs"){
+    const dist=new Map();
+    par.set(sk,null);dist.set(sk,0);
+    const q=[S];let qi=0;
+    while(qi<q.length){
+      const c=q[qi++],ck=key(c[0],c[1]);
+      const found=(ck===tk);
+      if(!found){
+        for(const n of nbrs(c[0],c[1])){
+          const nk=key(n[0],n[1]);
+          if(!par.has(nk)){par.set(nk,ck);dist.set(nk,dist.get(ck)+1);q.push(n);}
+        }
+      }
+      events.push({k:ck,label:dist.get(ck),frontier:q.slice(qi).map(n=>key(n[0],n[1])),
+        text:"Dequeue ("+c[0]+", "+c[1]+") at distance "+dist.get(ck)+(found?". This is T, so the wave stops and the backtrace begins.":".")});
+      if(found){reached=true;break;}
+    }
+  }else{
+    const w=(mode==="astar")?wt:0;
+    const hh=(x,y)=>Math.abs(x-T[0])+Math.abs(y-T[1]);
+    const g=new Map();g.set(sk,0);par.set(sk,null);
+    let cnt=0;
+    const open=[[w*hh(S[0],S[1]),0,cnt++,S[0],S[1]]];
+    const closed=new Set();
+    const openKeys=new Set([sk]);
+    const less=(a,b)=>a[0]!==b[0]?a[0]<b[0]:(a[1]!==b[1]?a[1]<b[1]:a[2]<b[2]);
+    while(open.length){
+      let bi=0;
+      for(let i=1;i<open.length;i++)if(less(open[i],open[bi]))bi=i;
+      const e=open.splice(bi,1)[0];
+      const x=e[3],y=e[4],k=key(x,y);
+      if(closed.has(k))continue;
+      closed.add(k);openKeys.delete(k);
+      const gv=g.get(k);
+      for(const n of nbrs(x,y)){
+        const nk=key(n[0],n[1]);
+        if(closed.has(nk))continue;
+        const ng=gv+1;
+        if(!g.has(nk)||ng<g.get(nk)){
+          g.set(nk,ng);par.set(nk,k);
+          open.push([ng+w*hh(n[0],n[1]),-ng,cnt++,n[0],n[1]]);
+          openKeys.add(nk);
+        }
+      }
+      const hv=hh(x,y);
+      events.push({k:k,label:closed.size,frontier:Array.from(openKeys),
+        text:"Expand ("+x+", "+y+"): g = "+gv+", h = "+hv+", f = "+(gv+w*hv)+(k===tk?". This is T, so the search stops.":".")});
+      if(k===tk){reached=true;break;}
+    }
+  }
+  let path=null;
+  if(reached){
+    path=[];let c=tk;
+    while(c!==null&&c!==undefined){path.push(c);c=par.get(c);}
+    path.reverse();
+  }
+  return {events:events,path:path,expanded:events.length};
+}
+//#SOLVE-END
+
+/* ===================== grid demo (A2, A4) ===================== */
+function gridDemo(root,opts){
+  const W=7,H=7;
+  const presets={
+    guide:{name:"Wall in the middle (guide example)",walls:[[3,2],[3,3],[3,4]]},
+    open:{name:"Open field",walls:[]},
+    gap:{name:"Long wall, gap at the bottom",walls:[[3,0],[3,1],[3,2],[3,3],[3,4],[3,5]]}
+  };
+  const S=[1,3],T=[5,3];
+  let walls=new Set(),mode=opts.modes[0],weight=1,k=0,res=null,timer=null;
+  const names={bfs:"BFS / Lee",dijkstra:"Dijkstra (h = 0)",astar:"A* (Manhattan)"};
+  function loadPreset(id){presets[id].walls.forEach(p=>walls.add(p[1]*W+p[0]));}
+  function setPreset(id){walls=new Set();loadPreset(id);recompute();}
+  loadPreset("guide");
+  const gridEl=h("div",{class:"grid",role:"grid","aria-label":"Routing grid. Tap a cell to toggle a wall."});
+  const cells=[];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const c=h("div",{class:"cell","data-x":x,"data-y":y,onclick:()=>{
+      const kk=y*W+x;
+      if((x===S[0]&&y===S[1])||(x===T[0]&&y===T[1]))return;
+      if(walls.has(kk))walls.delete(kk);else walls.add(kk);
+      recompute();
+    }});
+    cells.push(c);gridEl.append(c);
+  }
+  const status=h("div",{class:"status","aria-live":"polite"});
+  const slider=h("input",{type:"range",min:"0",max:"0",value:"0","aria-label":"Step",oninput:()=>{stop();k=+slider.value;render();}});
+  const bPrev=h("button",{class:"btn",type:"button",onclick:()=>{stop();k=Math.max(0,k-1);render();},"aria-label":"Previous step"},"◀ Back");
+  const bNext=h("button",{class:"btn primary",type:"button",onclick:()=>{stop();k=Math.min(res.events.length,k+1);render();}},"Step ▶");
+  const bPlay=h("button",{class:"btn",type:"button",onclick:()=>{timer?stop():play();}},"Play");
+  const bEnd=h("button",{class:"btn",type:"button",onclick:()=>{stop();k=res.events.length;render();}},"Finish");
+  const bRst=h("button",{class:"btn",type:"button",onclick:()=>{stop();k=0;render();}},"Reset");
+  function stop(){if(timer){clearInterval(timer);timer=null;bPlay.textContent="Play";}}
+  function play(){
+    if(k>=res.events.length)k=0;
+    bPlay.textContent="Pause";
+    timer=setInterval(()=>{if(k>=res.events.length){stop();return;}k++;render();},320);
+  }
+  const modeSeg=opts.modes.length>1?seg(opts.modes.map(m=>[m,names[m]]),mode,v=>{mode=v;wsel.style.display=(mode==="astar")?"":"none";recompute();}):null;
+  const wsel=h("select",{"aria-label":"Heuristic weight",onchange:()=>{weight=+wsel.value;recompute();}},
+    ...[1,2,5].map(v=>h("option",{value:v},v===1?"weight 1 (optimal)":"weight "+v+" (weighted A*)")));
+  wsel.style.display=(mode==="astar")?"":"none";
+  const psel=h("select",{"aria-label":"Grid preset",onchange:()=>setPreset(psel.value)},
+    ...Object.keys(presets).map(id=>h("option",{value:id},presets[id].name)));
+  const legend=h("div",{class:"legend"},
+    h("span",{},h("i",{style:"background:var(--m1)"}),"source S"),
+    h("span",{},h("i",{style:"background:var(--m2)"}),"target T"),
+    h("span",{},h("i",{style:"background:var(--m1soft);border:1px solid var(--m1)"}),"expanded (number = distance for BFS, expansion order otherwise)"),
+    h("span",{},h("i",{style:"background:var(--viasoft);border:1px solid var(--via)"}),"in queue or heap"),
+    h("span",{},h("i",{style:"background:var(--good)"}),"final path"),
+    h("span",{},h("i",{style:"background:var(--wall)"}),"wall"));
+  const bars=h("div",{class:"bars"});
+  const left=h("div",{},gridEl,legend);
+  const right=h("div",{},
+    modeSeg?h("div",{class:"row"},modeSeg,wsel):null,
+    h("div",{class:"row"},h("label",{},"Grid: "),psel),
+    h("div",{class:"row"},bRst,bPrev,bNext,bPlay,bEnd),
+    h("div",{class:"row"},slider),
+    status,
+    opts.compare?h("div",{},h("p",{class:"widget-title",style:"margin-top:14px"},"Cells expanded on this grid (weight 1)"),bars):null);
+  root.append(h("div",{class:"split"},left,right));
+  function recompute(){
+    stop();
+    res=solveGrid(walls,W,H,S,T,mode,weight);
+    k=0;slider.max=String(res.events.length);
+    if(opts.compare){
+      bars.replaceChildren();
+      const all=["bfs","dijkstra","astar"].map(m=>({m:m,r:solveGrid(walls,W,H,S,T,m,1)}));
+      const mx=Math.max(1,...all.map(a=>a.r.expanded));
+      all.forEach(a=>{
+        bars.append(h("div",{class:"bar"+(a.m===mode?" hl":"")},
+          h("span",{},names[a.m]),
+          h("div",{},h("i",{style:"width:"+(100*a.r.expanded/mx)+"%"})),
+          h("span",{},a.r.path?a.r.expanded:"none")));
+      });
+    }
+    render();
+  }
+  function render(){
+    const closed=new Map();
+    for(let i=0;i<k;i++)closed.set(res.events[i].k,res.events[i].label);
+    const cur=k>0?res.events[k-1]:null;
+    const front=new Set(cur?cur.frontier:[S[1]*W+S[0]]);
+    const done=(k===res.events.length&&res.path);
+    const onPath=new Set(done?res.path:[]);
+    cells.forEach((c,i)=>{
+      const x=i%W,y=(i/W)|0;
+      let cls="cell",txt="";
+      if(walls.has(i))cls+=" wall";
+      else if(onPath.has(i))cls+=" path";
+      else if(cur&&cur.k===i)cls+=" cur";
+      else if(closed.has(i))cls+=" closed";
+      else if(front.has(i))cls+=" front";
+      if(x===S[0]&&y===S[1]){cls+=" src";txt="S";}
+      else if(x===T[0]&&y===T[1]){cls+=" tgt";txt="T";}
+      else if(closed.has(i))txt=String(closed.get(i));
+      c.className=cls;c.textContent=txt;
+    });
+    slider.value=String(k);
+    bPrev.disabled=(k===0);bNext.disabled=(k>=res.events.length);
+    let msg;
+    if(k===0)msg=res.path?"Ready. "+names[mode]+" will expand "+res.expanded+" cells on this grid. Press Step ▶ or Play.":"No path exists on this grid: the wall seals T off. Remove a wall.";
+    else{
+      msg=cur.text;
+      if(k===res.events.length){
+        msg+=res.path?" Done: "+res.expanded+" cells expanded, path length "+(res.path.length-1)+".":" Search ended with no path.";
+      }
+    }
+    status.textContent=msg;
+  }
+  recompute();
+}
+
+/* ===================== A6 overflow demo ===================== */
+function overflowDemo(root){
+  let mode="straight";
+  const box=h("div",{class:"svgbox"});
+  const info=h("div",{class:"status","aria-live":"polite"});
+  function render(){
+    const sc=56,ox=36,oy=24;
+    const P=(x,y)=>[ox+x*sc,oy+y*sc];
+    const A=[[0,2],[1,2],[2,2],[3,2],[4,2]];
+    const C=mode==="straight"?[[1,2],[2,2],[3,2]]:[[1,2],[1,1],[2,1],[3,1],[3,2]];
+    const ek=(a,b)=>(a[0]<b[0]||(a[0]===b[0]&&a[1]<b[1]))?a.join(",")+"-"+b.join(","):b.join(",")+"-"+a.join(",");
+    const dem={};
+    const edges=p=>{const r=[];for(let i=0;i<p.length-1;i++)r.push([p[i],p[i+1]]);return r;};
+    edges(A).concat(edges(C)).forEach(e=>{const k=ek(e[0],e[1]);dem[k]=(dem[k]||0)+1;});
+    let over=0;Object.keys(dem).forEach(k=>{over+=Math.max(0,dem[k]-1);});
+    const wl=(A.length-1)+(C.length-1);
+    const svg=sv("svg",{viewBox:"0 0 330 260",role:"img","aria-label":"Global routing grid showing nets A and C and edge overflow"});
+    for(let y=0;y<5;y++)for(let x=0;x<5;x++){
+      if(x<4){const a=P(x,y),b=P(x+1,y);svg.append(sv("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:"var(--border)","stroke-width":2}));}
+      if(y<4){const a=P(x,y),b=P(x,y+1);svg.append(sv("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:"var(--border)","stroke-width":2}));}
+    }
+    const draw=(path,col,off)=>{
+      edges(path).forEach(e=>{
+        const a=P(e[0][0],e[0][1]),b=P(e[1][0],e[1][1]);
+        const bad=dem[ek(e[0],e[1])]>1;
+        const dx=(a[1]===b[1])?0:off,dy=(a[1]===b[1])?off:0;
+        svg.append(sv("line",{x1:a[0]+dx,y1:a[1]+dy,x2:b[0]+dx,y2:b[1]+dy,stroke:bad?"var(--bad)":col,"stroke-width":5,"stroke-linecap":"round"}));
+      });
+    };
+    draw(A,"var(--m1)",-4);draw(C,"var(--m2)",4);
+    for(let y=0;y<5;y++)for(let x=0;x<5;x++){const p=P(x,y);svg.append(sv("circle",{cx:p[0],cy:p[1],r:5,fill:"var(--surface)",stroke:"var(--muted)","stroke-width":1.5}));}
+    [[0,2,"A"],[4,2,"A"]].forEach(t=>{const p=P(t[0],t[1]);svg.append(sv("text",{x:p[0],y:p[1]+26,"text-anchor":"middle",style:"font-weight:700;fill:var(--m1)"},"A pin"));});
+    [[1,2],[3,2]].forEach(t=>{const p=P(t[0],t[1]);svg.append(sv("text",{x:p[0],y:p[1]+26,"text-anchor":"middle",style:"font-weight:700;fill:var(--m2)"},"C pin"));});
+    box.replaceChildren(svg);
+    info.replaceChildren(
+      h("span",{class:"tag blue"},"Net A: length 4"),
+      h("span",{class:"tag",style:"background:var(--m2soft);color:var(--m2)"},"Net C: length "+(C.length-1)),
+      h("span",{class:"tag "+(over?"bad":"good")},"Overflow: "+over),
+      h("span",{class:"tag warn"},"Total wirelength: "+wl),
+      h("div",{style:"margin-top:6px"},over?"Red edges carry 2 wires but have capacity 1. The router cannot build this.":"No edge exceeds capacity. Legal, at the price of 2 extra units of wire."));
+  }
+  root.append(h("div",{class:"row"},seg([["straight","C goes straight"],["detour","C detours via row 1"]],mode,v=>{mode=v;render();})),box,info);
+  render();
+}
+
+/* ===================== A1 3D neighbours demo ===================== */
+function layersDemo(root){
+  const W=5,H=5,L=2;
+  let sel={x:2,y:2,z:0};
+  function nb3(x,y,z){
+    const steps=(z%2===0)?[[1,0,0],[-1,0,0]]:[[0,1,0],[0,-1,0]];
+    steps.push([0,0,1],[0,0,-1]);
+    const r=[];
+    steps.forEach(s=>{const n=[x+s[0],y+s[1],z+s[2]];if(n[0]>=0&&n[0]<W&&n[1]>=0&&n[1]<H&&n[2]>=0&&n[2]<L)r.push(n);});
+    return r;
+  }
+  const holder=h("div",{style:"display:flex;gap:14px;flex-wrap:wrap"});
+  const info=h("div",{class:"status","aria-live":"polite"});
+  function render(){
+    holder.replaceChildren();
+    const nbs=nb3(sel.x,sel.y,sel.z);
+    const isN=(x,y,z)=>nbs.some(n=>n[0]===x&&n[1]===y&&n[2]===z);
+    for(let z=0;z<L;z++){
+      const sc=44,o=26;
+      const svg=sv("svg",{viewBox:"0 0 200 215",style:"width:200px;flex:1 1 180px;max-width:230px","aria-label":"Layer "+z});
+      svg.append(sv("text",{x:100,y:14,"text-anchor":"middle",style:"font-weight:700;fill:"+(z===0?"var(--m1)":"var(--m2)")},"Layer "+z+(z===0?" (horizontal)":" (vertical)")));
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+        const cx=o+x*sc*0.85+4,cy=o+10+y*sc*0.85;
+        if(z===0&&x<W-1)svg.append(sv("line",{x1:cx,y1:cy,x2:cx+sc*0.85,y2:cy,stroke:"var(--m1soft)","stroke-width":3}));
+        if(z===1&&y<H-1)svg.append(sv("line",{x1:cx,y1:cy,x2:cx,y2:cy+sc*0.85,stroke:"var(--m2soft)","stroke-width":3}));
+      }
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+        const cx=o+x*sc*0.85+4,cy=o+10+y*sc*0.85;
+        const isSel=(sel.x===x&&sel.y===y&&sel.z===z);
+        const n=isN(x,y,z);
+        const via=n&&z!==sel.z;
+        const c=sv("circle",{cx:cx,cy:cy,r:isSel?9:(n?8:6),fill:isSel?"var(--m1)":(via?"var(--via)":(n?"var(--good)":"var(--surface)")),stroke:isSel?"var(--m1)":(n?(via?"var(--via)":"var(--good)"):"var(--muted)"),"stroke-width":1.5,style:"cursor:pointer",tabindex:"0",role:"button","aria-label":"Vertex "+x+","+y+" on layer "+z});
+        const pick=()=>{sel={x:x,y:y,z:z};render();};
+        c.addEventListener("click",pick);
+        c.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();pick();}});
+        svg.append(c);
+      }
+      holder.append(svg);
+    }
+    const parts=nbs.map(n=>"("+n[0]+", "+n[1]+", "+n[2]+")"+(n[2]!==sel.z?" via":""));
+    info.replaceChildren(h("b",{},"Selected ("+sel.x+", "+sel.y+", "+sel.z+"): "),parts.length+" legal moves: "+parts.join(", "),
+      h("div",{style:"margin-top:5px;color:var(--muted)"},"Blue = you, green = wire step along this layer’s direction, amber = via to the other layer. Moves off the edge are not generated."));
+  }
+  root.append(holder,info);
+  render();
+}
+
+/* ===================== A3 via-cost demo ===================== */
+function viaDemo(root){
+  let via=1;
+  const out=h("div"),lab=h("span",{style:"font:600 14px system-ui,sans-serif"});
+  const slider=h("input",{type:"range",min:"0.5",max:"4",step:"0.5",value:"1","aria-label":"Via cost",oninput:()=>{via=+slider.value;render();}});
+  function render(){
+    lab.textContent="via cost = "+via;
+    const r1=7,r2=3+2*via,mx=Math.max(r1,r2,8);
+    const win=r1<r2?1:(r2<r1?2:0);
+    out.replaceChildren(
+      h("div",{class:"bars"},
+        h("div",{class:"bar"+(win===1?" hl":"")},h("span",{},"Route 1 (7 steps, 0 vias)"),h("div",{},h("i",{style:"width:"+(100*r1/mx)+"%"})),h("span",{},r1)),
+        h("div",{class:"bar"+(win===2?" hl":"")},h("span",{},"Route 2 (3 steps, 2 vias)"),h("div",{},h("i",{style:"width:"+(100*r2/mx)+"%"})),h("span",{},r2))),
+      h("div",{class:"status",style:"margin-top:10px"},
+        h("b",{},"Dijkstra picks "+(win===0?"either (tie)":"Route "+win)+". "),
+        "cost = wire steps + via cost × vias.  Route 2 = 3 + "+via+" × 2 = "+r2+".  BFS would pick Route 2 regardless (5 hops against 7)."));
+    $$(".bar span:first-child",out).forEach(s=>s.style.fontSize="12px");
+  }
+  root.append(h("div",{class:"row"},h("label",{},"Via cost"),slider,lab),out);
+  root.querySelectorAll(".bar").forEach(b=>b.style.gridTemplateColumns="190px 1fr 38px");
+  render();
+}
+
+/* ===================== A3 Dijkstra stepper ===================== */
+function dijkstraDemo(root){
+  const adj={a:[["b",1],["c",4]],b:[["c",2],["d",6]],c:[["d",3]],d:[]};
+  const pos={a:[40,100],b:[170,35],c:[170,165],d:[300,100]};
+  const steps=[];
+  const dist={a:0};let heap=[[0,"a"]];const done=[];
+  const snap=(note,cur)=>steps.push({note:note,dist:Object.assign({},dist),heap:heap.map(x=>x.slice()).sort((p,q)=>p[0]-q[0]),done:done.slice(),cur:cur});
+  snap("Start: dist[a] = 0, and the heap holds (0, a).",null);
+  while(heap.length){
+    heap.sort((p,q)=>p[0]-q[0]||(p[1]<q[1]?-1:1));
+    const e=heap.shift(),d=e[0],u=e[1];
+    if(d>dist[u]){snap("Pop ("+d+", "+u+"): stale. dist["+u+"] is already "+dist[u]+", so skip it.",null);continue;}
+    done.push(u);
+    const imp=[];
+    adj[u].forEach(p=>{const v=p[0],nd=d+p[1];if(dist[v]===undefined||nd<dist[v]){dist[v]=nd;heap.push([nd,v]);imp.push(v+" to "+nd);}});
+    snap("Pop ("+d+", "+u+"): "+u+" is final. "+(imp.length?"Relax: "+imp.join(", ")+".":"No edge improves anything."),u);
+  }
+  let i=0;
+  const box=h("div",{class:"svgbox"}),info=h("div",{class:"status","aria-live":"polite"}),tbl=h("div",{class:"tbl"});
+  const bN=h("button",{class:"btn primary",type:"button",onclick:()=>{i=Math.min(steps.length-1,i+1);render();}},"Next pop ▶");
+  const bP=h("button",{class:"btn",type:"button",onclick:()=>{i=Math.max(0,i-1);render();}},"◀ Back");
+  const bR=h("button",{class:"btn",type:"button",onclick:()=>{i=0;render();}},"Reset");
+  function render(){
+    const s=steps[i];
+    const svg=sv("svg",{viewBox:"0 0 340 200",role:"img","aria-label":"Directed weighted graph a b c d"});
+    svg.append(sv("defs",{},sv("marker",{id:"arr",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},sv("path",{d:"M0 0L10 5L0 10z",fill:"var(--muted)"}))));
+    Object.keys(adj).forEach(u=>adj[u].forEach(p=>{
+      const a=pos[u],b=pos[p[0]];
+      const dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy);
+      const x1=a[0]+dx/L*20,y1=a[1]+dy/L*20,x2=b[0]-dx/L*22,y2=b[1]-dy/L*22;
+      svg.append(sv("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:"var(--muted)","stroke-width":1.8,"marker-end":"url(#arr)"}));
+      svg.append(sv("text",{x:(x1+x2)/2+(dy>0?-9:9)*(Math.abs(dy)>20?1:0),y:(y1+y2)/2-(Math.abs(dy)>20?0:7),"text-anchor":"middle",style:"font-weight:700;fill:var(--via)"},p[1]));
+    }));
+    Object.keys(pos).forEach(n=>{
+      const p=pos[n],fin=s.done.includes(n),cur=(s.cur===n);
+      svg.append(sv("circle",{cx:p[0],cy:p[1],r:19,fill:cur?"var(--m1)":(fin?"var(--m1soft)":"var(--surface)"),stroke:fin?"var(--m1)":"var(--muted)","stroke-width":2}));
+      svg.append(sv("text",{x:p[0],y:p[1]+4,"text-anchor":"middle",style:"font-weight:800;fill:"+(cur?"var(--surface)":"var(--text)")},n));
+      svg.append(sv("text",{x:p[0],y:p[1]+36,"text-anchor":"middle",class:"mut"},s.dist[n]===undefined?"∞":"dist "+s.dist[n]));
+    });
+    box.replaceChildren(svg);
+    info.textContent="Step "+i+" of "+(steps.length-1)+". "+s.note;
+    tbl.replaceChildren(h("table",{},
+      h("tr",{},h("th",{},"Heap (smallest first)"),h("th",{},"Final nodes")),
+      h("tr",{},h("td",{},s.heap.length?s.heap.map(x=>"("+x[0]+", "+x[1]+")").join("  "):"empty"),h("td",{},s.done.length?s.done.join(", "):"none"))));
+    bN.disabled=(i>=steps.length-1);bP.disabled=(i===0);
+  }
+  root.append(h("div",{class:"row"},bR,bP,bN),box,info,tbl);
+  render();
+}
+
+/* ===================== A5 Steiner demo ===================== */
+function steinerDemo(root){
+  const ex={
+    one:{name:"Three pins",pins:[[0,0,"A"],[4,0,"B"],[2,3,"C"]],
+      mst:{len:9,polys:[[[0,0],[4,0]],[[0,0],[0,3],[2,3]]],note:"MST = AB (4) + AC (5) = 9"},
+      st:{len:7,polys:[[[0,0],[4,0]],[[2,0],[2,3]]],pt:[2,0],note:"Steiner point at (2, 0): 2 + 2 + 3 = 7. HPWL = width 4 + height 3 = 7, so this is optimal."}},
+    plus:{name:"Plus sign (worst case)",pins:[[-1,0,"L"],[1,0,"R"],[0,1,"U"],[0,-1,"D"]],
+      mst:{len:6,polys:[[[-1,0],[-1,1],[0,1]],[[0,1],[1,1],[1,0]],[[1,0],[1,-1],[0,-1]]],note:"Every adjacent pair is 2 apart. MST = 3 edges × 2 = 6"},
+      st:{len:4,polys:[[[-1,0],[1,0]],[[0,-1],[0,1]]],pt:[0,0],note:"Steiner point at (0, 0), four arms of length 1 = 4. Ratio 6 / 4 = 1.5, the worst case."}}
+  };
+  let key="one",kind="mst";
+  const box=h("div",{class:"svgbox"}),info=h("div",{class:"status","aria-live":"polite"});
+  function render(){
+    const e=ex[key],t=e[kind];
+    const xs=e.pins.map(p=>p[0]),ys=e.pins.map(p=>p[1]);
+    const minx=Math.min(...xs)-0.8,maxx=Math.max(...xs)+0.8,miny=Math.min(...ys)-0.8,maxy=Math.max(...ys)+0.8;
+    const Wd=360,Hd=240,sc=Math.min((Wd-30)/(maxx-minx),(Hd-30)/(maxy-miny));
+    const X=x=>15+(x-minx)*sc,Y=y=>Hd-15-(y-miny)*sc;
+    const svg=sv("svg",{viewBox:"0 0 "+Wd+" "+Hd,role:"img","aria-label":"Pins and the "+(kind==="mst"?"spanning":"Steiner")+" tree connecting them"});
+    const gx=[...new Set(xs)],gy=[...new Set(ys)];
+    gx.forEach(x=>svg.append(sv("line",{x1:X(x),y1:Y(miny),x2:X(x),y2:Y(maxy),stroke:"var(--border)","stroke-dasharray":"3 4"})));
+    gy.forEach(y=>svg.append(sv("line",{x1:X(minx),y1:Y(y),x2:X(maxx),y2:Y(y),stroke:"var(--border)","stroke-dasharray":"3 4"})));
+    t.polys.forEach(poly=>svg.append(sv("polyline",{points:poly.map(p=>X(p[0])+","+Y(p[1])).join(" "),fill:"none",stroke:kind==="mst"?"var(--m1)":"var(--good)","stroke-width":5,"stroke-linecap":"round","stroke-linejoin":"round"})));
+    if(t.pt)svg.append(sv("rect",{x:X(t.pt[0])-7,y:Y(t.pt[1])-7,width:14,height:14,fill:"var(--via)",stroke:"var(--surface)","stroke-width":2,transform:"rotate(45 "+X(t.pt[0])+" "+Y(t.pt[1])+")"}));
+    e.pins.forEach(p=>{svg.append(sv("circle",{cx:X(p[0]),cy:Y(p[1]),r:8,fill:"var(--m2)",stroke:"var(--surface)","stroke-width":2}));svg.append(sv("text",{x:X(p[0])+12,y:Y(p[1])-10,style:"font-weight:700"},p[2]+" ("+p[0]+", "+p[1]+")"));});
+    box.replaceChildren(svg);
+    info.replaceChildren(
+      h("span",{class:"tag "+(kind==="mst"?"blue":"good")},(kind==="mst"?"Spanning tree":"Steiner tree")+": length "+t.len),
+      h("span",{class:"tag warn"},"Other tree: length "+e[kind==="mst"?"st":"mst"].len),
+      h("div",{style:"margin-top:6px"},t.note+(t.pt?" The amber diamond is the Steiner point (a junction that is not a pin).":"")));
+  }
+  root.append(h("div",{class:"row"},
+    seg([["one","Three pins"],["plus","Plus sign"]],key,v=>{key=v;render();}),
+    seg([["mst","Spanning tree (MST)"],["st","Steiner tree"]],kind,v=>{kind=v;render();})),box,info);
+  render();
+}
+
+/* ===================== A7 net-order demo ===================== */
+function orderDemo(root){
+  const W=5,H=3;
+  const data={
+    ab:{A:[[1,0],[1,1],[2,1],[3,1],[3,0]],B:[[0,1],[0,2],[1,2],[2,2],[3,2],[4,2],[4,1]],msg:"A first: A goes down and around the blockage (length 4). B then finds a way along the bottom row (length 6). Both routed, total wirelength 10."},
+    ba:{A:null,B:[[0,1],[1,1],[2,1],[3,1],[4,1]],msg:"B first: B takes the straight row 1 (length 4). Now A is sealed in: its only ways out pass through B’s wire. A fails. Same nets, same grid, different order."}
+  };
+  let ord="ab";
+  const holder=h("div"),info=h("div",{class:"status","aria-live":"polite"});
+  function render(){
+    const d=data[ord];
+    const owner=new Map();
+    if(d.A)d.A.forEach(p=>owner.set(p.join(","),"A"));
+    d.B.forEach(p=>owner.set(p.join(","),"B"));
+    const g=h("div",{class:"grid",style:"grid-template-columns:repeat(5,1fr);max-width:320px"});
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const k=x+","+y,o=owner.get(k);
+      let cls="cell",txt="",style="";
+      if(x===2&&y===0){cls+=" wall";}
+      else if(o==="A"){style="background:var(--m1);color:var(--surface)";}
+      else if(o==="B"){style="background:var(--m2);color:var(--surface)";}
+      const pinA=(x===1&&y===0)||(x===3&&y===0),pinB=(x===0&&y===1)||(x===4&&y===1);
+      if(pinA)txt="A";if(pinB)txt="B";
+      if(pinA&&!d.A){style="background:var(--badsoft);color:var(--bad);border-color:var(--bad)";}
+      g.append(h("div",{class:cls,style:style},txt));
+    }
+    holder.replaceChildren(g);
+    info.replaceChildren(h("span",{class:"tag "+(d.A?"good":"bad")},d.A?"Both nets routed, length 10":"Net A fails"),h("div",{style:"margin-top:6px"},d.msg));
+  }
+  root.append(h("div",{class:"row"},seg([["ab","Route A, then B"],["ba","Route B, then A"]],ord,v=>{ord=v;render();})),holder,info,
+    h("p",{class:"widget-title",style:"margin-top:10px"},"Dark cell = blockage at (2,0). Blue = net A, magenta = net B. Other nets’ pins count as obstacles."));
+  render();
+}
+
+/* ===================== A7 PathFinder demo ===================== */
+function pathfinderDemo(root){
+  const its=[
+    {A:{m:1,d:3,go:"M"},B:{m:1,d:5,go:"M"},over:1,hist:0.6,note:"Iteration 1: congestion is ignored. A: M costs 1, detour 3, so A takes M. B: M costs 1, detour 5, so B takes M. M carries 2 nets, overuse 1. History h(M) rises to 0.6."},
+    {A:{m:2.4,d:3,go:"M"},B:{m:2.4,d:5,go:"M"},over:1,hist:1.2,note:"Iteration 2: cost(M) = (1 + 0.6) × 1.5 = 2.4 for both nets. Both still prefer M over their detours (3 and 5). Overuse stays 1, history rises to 1.2."},
+    {A:{m:3.3,d:3,go:"D"},B:{m:2.2,d:5,go:"M"},over:0,hist:1.2,note:"Iteration 3: A sees (1 + 1.2) × 1.5 = 3.3, more than its detour of 3, so A leaves. B then sees (1 + 1.2) × 1.0 = 2.2 against a detour of 5, so B stays. Overuse is 0: done."}
+  ];
+  let i=0;
+  const body=h("div"),info=h("div",{class:"status","aria-live":"polite"});
+  const bN=h("button",{class:"btn primary",type:"button",onclick:()=>{i=Math.min(2,i+1);render();}},"Next iteration ▶");
+  const bP=h("button",{class:"btn",type:"button",onclick:()=>{i=Math.max(0,i-1);render();}},"◀ Back");
+  const bR=h("button",{class:"btn",type:"button",onclick:()=>{i=0;render();}},"Reset");
+  function netRow(name,col,d){
+    const mx=6;
+    const mWin=d.go==="M";
+    return h("div",{style:"margin:10px 0"},
+      h("b",{class:"ui",style:"color:"+col},"Net "+name+" chooses "+(mWin?"resource M":"its detour")),
+      h("div",{class:"bars"},
+        h("div",{class:"bar"+(mWin?" hl":"")},h("span",{},"cost of M"),h("div",{},h("i",{style:"width:"+(100*d.m/mx)+"%"})),h("span",{},d.m)),
+        h("div",{class:"bar"+(!mWin?" hl":"")},h("span",{},"cost of detour"),h("div",{},h("i",{style:"width:"+(100*d.d/mx)+"%"})),h("span",{},d.d))));
+  }
+  function render(){
+    const it=its[i];
+    body.replaceChildren(netRow("A","var(--m1)",it.A),netRow("B","var(--m2)",it.B),
+      h("div",{},h("span",{class:"tag "+(it.over?"bad":"good")},"Overuse of M after this iteration: "+it.over),h("span",{class:"tag warn"},"History h(M) = "+it.hist)));
+    info.textContent=it.note;
+    bN.disabled=(i>=2);bP.disabled=(i===0);
+  }
+  root.append(h("div",{class:"row"},bR,bP,bN),body,info);
+  root.querySelectorAll(".bar").forEach(b=>b.style.gridTemplateColumns="110px 1fr 38px");
+  render();
+}
+
+/* ===================== A8 knapsack demo ===================== */
+function knapDemo(root){
+  let yv=20;
+  const out=h("div");
+  function render(){
+    const items=[["X",1,15],["Y",3,yv],["Z",4,30]];
+    const gv=yv===20?35:29,dv=yv===20?35:30;
+    const gset="X + Y",dset=yv===20?"X + Y":"Z alone";
+    out.replaceChildren(
+      h("div",{class:"tbl"},h("table",{},
+        h("tr",{},h("th",{},"Net"),h("th",{},"Tracks"),h("th",{},"Value"),h("th",{},"Value per track")),
+        ...items.map(it=>h("tr",{},h("td",{},it[0]),h("td",{},it[1]),h("td",{},it[2]),h("td",{},(it[2]/it[1]).toFixed(1)))))),
+      h("p",{},h("b",{},"Greedy by value per track: "),"takes X (15.0), skips Z (7.5, does not fit in the 3 left), takes Y. ",h("b",{},gset+" = "+gv+".")),
+      h("p",{},h("b",{},"Dynamic programming over capacity 0 to 4: "),"best[4] = max(Z alone = 30, X + Y = "+(1===1?(yv+15):"")+") = "+dv+". ",h("b",{},dset+" = "+dv+".")),
+      h("span",{class:"tag "+(gv===dv?"good":"bad")},gv===dv?"Greedy happens to be optimal here":"Greedy loses "+(dv-gv)+" value: only DP is guaranteed"));
+  }
+  root.append(h("div",{class:"row"},seg([[20,"Y is worth 20"],[14,"Y is worth 14"]],yv,v=>{yv=v;render();})),out);
+  render();
+}
+
+/* ===================== evidence ===================== */
+const EVID=[
+  {id:"E1",fact:true,t:"Micron GenAI role for AMS design",u:"https://www.builtinsf.com/job/staff-genai-engineer-ams-design-and-optimization/10487291",c:"Posting says the role builds AI-driven tools to optimise memory circuit floorplanning, placement, routing and verification, and uses historical design and silicon data to reduce tape-out iterations.",w:"AI is layered on an existing design flow. Expect “how would you formulate X as an optimisation problem” more than “build a router from zero”.",m:["A6","A7"]},
+  {id:"E2",fact:true,t:"Sr Layout Engineer, DPG-LPDDR (Hyderabad)",u:"https://builtinhyderabad.in/job/sr-layout-engineer-dpg-lpddr/10796634",c:"Hyderabad layout teams do full-custom DRAM and LPDDR layout: bit-cell creation, pitch matching, row and column decoder layout, in Cadence Virtuoso with Calibre DRC and LVS, and use AI/ML for layout automation.",w:"Layout here is custom memory layout, not only push-button digital place-and-route. Know DRC, LVS, matching and parasitics.",m:["A6"]},
+  {id:"E3",fact:true,t:"Senior Silicon Design Engineer, AI (Hyderabad)",u:"https://builtin.com/job/staff-silcion-design-engineer-ai/8284729",c:"Builds AI/ML workflows for DRAM and NAND and improves design and layout efficiency through automation with Python and LLMs.",w:"Python is the working language. LLM and agent work is in scope, so your LangGraph project is relevant.",m:["A6"]},
+  {id:"E4",fact:true,t:"Staff Layout Engineer, DPG (Hyderabad)",u:"https://builtinhyderabad.in/job/staff-layout-engineer-dpg-layout/9601166",c:"Asks for copilot assistants, agentic AI flows and rule-aware automation to accelerate placement, routing and optimisation.",w:"“Rule-aware” means design rules are hard constraints. Constraint handling is a likely topic.",m:["A6","A7"]},
+  {id:"R1",t:"Survey of ML for placement and routing (arXiv 2202.13564)",u:"https://arxiv.org/pdf/2202.13564v1.pdf",c:"Global routing works on a grid graph whose vertices are rectangular G-cells. Detailed routing works on a much finer 3D grid under complex design rules and follows the global route as a guide. Unroutable conflicts appear as design rule violations.",w:"The problem statement you must be able to draw.",m:["A6","A1"]},
+  {id:"R2",t:"PathFinder (McMurchie and Ebeling, 1995)",u:"https://www.esa.informatik.tu-darmstadt.de/archive/twiki/pub/Lectures/AlgorithmenImChipEntwurfDe/router-pathfinder.pdf",c:"Plain rip-up-and-retry depends on which nets you reroute and in what order. PathFinder reroutes every net each iteration and lets nets negotiate for shared resources through a cost of (base + history) × present sharing.",w:"The core idea behind most modern routers.",m:["A7"]},
+  {id:"R3",t:"NTHU-Route (ASP-DAC 2008)",u:"https://websrv.cecs.uci.edu/~papers/aspdac08/pdf/p232_3A-2.pdf",c:"A global router built on iterative rip-up and reroute with a history-based cost. The paper contrasts this family with multicommodity-flow and ILP formulations.",w:"Shows the two families: heuristic and exact.",m:["A7","A8"]},
+  {id:"R4",t:"Deep RL for global routing (Liao et al., 2019)",u:"https://www.emergentmind.com/papers/1906.08809",c:"A deep RL agent routes in a simulated environment and beats a sequential A* baseline. The authors also built a generator of parameterised routing problems.",w:"The simplest RL-routing paper. Note the baseline is A*.",m:["A4","A7"]},
+  {id:"R5",t:"TREND: transformer RL for net ordering (IJCAI 2025)",u:"https://www.ijcai.org/proceedings/2025/1055.pdf",c:"Net ordering in detailed routing usually relies on expert heuristics. TREND learns the order with transformer-based RL and a graph convolutional network over net interactions.",w:"RL makes one decision inside a classical router. It does not replace the router.",m:["A7"]},
+  {id:"R6",t:"XRoute Environment (arXiv 2305.13823)",u:"https://arxiv.org/pdf/2305.13823v1",c:"RL routing studies solve problems far smaller than real chips, and benchmarks from real chips are scarce. XRoute offers an open RL environment for detailed routing.",w:"The honest limitation to state when asked about RL.",m:["A7"]},
+  {id:"R7",t:"ISPD 2024 GPU/ML routing contest and InstantGR",u:"https://qqq1357962.github.io/pdf/instantgr.pdf",c:"The first GPU/ML global routing contest, with benchmarks up to 50 million cells. InstantGR is an open-source GPU global router that reports beating the contest’s top entries in runtime and quality.",w:"State of the art at scale is GPU parallelism plus classical algorithms, not pure learning.",m:["A7"]},
+  {id:"R8",t:"RouteNet (ICCAD 2018) and CircuitNet",u:"https://research.nvidia.com/publication/2018-11_routenet-routability-prediction-mixed-size-designs-using-convolutional-neural",c:"RouteNet uses a CNN to predict overall routability and DRC hotspot locations from a placement without running the router. CircuitNet is an open dataset for congestion, DRC and IR-drop prediction.",w:"ML as a fast predictor. Close to your VisionDev CNN work.",m:["A7"]},
+  {id:"R9",t:"GeniusRoute (ICCAD 2019)",u:"https://par.nsf.gov/biblio/10192510",c:"Analog routing is hard to generalise because of layout-dependent effects, so the method learns routing guidance from human layouts with a generative network and feeds it to the router.",w:"The closest public analogue to custom memory layout.",m:["A6","A7"]},
+  {id:"R10",t:"From multi-agent path finding to pipe routing (arXiv 1905.08412)",u:"https://arxiv.org/pdf/1905.08412.pdf",c:"Industrial 3D pipe routing is solved by adapting the multi-agent path finding solvers CBS and ECBS.",w:"Explains why the JD lists multi-agent path finding.",m:["A7"]},
+  {id:"R11",t:"HeuriGym (arXiv 2506.07972)",u:"https://arxiv.org/pdf/2506.07972",c:"A benchmark of LLM-written heuristics. Its global routing section summarises the classical methods: Steiner trees for multi-pin nets, ILP, randomised rounding, multicommodity flow.",w:"Links routing to LLM agents.",m:["A5","A8"]},
+  {id:"R12",t:"AI-driven EDA overview (GreyB)",u:"https://insights.greyb.com/ai-driven-eda-semiconductor-design/",c:"Synopsys DSO.ai uses reinforcement learning to search physical design configurations for better power, performance and area.",w:"What commercial tools already do.",m:["A7"]}
+];
+(function(){
+  const grid=$("#evGrid"),fil=$("#evFilter");
+  let cur="all";
+  const mods=["all","A6","A1","A4","A5","A7","A8"];
+  function draw(){
+    grid.replaceChildren();
+    EVID.filter(e=>cur==="all"||e.m.includes(cur)).forEach(e=>{
+      grid.append(h("div",{class:"evc"},
+        h("h4",{},h("span",{class:"id"},e.id),e.t),
+        h("div",{},h("span",{class:"tag "+(e.fact?"good":"blue")},e.fact?"Fact: posting":"Research")),
+        h("div",{},e.c),
+        h("div",{class:"why"},h("b",{},"Why it matters: "),e.w),
+        h("div",{style:"margin-top:6px"},h("a",{href:e.u,target:"_blank",rel:"noopener"},e.u))));
+    });
+  }
+  mods.forEach(m=>{
+    const b=h("button",{type:"button","aria-pressed":String(m===cur),onclick:()=>{cur=m;$$("button",fil).forEach(x=>x.setAttribute("aria-pressed","false"));b.setAttribute("aria-pressed","true");draw();}},m==="all"?"All":"Used in "+m);
+    fil.append(b);
+  });
+  draw();
+})();
+
+/* ===================== Q&A bank ===================== */
+const QA={
+A6:[
+["What is the difference between global and detailed routing?","Global routing assigns each net a coarse path through G-cells and balances congestion against capacity. Detailed routing turns that into exact wires and vias on tracks while obeying design rules. Global is a planning problem on a small graph. Detailed is a legality problem on a very fine graph."],
+["What is overflow, and why do routers minimise it instead of only wirelength?","Overflow on an edge is demand minus capacity when demand is larger, else zero. If global routing leaves overflow, the detailed router cannot fit all wires there and produces shorts or long detours. A slightly longer route with zero overflow is usually better than a short route that cannot be built."],
+["Why is routing NP-hard?","Connecting one multi-pin net with minimum wire is the Steiner tree problem, which is NP-hard. Routing many 2-pin nets under edge capacities contains the edge-disjoint paths problem, also NP-complete. So real routers use heuristics and iterative improvement, and exact methods only on small windows."],
+["Which metrics would you report for a routing solution?","Total wirelength, via count, total and maximum overflow (global) or DRV count by type (detailed), runtime and peak memory. If timing matters, worst slack and total negative slack. Report them per benchmark, not only as an average."],
+["How do you think routing in memory or analog layout differs from digital place-and-route?","Say it is your inference. Digital routing is mostly automated and optimises wirelength, congestion and timing over millions of nets. Custom memory and analog layout has fewer nets but stronger constraints: symmetry, matched lengths, shielding, pitch matching to the array, and sensitivity to parasitics. That is why it is still heavily manual and why learning from human layouts is attractive."],
+["What are DRC and LVS?","DRC checks that the geometry obeys manufacturing rules such as spacing and width. LVS checks that the layout’s connectivity and devices match the schematic. A layout must pass both before tape-out."]],
+A1:[
+["Adjacency list or adjacency matrix for a routing grid?","Neither is stored explicitly. The grid is implicit, so neighbours are computed from coordinates. If forced to choose, adjacency list, because each vertex has at most 6 neighbours and the matrix would need V² entries."],
+["How would you store per-cell data for a large grid in Python?","Flat NumPy arrays indexed by (z·H + y)·W + x, or a 3D array indexed [z, y, x]. Dictionaries keyed by tuples are fine for small examples but are slow and memory-heavy at scale."],
+["How do you model vias and preferred routing direction?","Vias are edges between the same (x, y) on adjacent layers with a cost higher than a wire step. Preferred direction is modelled by only generating moves along the layer’s direction, or by adding a wrong-way penalty to the other moves."],
+["When is the routing graph directed?","When cost depends on direction, for example wrong-way penalties that differ by direction, or in FPGA routing where switches are one-way (PathFinder works on a directed resource graph). Timing graphs are also directed and acyclic."],
+["How do you represent capacity?","As an attribute of an edge (global routing) or as occupancy of a cell (detailed routing, capacity 1). The search never forbids overuse outright in negotiated routing. It makes overused resources expensive."]],
+A2:[
+["Why does BFS return a shortest path on an unweighted graph?","BFS dequeues vertices in non-decreasing distance from the source. All vertices at distance d are processed before any at distance d+1. So when a vertex is first labelled, no shorter route to it can exist."],
+["BFS versus DFS: when do you use which?","BFS for shortest paths in unweighted graphs and level-by-level exploration. DFS for reachability, connected components, cycle detection and topological sort. Both are O(V + E). BFS can hold a whole frontier in memory. Recursive DFS can overflow the call stack on a large grid, so write it iteratively."],
+["How do you recover the path after BFS?","Store a parent pointer when a cell is first labelled and walk back from the target. Or store only distance labels and backtrace by stepping to any neighbour whose label is one smaller."],
+["How would you route a net with more than two pins using BFS?","Connect two pins first. Then run a multi-source BFS from every cell of the partial tree and stop at the nearest unconnected pin. Repeat until all pins are connected. This gives a valid tree but not the minimum one, which is a Steiner tree."],
+["What limits Lee’s algorithm on a real chip, and how is it fixed?","Time and memory are proportional to the area searched, for every net. Fixes: restrict the search to a bounding box, use A* to steer the wave, search from both ends, use global routing first so detailed search stays inside a narrow guide, and use cheap pattern routes where no search is needed."]],
+A3:[
+["Why does Dijkstra fail with negative edge weights?","It finalises a vertex when popped, assuming no cheaper path can appear later. Example: A→B costs 2, A→C costs 3, C→B costs −2. Dijkstra finalises B at 2, but the true shortest is A→C→B = 1."],
+["What is Dijkstra’s complexity, and what is lazy deletion?","O((V + E) log V) with a binary heap. Python’s heapq has no decrease-key, so you push a duplicate entry with the smaller distance and ignore outdated entries when they are popped. The heap can hold up to E entries, which does not change the bound."],
+["How do you choose between BFS, Dijkstra, Bellman-Ford and DAG relaxation?","Equal weights: BFS. Non-negative weights: Dijkstra. Negative weights or need to detect negative cycles: Bellman-Ford. Acyclic graph: topological order, linear time, and it also handles longest paths."],
+["What goes into the edge cost of a router?","A base cost per wire step, a via cost, a penalty for routing against the preferred direction, a congestion term that grows with how full the resource is, and for timing-critical nets a weight that favours short delay over avoiding congestion."],
+["How is timing analysis a graph problem?","Model gates and wires as a DAG with delays on edges. Arrival times are longest paths from inputs, computed in topological order in O(V + E). Slack at a node is required time minus arrival time. The path with the worst slack is the critical path."]],
+A4:[
+["What is the difference between an admissible and a consistent heuristic?","Admissible means h never overestimates the true remaining cost. Consistent means h drops by at most the edge cost along any edge. Consistency implies admissibility. Admissibility gives optimality. Consistency additionally guarantees no vertex needs to be expanded twice."],
+["Why is Manhattan distance a valid heuristic on a routing grid, and when would it not be?","With 4-directional moves each costing at least 1, you need at least |dx| + |dy| steps, so it is a lower bound, and one step changes it by at most 1, so it is consistent. It breaks if some moves cost less than 1 per unit distance or if diagonal moves are allowed. Then scale it by the minimum step cost or use a different bound."],
+["How does A* relate to Dijkstra and to greedy best-first search?","Dijkstra is A* with h = 0: optimal but explores in all directions. Greedy best-first uses only h: fast, but can return a poor path. A* uses both and is optimal with an admissible heuristic."],
+["What is weighted A*, and when would you use it?","It inflates the heuristic by w > 1. The search becomes greedier and faster, and the result costs at most w times the optimum. Use it when runtime matters more than the last few percent of wirelength, for example in early iterations of rip-up-and-reroute."],
+["On an open grid A* still expands a lot of cells. Why, and what do you do?","Many different paths have the same f, so A* explores a diamond of ties. Break ties toward larger g or toward the straight line to the target. Also restrict the search to a bounding box around the pins and expand the box only if routing fails."],
+["A* runs out of memory on a large instance. Options?","Bounding box, bidirectional search, IDA* (linear memory, repeated depth-limited passes), or a hierarchical approach: plan coarsely first (global routing), then search only inside the planned corridor."]],
+A5:[
+["What is the difference between a minimum spanning tree and a Steiner tree?","An MST may only connect the given pins directly to each other. A Steiner tree may add extra junction points, which can shorten the total. Finding the MST is polynomial. Finding the minimum Steiner tree is NP-hard."],
+["Prim or Kruskal, and what are their complexities?","Kruskal sorts edges and adds the cheapest edge that joins two components, using union-find: O(E log E). Prim grows one tree from a start vertex using a heap: O(E log V), or O(V²) with arrays, which is better on dense graphs. For pins in the plane the graph is complete, so array-based Prim is a natural fit."],
+["How does union-find work and why is it fast?","Each set is a tree with a representative root. Find follows parents to the root. Union links two roots. With path compression and union by rank, a sequence of operations costs almost constant time each (inverse Ackermann)."],
+["The Steiner tree problem is NP-hard. What do routers do?","Use the Hanan grid to limit candidate points, use lookup tables for small nets (FLUTE handles up to 9 pins optimally), use MST-based heuristics with the 1.5 guarantee, or iteratively add the Steiner point that saves the most wire. Then refine the tree during routing when congestion is known."],
+["What is HPWL and why is it used?","Half the perimeter of the bounding box of a net’s pins. It is O(n) to compute, exact for 2 and 3 pins, and a lower bound on any rectilinear tree. Placement needs to evaluate wirelength millions of times, so it uses HPWL as a cheap proxy."],
+["When is the minimum-wirelength tree the wrong choice?","When timing matters. A minimum tree can route a critical sink through a long chain of other pins. For critical nets you accept more wire to shorten the driver-to-sink path, trading between a spanning tree and a shortest-path tree."]],
+A7:[
+["Compare Lee, Hadlock and Soukup.","Lee is plain BFS: always finds the shortest path, but explores in all directions. Hadlock orders the search by detour count, which is A* with the Manhattan heuristic: still shortest, far fewer cells. Soukup dashes toward the target and only searches around obstacles: fastest, but the path may not be shortest."],
+["Why does net ordering matter? Give an example.","An early net takes resources a later net needs. In the demo above, routing B first seals A in and A fails, while routing A first lets both complete. Ordering heuristics help but none is always right."],
+["What is rip-up-and-reroute, and what is its weakness?","Route all nets, find conflicts, remove some nets and route them again with updated costs. The weakness is that the outcome depends on which nets are ripped up and in what order, and it can cycle between the same conflicting solutions."],
+["Explain negotiated congestion routing.","All nets are routed by shortest path and may share resources. Each resource costs (base + history) × present sharing. Every iteration all nets are rerouted under the updated costs. Present sharing pushes nets apart now. History remembers resources that keep being fought over, so the nets with cheaper alternatives move away for good. It converges when no resource is overused."],
+["Why are both a present term and a history term needed?","Present alone causes oscillation: nets swap between contested resources each iteration. History alone reacts too slowly to the current state. Together, present handles the immediate conflict and history breaks cycles."],
+["What is pattern routing and why not always use maze routing?","Pattern routing tries a few fixed shapes (L, Z) for a 2-pin connection. It costs a few lookups instead of a graph search, and most nets in uncongested areas are routed well by it. Maze routing is kept for the congested minority."],
+["Where would you add machine learning to a router?","Predict congestion or DRC hotspots early to seed costs. Learn net ordering or rip-up selection. Learn cost weights. Keep the search core, because it guarantees connectivity and legality, and compare against the unmodified router."]],
+A8:[
+["Explain P, NP, NP-hard and NP-complete.","P: solvable in polynomial time. NP: solutions verifiable in polynomial time. NP-hard: at least as hard as anything in NP. NP-complete: both NP-hard and in NP. Whether P equals NP is open, so for NP-hard problems we do not expect a fast exact algorithm."],
+["What is the difference between a heuristic, an approximation algorithm and a metaheuristic?","An approximation algorithm has a proven worst-case ratio to the optimum. A heuristic is a rule that works well in practice with no proof. A metaheuristic is a general strategy for searching the space of solutions, such as simulated annealing or genetic algorithms, that can be applied to many problems."],
+["When does a greedy algorithm give the optimal answer?","When the problem has the greedy-choice property, usually shown by an exchange argument: any optimal solution can be transformed to include the greedy choice without getting worse. True for MST and for Dijkstra with non-negative weights. Not true for 0/1 knapsack or for routing nets one by one."],
+["Backtracking versus branch and bound, and how does A* relate?","Backtracking explores choices depth-first and abandons a branch when a constraint is violated. Branch and bound also abandons a branch when a bound shows it cannot beat the best known solution. A* is best-first branch and bound where g + h is the bound."],
+["You are given an NP-hard layout problem and three months. What is your plan?","Define the objective and constraints with the physical-design engineers. Build a generator or collect a small benchmark set. Implement a simple baseline. Solve small instances exactly (ILP) for ground truth. Try one or two improvements (better heuristic, metaheuristic, learned component). Compare on quality, runtime and scaling, and document what worked and what did not."]]
+};
+$$(".qa").forEach(box=>{
+  const m=box.dataset.mod;
+  box.append(h("div",{class:"qa-title"},"Interview questions: say your answer first, then open it"));
+  (QA[m]||[]).forEach((p,i)=>box.append(h("details",{},h("summary",{},(i+1)+". "+p[0]),h("div",{class:"body"},p[1]))));
+});
+
+/* ===================== drill ===================== */
+(function(){
+  const box=$("#drillBox");
+  const all=[];
+  Object.keys(QA).forEach(m=>QA[m].forEach(p=>all.push({m:m,q:p[0],a:p[1]})));
+  let pool=[],cur=null,knew=0,missed=0,total=all.length;
+  function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+  function refill(){pool=shuffle(all.slice());}
+  refill();
+  const tag=h("span",{class:"tag blue"}),q=h("div",{class:"q"}),a=h("div",{class:"a"}),score=h("div",{class:"ui",style:"font-size:13px;color:var(--muted);margin-top:10px"});
+  const reveal=h("button",{class:"btn primary",type:"button",onclick:()=>{a.classList.add("show");reveal.style.display="none";row2.style.display="flex";}},"Reveal answer");
+  const bKnew=h("button",{class:"btn",type:"button",onclick:()=>{knew++;next();}},"I knew it");
+  const bMiss=h("button",{class:"btn",type:"button",onclick:()=>{missed++;const ins=Math.min(pool.length,3+((Math.random()*4)|0));pool.splice(ins,0,cur);next();}},"I missed it, ask again later");
+  const row2=h("div",{class:"row",style:"display:none"},bKnew,bMiss);
+  function next(){
+    if(!pool.length){refill();knew=0;missed=0;}
+    cur=pool.shift();
+    tag.textContent="From "+cur.m;q.textContent=cur.q;a.textContent=cur.a;a.classList.remove("show");
+    reveal.style.display="";row2.style.display="none";
+    score.textContent="Knew "+knew+" · Missed "+missed+" · "+pool.length+" left in this round of "+total;
+  }
+  box.append(tag,q,reveal,a,row2,score);
+  next();
+})();
+
+/* ===================== steppers ===================== */
+$$(".stepper").forEach(st=>{
+  const steps=$$(":scope > .step",st);
+  steps.forEach((s,i)=>{
+    const t=s.dataset.title||"";
+    s.prepend(h("div",{class:"step-h"},h("b",{},"Step "+(i+1)+" of "+steps.length),h("h3",{},t)));
+  });
+  let cur=0;
+  const dots=h("div",{class:"dots","aria-hidden":"true"},...steps.map(()=>h("i")));
+  const count=h("span",{class:"count"});
+  const next=h("button",{class:"btn primary",type:"button"},"Next step");
+  const prev=h("button",{class:"btn",type:"button"},"Back");
+  const ctrl=h("div",{class:"ctrl"},prev,next,dots,count);
+  st.after(ctrl);
+  function upd(scroll){
+    steps.forEach((s,i)=>{s.classList.toggle("shown",i<=cur);s.classList.toggle("latest",i===cur&&i>0);});
+    $$("i",dots).forEach((d,i)=>d.classList.toggle("on",i<=cur));
+    count.textContent=(cur+1)+" of "+steps.length+" steps shown";
+    prev.disabled=(cur===0);
+    next.disabled=(cur>=steps.length-1);
+    next.textContent=cur>=steps.length-1?"All steps shown":"Next step";
+    if(scroll){try{steps[cur].scrollIntoView({block:"nearest",behavior:"smooth"});}catch(e){}}
+  }
+  next.addEventListener("click",()=>{if(cur<steps.length-1){cur++;upd(true);}});
+  prev.addEventListener("click",()=>{if(cur>0){cur--;upd(false);}});
+  upd(false);
+});
+
+/* ===================== widget mounting ===================== */
+gridDemo($("#w-bfs"),{modes:["bfs"],compare:false});
+gridDemo($("#w-astar"),{modes:["bfs","dijkstra","astar"],compare:true});
+overflowDemo($("#w-overflow"));
+layersDemo($("#w-layers"));
+viaDemo($("#w-via"));
+dijkstraDemo($("#w-dij"));
+steinerDemo($("#w-steiner"));
+orderDemo($("#w-order"));
+pathfinderDemo($("#w-pf"));
+knapDemo($("#w-knap"));
+$("#w-astar").prepend(h("p",{class:"widget-title"},"Same S, T and walls for all three algorithms"));
+
+/* ===================== progress, theme, revision, copy ===================== */
+const MODS=["A6","A1","A2","A3","A4","A5","A7","A8"];
+let doneSet={};
+function loadProg(){try{const v=localStorage.getItem("aisd-guide-done");if(v)doneSet=JSON.parse(v)||{};}catch(e){doneSet={};}}
+function saveProg(){try{localStorage.setItem("aisd-guide-done",JSON.stringify(doneSet));}catch(e){}}
+function paintProg(){
+  const n=MODS.filter(m=>doneSet[m]).length;
+  $("#progtxt").textContent=n+" of "+MODS.length+" modules done";
+  $("#progbar").style.width=(100*n/MODS.length)+"%";
+  $$(".nav a[data-m]").forEach(a=>a.classList.toggle("done",!!doneSet[a.dataset.m]));
+  $$("input[data-done]").forEach(i=>{i.checked=!!doneSet[i.dataset.done];});
+}
+loadProg();
+$$("input[data-done]").forEach(i=>i.addEventListener("change",()=>{doneSet[i.dataset.done]=i.checked;saveProg();paintProg();}));
+paintProg();
+
+$("#revBtn").addEventListener("click",e=>{
+  const on=document.body.classList.toggle("all");
+  e.currentTarget.setAttribute("aria-pressed",String(on));
+});
+$("#themeBtn").addEventListener("click",()=>{
+  const root=document.documentElement;
+  const dark=matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur=root.dataset.theme||(dark?"dark":"light");
+  root.dataset.theme=(cur==="dark")?"light":"dark";
+});
+$$("[data-copy]").forEach(b=>b.addEventListener("click",()=>{
+  const src=document.getElementById(b.dataset.copy);
+  const txt=src.textContent;
+  const mark=()=>{b.textContent="Copied";setTimeout(()=>{b.textContent="Copy prompt";},1600);};
+  const fallback=()=>{
+    try{const r=document.createRange();r.selectNodeContents(src);const s=getSelection();s.removeAllRanges();s.addRange(r);
+      if(document.execCommand("copy"))mark();else b.textContent="Selected: press Ctrl or Cmd + C";}
+    catch(e){b.textContent="Select the text and copy it";}
+  };
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(mark,fallback);}
+    else fallback();
+  }catch(e){fallback();}
+}));
+</script>
+</body>
+</html>
