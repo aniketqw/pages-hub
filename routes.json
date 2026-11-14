@@ -433,6 +433,23 @@
       "visibility": "public",
       "status": "live",
       "managed": true
+    },
+    {
+      "id": "zs-interview-atlas",
+      "title": "ZS BTSA Interview Atlas",
+      "url": "/pages-hub/pages/zs-interview-atlas/",
+      "repo": "pages-hub",
+      "group": "Interview Prep",
+      "description": "67 teaching-first questions, 603 three-round follow-up answers, source evidence and V1/V2 architecture diagrams.",
+      "tags": [
+        "interview",
+        "ZS",
+        "AI",
+        "architecture"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": true
     }
   ]
 }
