@@ -183,6 +183,42 @@ code,pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 mark{background:#4a3a12;color:var(--txt);border-radius:3px}
 @media(max-width:860px){#sidebar{display:none}#main{padding:16px}}
 </style>
+<style>
+#layout.assessment-active #howto,
+#layout.assessment-active #content,
+#layout.assessment-active #footer,
+#layout.assessment-active #search,
+#layout.assessment-active #progressWrap,
+#layout.assessment-active #navBtns ~ *,
+#topbar.assessment-active #focusBtn,
+#topbar.assessment-active #resetBtn { display: none; }
+
+.oa-panel { max-width: 850px; }
+.oa-panel [hidden], .oa-panel[hidden] { display: none; }
+.oa-panel h2 { font-size: clamp(1.55rem, 4vw, 2.15rem); line-height: 1.2; margin: 4px 0 9px; }
+.oa-panel :focus-visible { outline: 2px solid var(--accent2); outline-offset: 4px; }
+.oa-kicker { color: var(--accent); font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.oa-intro { color: var(--dim); margin-bottom: 18px; max-width: 70ch; }
+.oa-question { background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; margin-bottom: 12px; }
+.oa-question > summary { padding: 13px 16px; color: var(--txt); font-size: 1.04rem; font-weight: 650; cursor: pointer; }
+.oa-question > summary::marker, .oa-reveal > summary::marker { color: var(--accent2); }
+.oa-question[open] > summary { border-bottom: 1px solid var(--border); }
+.oa-body { padding: 5px 16px 16px; }
+.oa-body h3 { margin: 17px 0 5px; color: var(--accent2); font-size: 1rem; }
+.oa-body p { margin: 6px 0; }
+.oa-body ol, .oa-body ul { padding-inline-start: 1.55em; }
+.oa-body li { padding-inline-start: .15em; margin-bottom: .45em; }
+.oa-body code { overflow-wrap: anywhere; }
+.oa-note { color: var(--dim); font-size: .87rem; }
+.oa-worked { background: var(--bg); border-inline-start: 3px solid var(--warn); border-radius: 7px; padding: 8px 12px; margin: 9px 0; }
+.oa-reveal { background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; margin: 10px 0 0; padding: 9px 12px; }
+.oa-reveal > summary { cursor: pointer; color: var(--accent2); font-weight: 600; }
+.oa-reveal[open] > summary { margin-bottom: 8px; }
+.oa-reveal pre { overflow-x: auto; padding: 7px 0; font-size: .82rem; }
+.oa-reveal pre code { overflow-wrap: normal; }
+.oa-result { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+.oa-extra { margin: 22px 0 7px; color: var(--dim); font-weight: 650; font-size: .88rem; }
+</style>
 </head>
 <body>
 <script type="application/json" id="bank">{
@@ -17144,7 +17180,930 @@ mark{background:#4a3a12;color:var(--txt);border-radius:3px}
       Mark practiced when you can explain the reasoning. Switch <b>Focus mode OFF</b> to browse lessons freely; keep it ON for recall practice.
     </div>
     <div id="content"></div>
-    <div id="footer"></div>
+    <section id="assessmentPanel" class="oa-panel" aria-labelledby="assessmentTitle" hidden>
+  <div class="oa-kicker">ZS interview practice</div>
+  <h2 id="assessmentTitle" tabindex="-1">Online Assessment</h2>
+  <p class="oa-intro">Start with the question, trace the actual code, then explain why each step is there. Try the new case aloud before opening its answer.</p>
+
+  <details class="oa-question" id="assessment-prompt-quality" open>
+  <summary>PyTorch · Rate LLM Prompt Quality</summary>
+  <div class="oa-body">
+    <h3>Question: How would you train a neural network to rate a prompt?</h3>
+    <p>You receive examples of prompts and their quality scores in <code>train.csv</code>. Scores run from 0 to 5 and can be fractional. Build a neural network that predicts a score for every unlabeled prompt in <code>test.csv</code>. Use mean absolute error (MAE) to evaluate the predictions. Fill <code>submissions.csv</code> with <code>prompt,label</code> in the order in <code>sample_submission.csv</code>.</p>
+    <p>A prompt is the text someone would send to an LLM. The task is to <strong>score that text</strong>. This solution does not call the LLM, generate an answer to the prompt, or train a language model. PyTorch trains a small model that learns from the provided scores.</p>
+    <div class="oa-worked"><p><strong>Trace one prompt:</strong> text → token IDs → one vector per token → average of real tokens → one predicted score. During training, compare that score with the label and use the error to update the model.</p></div>
+    <p class="oa-note">The code below is from the complete practice solution in the chat. It was prepared after the assessment for synthetic data. The original dataset, final submission and official score are unverified; the chat did not run PyTorch training.</p>
+
+    <h3>1. Why is the output one number? What data goes where?</h3>
+    <p>A nominal classification model picks a class. Here a prediction of 3.4 for a label of 3.5 is close, and a prediction of 0 for the same label is far off. MAE gives those mistakes different costs without rounding. The historical solution uses one scalar and floating-point labels.</p>
+    <p><code>train_test_split(..., test_size=0.20)</code> holds back 20% of the labeled rows. Use the other 80% to learn the vocabulary, choose the token cap and train the weights. Use the held-out rows to choose the epoch. The real <code>test.csv</code> has no labels for computing MAE. A real dataset with near-identical prompts may need a grouped split so paraphrases do not appear on both sides.</p>
+    <details class="oa-reveal">
+      <summary>Read the actual data loading and split code</summary>
+      <pre><code># ---------- 2. Load the data ----------
+
+train = pd.read_csv("train.csv", keep_default_na=False)
+test = pd.read_csv("test.csv", keep_default_na=False)
+sample = pd.read_csv(
+    "sample_submission.csv", keep_default_na=False
+)
+
+for frame in (train, test, sample):
+    frame["prompt"] = frame["prompt"].astype(str)
+
+train["label"] = pd.to_numeric(
+    train["label"], errors="raise"
+).astype("float32")
+
+if not train["label"].between(0, 5).all():
+    raise ValueError("Training labels must be between 0 and 5.")
+
+if not sample["prompt"].equals(test["prompt"]):
+    raise ValueError("Sample and test prompts must have the same order.")
+
+
+# ---------- 3. Split labeled data ----------
+
+train_df, val_df = train_test_split(
+    train,
+    test_size=0.20,
+    random_state=SEED,
+)</code></pre>
+    </details>
+
+    <h3>2. Why tokenize, and why look at the longest prompt?</h3>
+    <p><code>tokenize(text)</code> lowercases a prompt and uses <code>\w+</code> to find word-like chunks. <code>Counter</code> counts them on training prompts. <code>build_vocab</code> assigns IDs to the most common tokens, reserving 0 for padding and 1 for unknown words. An ID is a row number in a lookup table. A larger ID does not mean a better word.</p>
+    <p>A batch is a rectangular tensor, so this code makes every row the same length. If <code>MAX_LENGTH</code> is 4, and <code>summarize</code> maps to 2 and <code>sales</code> to 7, then <code>"Summarize sales"</code> becomes <code>[2, 7, 0, 0]</code>. A new word becomes 1. If a prompt is longer than the cap, the code keeps its first tokens. An empty prompt uses <code>[1]</code> before padding.</p>
+    <p>Inspect the observed maximum, then look at p90, p95 and p99. The practice code rounds p99 up. That is a starting point: count how many rows get cut, check what is lost from long prompts, and compare the validation error. A single 12,000-token outlier does not automatically justify padding every prompt to 12,000. The actual exam lengths were not recorded.</p>
+    <p><strong>What the actual bug meant:</strong> in <code>tokenizer(text)</code>, <code>test</code> was the entire DataFrame and had no <code>.lower()</code>. <code>text</code> is the current string, so call <code>text.lower()</code>. The other correction was pandas’ argument name: <code>percentiles=</code>, with an s.</p>
+    <details class="oa-reveal">
+      <summary>Read the actual tokenizer, vocabulary and batch code</summary>
+      <pre><code># ---------- 4. Tokenize and inspect lengths ----------
+
+def tokenize(text):
+    return re.findall(r"\w+", text.lower())
+
+
+lengths = train_df["prompt"].apply(
+    lambda text: len(tokenize(text))
+)
+
+print(lengths.describe(percentiles=[0.90, 0.95, 0.99]))
+
+MAX_LENGTH = max(
+    1, int(np.ceil(lengths.quantile(0.99)))
+)
+
+print("Chosen maximum length:", MAX_LENGTH)
+
+
+# ---------- 5. Vocabulary and data loaders ----------
+
+def build_vocab(prompts):
+    counts = Counter(
+        token
+        for text in prompts
+        for token in tokenize(text)[:MAX_LENGTH]
+    )
+
+    vocabulary = {"&lt;PAD&gt;": 0, "&lt;UNK&gt;": 1}
+
+    for word, _ in counts.most_common(20_000 - 2):
+        vocabulary[word] = len(vocabulary)
+
+    return vocabulary
+
+
+def make_loader(frame, vocabulary, labeled=True, shuffle=False):
+    rows = []
+
+    for text in frame["prompt"]:
+        ids = [
+            vocabulary.get(token, 1)
+            for token in tokenize(text)[:MAX_LENGTH]
+        ]
+
+        if not ids:
+            ids = [1]
+
+        rows.append(ids + [0] * (MAX_LENGTH - len(ids)))
+
+    inputs = torch.tensor(rows, dtype=torch.long)
+
+    if labeled:
+        targets = torch.tensor(
+            frame["label"].to_numpy(),
+            dtype=torch.float32,
+        )
+        dataset = TensorDataset(inputs, targets)
+    else:
+        dataset = TensorDataset(inputs)
+
+    return DataLoader(
+        dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=shuffle,
+    )
+
+
+vocab = build_vocab(train_df["prompt"])
+
+train_loader = make_loader(train_df, vocab, shuffle=True)
+train_eval_loader = make_loader(train_df, vocab)
+val_loader = make_loader(val_df, vocab)</code></pre>
+    </details>
+
+    <h3>3. How does the PyTorch model turn those IDs into a score?</h3>
+    <ol>
+      <li><strong>Look up a trainable vector.</strong> <code>nn.Embedding(vocab_size, 64)</code> stores 64 numbers per ID. The weights start without pretrained language knowledge, and training adjusts the useful rows. With 10,000 IDs this layer has 640,000 parameters. 64 is the vector width, separate from how many words the prompt can contain.</li>
+      <li><strong>Average the real tokens.</strong> <code>token_ids != 0</code> is true on words and false on padding. <code>unsqueeze(-1)</code> adds a trailing dimension so the mask can multiply all 64 features of each token. Sum over the tokens and divide by the count of nonpadding tokens. <code>clamp(min=1)</code> prevents division by zero. Even when the padding vector is zero, counting padded positions would shrink the mean.</li>
+      <li><strong>Predict a scalar.</strong> The linear layers and ReLUs turn the pooled vector into one raw number per prompt. <code>squeeze(-1)</code> removes just the last size-one dimension so the predictions and labels both have shape <code>[B]</code>. Keeping predictions at <code>[B,1]</code> can cause broadcasting against <code>[B]</code> and compare every prediction with every label. <code>5 * sigmoid(score)</code> smoothly maps the raw number to the score scale. A raw score of 0 gives 2.5; very positive or negative raw scores approach the endpoints.</li>
+    </ol>
+    <div class="oa-worked">
+      <p><strong>Do it by hand:</strong> imagine two features instead of 64. Let <code>summarize → [2,0]</code>, <code>sales → [0,4]</code>, and padding be <code>[0,0]</code>. With IDs <code>[2,7,0,0]</code>, the sum is <code>[2,4]</code>. Divide by 2 real tokens to get <code>[1,2]</code>. Dividing by all four positions would give <code>[0.5,1]</code>. The same text would look different just because the batch contained extra padding.</p>
+      <p><strong>Keep track of shapes:</strong> IDs <code>[B,L]</code> → embeddings <code>[B,L,64]</code> → mask <code>[B,L,1]</code> → pooled <code>[B,64]</code> → raw scores <code>[B,1]</code> → predictions <code>[B]</code>. <code>B</code> is the number of prompts in the batch; <code>L</code> is the token cap.</p>
+    </div>
+    <details class="oa-reveal" open>
+      <summary>Read the actual PyTorch model, line by line</summary>
+      <pre><code># ---------- 6. Neural network ----------
+
+class PromptQuality(nn.Module):
+    def __init__(self, vocab_size, embedding_dim=64):
+        super().__init__()
+
+        self.embedding = nn.Embedding(
+            vocab_size,
+            embedding_dim,
+            padding_idx=0,
+        )
+
+        self.network = nn.Sequential(
+            nn.Linear(embedding_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+        )
+
+    def forward(self, token_ids):
+        embeddings = self.embedding(token_ids)
+
+        # Exclude padding from the average.
+        mask = (token_ids != 0).unsqueeze(-1)
+        mask = mask.to(embeddings.dtype)
+
+        pooled = (embeddings * mask).sum(dim=1)
+        pooled = pooled / mask.sum(dim=1).clamp(min=1)
+
+        scores = self.network(pooled).squeeze(-1)
+
+        return 5.0 * torch.sigmoid(scores)</code></pre>
+      <p class="oa-note">The earlier screenshot assigned <code>score</code> but returned <code>scores</code>. This version consistently uses <code>scores</code>.</p>
+    </details>
+    <details class="oa-reveal">
+      <summary>Think first: what breaks if you reverse the two words?</summary>
+      <p>The average is unchanged. This model loses word order: “dog bites man” and “man bites dog” produce the same vector with this tokenizer. It can still learn word and topic signals, but it has trouble with order and context. If that matters on validation, compare with a model that uses order, such as a pretrained text encoder, using the same split and metric.</p>
+    </details>
+
+    <h3>4. What happens between prediction and learning?</h3>
+    <p>Suppose the targets are <code>[3, 2.5, 5]</code> and the outputs are <code>[2.5, 3.5, 4.5]</code>. Their absolute errors are <code>[0.5, 1, 0.5]</code>. The loss is <strong>2 / 3 ≈ 0.6667</strong> score points. Over- and under-predictions both add error. That number is a toy calculation.</p>
+    <p>Each batch calls <code>zero_grad()</code> to clear old gradients. <code>model(inputs)</code> runs <code>forward</code>. <code>nn.L1Loss()</code> compares the predictions with the matching labels. <code>loss.backward()</code> computes how the loss changes with the weights, including embedding weights; <code>optimizer.step()</code> uses those gradients to update them. The next batch uses the updated weights.</p>
+    <p>During evaluation, use <code>model.eval()</code> and <code>no_grad()</code>: evaluation mode sets the layer behavior and <code>no_grad()</code> stops gradient tracking. Add all absolute errors and divide by the number of rows. If a 32-row batch has mean error 1 and a 1-row batch has mean error 3, the result is <code>(32 + 3) / 33</code>, not 2. Batch means need to be weighted by their sizes.</p>
+    <details class="oa-reveal">
+      <summary>Read the actual loss, gradient updates and MAE code</summary>
+      <pre><code># ---------- 7. Training and evaluation functions ----------
+
+loss_fn = nn.L1Loss()  # Mean absolute error.
+
+
+def train_one_epoch(model, loader, optimizer):
+    model.train()
+
+    for inputs, targets in loader:
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        optimizer.zero_grad()
+
+        predictions = model(inputs)
+        loss = loss_fn(predictions, targets)
+
+        loss.backward()
+        optimizer.step()
+
+
+@torch.no_grad()
+def calculate_mae(model, loader):
+    model.eval()
+
+    total_error = 0.0
+    total_samples = 0
+
+    for inputs, targets in loader:
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        predictions = model(inputs)
+
+        total_error += (
+            predictions - targets
+        ).abs().sum().item()
+
+        total_samples += targets.numel()
+
+    return total_error / total_samples</code></pre>
+    </details>
+
+    <h3>5. Why measure validation MAE, and what do we keep?</h3>
+    <p>Training error tells you how closely the model fits the rows it used to learn. The held-out error is how you choose when to stop: if training MAE falls but validation MAE rises, the model may be learning quirks that do not help on new prompts. In the script, <code>deepcopy(model.state_dict())</code> saves the best weights as they were at that epoch. Compare held-out MAE against a constant prediction equal to the median of the training labels. For absolute error, moving a constant toward the median reduces the errors for at least as many labels as it increases them.</p>
+    <p>After selecting the number of epochs, the practice script builds a vocabulary on all labeled rows and starts a fresh model for that many epochs. Rebuilding can change which token each ID means, so the old embedding table should not be reused with the new IDs. The earlier validation MAE belongs to the earlier model, not the final refit.</p>
+    <details class="oa-reveal">
+      <summary>Read the actual model selection and final refit code</summary>
+      <pre><code># ---------- 8. Train and select the best epoch ----------
+
+model = PromptQuality(
+    len(vocab), EMBEDDING_DIM
+).to(device)
+
+optimizer = torch.optim.Adam(
+    model.parameters(), lr=0.001
+)
+
+best_val_mae = float("inf")
+best_epoch = 0
+best_state = None
+
+for epoch in range(1, EPOCHS + 1):
+    train_one_epoch(model, train_loader, optimizer)
+
+    train_mae = calculate_mae(model, train_eval_loader)
+    val_mae = calculate_mae(model, val_loader)
+
+    print(
+        f"Epoch {epoch:02d} | "
+        f"Train MAE: {train_mae:.4f} | "
+        f"Validation MAE: {val_mae:.4f}"
+    )
+
+    if val_mae &lt; best_val_mae:
+        best_val_mae = val_mae
+        best_epoch = epoch
+        best_state = copy.deepcopy(model.state_dict())
+
+model.load_state_dict(best_state)
+
+print("\nSelected epoch:", best_epoch)
+print("Selected model train MAE:",
+      calculate_mae(model, train_eval_loader))
+print("Selected model validation MAE:",
+      calculate_mae(model, val_loader))
+
+
+# ---------- 9. Refit on all labeled training rows ----------
+
+# Test labels are still not loaded.
+vocab = build_vocab(train["prompt"])
+
+full_train_loader = make_loader(
+    train, vocab, shuffle=True
+)
+
+torch.manual_seed(SEED)
+
+final_model = PromptQuality(
+    len(vocab), EMBEDDING_DIM
+).to(device)
+
+final_optimizer = torch.optim.Adam(
+    final_model.parameters(), lr=0.001
+)
+
+for epoch in range(best_epoch):
+    train_one_epoch(
+        final_model,
+        full_train_loader,
+        final_optimizer,
+    )</code></pre>
+    </details>
+
+    <h3>6. How do you make the submission without mixing up the rows?</h3>
+    <p>Use the final vocabulary and set <code>shuffle=False</code>. Use <code>eval()</code> and no gradients. Append scores in test order. Check that the output has the same row count as <code>test.csv</code> and that the sample prompts match in order. Fill the sample's <code>label</code> column and write <code>submissions.csv</code> with <code>index=False</code>. The chat also wrote the singular name for convenience. The real grader is the only source of the hidden labels; the extra <code>test_labels.csv</code> block in this code was a synthetic practice check.</p>
+    <details class="oa-reveal">
+      <summary>Read the actual prediction and submission code</summary>
+      <pre><code># ---------- 10. Predict test prompts ----------
+
+test_loader = make_loader(
+    test,
+    vocab,
+    labeled=False,
+    shuffle=False,
+)
+
+final_model.eval()
+predictions = []
+
+with torch.no_grad():
+    for (inputs,) in test_loader:
+        batch_predictions = final_model(
+            inputs.to(device)
+        )
+
+        predictions.extend(
+            batch_predictions.cpu().tolist()
+        )
+
+assert len(predictions) == len(test)
+assert np.isfinite(predictions).all()
+
+
+# ---------- 11. Create the submission ----------
+
+submission = sample.copy()
+submission["label"] = np.clip(predictions, 0.0, 5.0)
+
+submission.to_csv("submission.csv", index=False)
+submission.to_csv("submissions.csv", index=False)
+
+print("\nSubmission preview:")
+print(submission.head())</code></pre>
+    </details>
+    <details class="oa-reveal">
+      <summary>Read the practice-only answer-key evaluation</summary>
+      <pre><code># ---------- 12. Practice-only test evaluation ----------
+
+# Open the answer key only AFTER saving predictions.
+truth = pd.read_csv(
+    "test_labels.csv", keep_default_na=False
+)
+
+if not truth["prompt"].equals(submission["prompt"]):
+    raise ValueError("Answer-key row order does not match.")
+
+truth["label"] = pd.to_numeric(
+    truth["label"], errors="raise"
+)
+
+if not truth["label"].between(0, 5).all():
+    raise ValueError("Answer-key labels must be between 0 and 5.")
+
+evaluation = pd.DataFrame({
+    "prompt": test["prompt"],
+    "true_label": truth["label"],
+    "predicted_label": submission["label"],
+})
+
+evaluation["absolute_error"] = (
+    evaluation["true_label"]
+    - evaluation["predicted_label"]
+).abs()
+
+test_mae = evaluation["absolute_error"].mean()
+
+evaluation.to_csv("test_evaluation.csv", index=False)
+
+print("\nPer-prompt evaluation:")
+print(
+    evaluation[
+        ["true_label", "predicted_label", "absolute_error"]
+    ].head(10)
+)
+
+print(f"\nFINAL TEST MAE: {test_mae:.4f}")
+
+# Compare with always predicting the training-label median.
+baseline_prediction = train["label"].median()
+baseline_mae = (
+    truth["label"] - baseline_prediction
+).abs().mean()
+
+print(f"Constant baseline test MAE: {baseline_mae:.4f}")</code></pre>
+    </details>
+    <details class="oa-reveal">
+      <summary>Show the complete original practice script</summary>
+      <p class="oa-note">This is the complete script from the final chat response. Its practice-only final section expects a separate answer-key CSV. No datasets are bundled here.</p>
+      <pre><code>import copy
+import re
+from collections import Counter
+
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, TensorDataset
+
+
+# ---------- 1. Settings ----------
+
+SEED = 42
+EPOCHS = 25
+BATCH_SIZE = 32
+EMBEDDING_DIM = 64
+
+torch.manual_seed(SEED)
+
+device = torch.device(
+    "cuda" if torch.cuda.is_available() else "cpu"
+)
+
+
+# ---------- 2. Load the data ----------
+
+train = pd.read_csv("train.csv", keep_default_na=False)
+test = pd.read_csv("test.csv", keep_default_na=False)
+sample = pd.read_csv(
+    "sample_submission.csv", keep_default_na=False
+)
+
+for frame in (train, test, sample):
+    frame["prompt"] = frame["prompt"].astype(str)
+
+train["label"] = pd.to_numeric(
+    train["label"], errors="raise"
+).astype("float32")
+
+if not train["label"].between(0, 5).all():
+    raise ValueError("Training labels must be between 0 and 5.")
+
+if not sample["prompt"].equals(test["prompt"]):
+    raise ValueError("Sample and test prompts must have the same order.")
+
+
+# ---------- 3. Split labeled data ----------
+
+train_df, val_df = train_test_split(
+    train,
+    test_size=0.20,
+    random_state=SEED,
+)
+
+
+# ---------- 4. Tokenize and inspect lengths ----------
+
+def tokenize(text):
+    return re.findall(r"\w+", text.lower())
+
+
+lengths = train_df["prompt"].apply(
+    lambda text: len(tokenize(text))
+)
+
+print(lengths.describe(percentiles=[0.90, 0.95, 0.99]))
+
+MAX_LENGTH = max(
+    1, int(np.ceil(lengths.quantile(0.99)))
+)
+
+print("Chosen maximum length:", MAX_LENGTH)
+
+
+# ---------- 5. Vocabulary and data loaders ----------
+
+def build_vocab(prompts):
+    counts = Counter(
+        token
+        for text in prompts
+        for token in tokenize(text)[:MAX_LENGTH]
+    )
+
+    vocabulary = {"&lt;PAD&gt;": 0, "&lt;UNK&gt;": 1}
+
+    for word, _ in counts.most_common(20_000 - 2):
+        vocabulary[word] = len(vocabulary)
+
+    return vocabulary
+
+
+def make_loader(frame, vocabulary, labeled=True, shuffle=False):
+    rows = []
+
+    for text in frame["prompt"]:
+        ids = [
+            vocabulary.get(token, 1)
+            for token in tokenize(text)[:MAX_LENGTH]
+        ]
+
+        if not ids:
+            ids = [1]
+
+        rows.append(ids + [0] * (MAX_LENGTH - len(ids)))
+
+    inputs = torch.tensor(rows, dtype=torch.long)
+
+    if labeled:
+        targets = torch.tensor(
+            frame["label"].to_numpy(),
+            dtype=torch.float32,
+        )
+        dataset = TensorDataset(inputs, targets)
+    else:
+        dataset = TensorDataset(inputs)
+
+    return DataLoader(
+        dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=shuffle,
+    )
+
+
+vocab = build_vocab(train_df["prompt"])
+
+train_loader = make_loader(train_df, vocab, shuffle=True)
+train_eval_loader = make_loader(train_df, vocab)
+val_loader = make_loader(val_df, vocab)
+
+
+# ---------- 6. Neural network ----------
+
+class PromptQuality(nn.Module):
+    def __init__(self, vocab_size, embedding_dim=64):
+        super().__init__()
+
+        self.embedding = nn.Embedding(
+            vocab_size,
+            embedding_dim,
+            padding_idx=0,
+        )
+
+        self.network = nn.Sequential(
+            nn.Linear(embedding_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+        )
+
+    def forward(self, token_ids):
+        embeddings = self.embedding(token_ids)
+
+        # Exclude padding from the average.
+        mask = (token_ids != 0).unsqueeze(-1)
+        mask = mask.to(embeddings.dtype)
+
+        pooled = (embeddings * mask).sum(dim=1)
+        pooled = pooled / mask.sum(dim=1).clamp(min=1)
+
+        scores = self.network(pooled).squeeze(-1)
+
+        return 5.0 * torch.sigmoid(scores)
+
+
+# ---------- 7. Training and evaluation functions ----------
+
+loss_fn = nn.L1Loss()  # Mean absolute error.
+
+
+def train_one_epoch(model, loader, optimizer):
+    model.train()
+
+    for inputs, targets in loader:
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        optimizer.zero_grad()
+
+        predictions = model(inputs)
+        loss = loss_fn(predictions, targets)
+
+        loss.backward()
+        optimizer.step()
+
+
+@torch.no_grad()
+def calculate_mae(model, loader):
+    model.eval()
+
+    total_error = 0.0
+    total_samples = 0
+
+    for inputs, targets in loader:
+        inputs = inputs.to(device)
+        targets = targets.to(device)
+
+        predictions = model(inputs)
+
+        total_error += (
+            predictions - targets
+        ).abs().sum().item()
+
+        total_samples += targets.numel()
+
+    return total_error / total_samples
+
+
+# ---------- 8. Train and select the best epoch ----------
+
+model = PromptQuality(
+    len(vocab), EMBEDDING_DIM
+).to(device)
+
+optimizer = torch.optim.Adam(
+    model.parameters(), lr=0.001
+)
+
+best_val_mae = float("inf")
+best_epoch = 0
+best_state = None
+
+for epoch in range(1, EPOCHS + 1):
+    train_one_epoch(model, train_loader, optimizer)
+
+    train_mae = calculate_mae(model, train_eval_loader)
+    val_mae = calculate_mae(model, val_loader)
+
+    print(
+        f"Epoch {epoch:02d} | "
+        f"Train MAE: {train_mae:.4f} | "
+        f"Validation MAE: {val_mae:.4f}"
+    )
+
+    if val_mae &lt; best_val_mae:
+        best_val_mae = val_mae
+        best_epoch = epoch
+        best_state = copy.deepcopy(model.state_dict())
+
+model.load_state_dict(best_state)
+
+print("\nSelected epoch:", best_epoch)
+print("Selected model train MAE:",
+      calculate_mae(model, train_eval_loader))
+print("Selected model validation MAE:",
+      calculate_mae(model, val_loader))
+
+
+# ---------- 9. Refit on all labeled training rows ----------
+
+# Test labels are still not loaded.
+vocab = build_vocab(train["prompt"])
+
+full_train_loader = make_loader(
+    train, vocab, shuffle=True
+)
+
+torch.manual_seed(SEED)
+
+final_model = PromptQuality(
+    len(vocab), EMBEDDING_DIM
+).to(device)
+
+final_optimizer = torch.optim.Adam(
+    final_model.parameters(), lr=0.001
+)
+
+for epoch in range(best_epoch):
+    train_one_epoch(
+        final_model,
+        full_train_loader,
+        final_optimizer,
+    )
+
+
+# ---------- 10. Predict test prompts ----------
+
+test_loader = make_loader(
+    test,
+    vocab,
+    labeled=False,
+    shuffle=False,
+)
+
+final_model.eval()
+predictions = []
+
+with torch.no_grad():
+    for (inputs,) in test_loader:
+        batch_predictions = final_model(
+            inputs.to(device)
+        )
+
+        predictions.extend(
+            batch_predictions.cpu().tolist()
+        )
+
+assert len(predictions) == len(test)
+assert np.isfinite(predictions).all()
+
+
+# ---------- 11. Create the submission ----------
+
+submission = sample.copy()
+submission["label"] = np.clip(predictions, 0.0, 5.0)
+
+submission.to_csv("submission.csv", index=False)
+submission.to_csv("submissions.csv", index=False)
+
+print("\nSubmission preview:")
+print(submission.head())
+
+
+# ---------- 12. Practice-only test evaluation ----------
+
+# Open the answer key only AFTER saving predictions.
+truth = pd.read_csv(
+    "test_labels.csv", keep_default_na=False
+)
+
+if not truth["prompt"].equals(submission["prompt"]):
+    raise ValueError("Answer-key row order does not match.")
+
+truth["label"] = pd.to_numeric(
+    truth["label"], errors="raise"
+)
+
+if not truth["label"].between(0, 5).all():
+    raise ValueError("Answer-key labels must be between 0 and 5.")
+
+evaluation = pd.DataFrame({
+    "prompt": test["prompt"],
+    "true_label": truth["label"],
+    "predicted_label": submission["label"],
+})
+
+evaluation["absolute_error"] = (
+    evaluation["true_label"]
+    - evaluation["predicted_label"]
+).abs()
+
+test_mae = evaluation["absolute_error"].mean()
+
+evaluation.to_csv("test_evaluation.csv", index=False)
+
+print("\nPer-prompt evaluation:")
+print(
+    evaluation[
+        ["true_label", "predicted_label", "absolute_error"]
+    ].head(10)
+)
+
+print(f"\nFINAL TEST MAE: {test_mae:.4f}")
+
+# Compare with always predicting the training-label median.
+baseline_prediction = train["label"].median()
+baseline_mae = (
+    truth["label"] - baseline_prediction
+).abs().mean()
+
+print(f"Constant baseline test MAE: {baseline_mae:.4f}")</code></pre>
+    </details>
+
+    <h3>Practise defending one choice at a time</h3>
+    <p>You get <code>[5,8,0,0]</code>, a label of 3.5, and a predicted score of 2.0. Explain which embedding rows are averaged, the loss for this one row, what the optimizer changes, and why the hidden test label cannot help you tune the model.</p>
+    <details class="oa-reveal">
+      <summary>Check your reasoning</summary>
+      <p>Only rows 5 and 8 enter the mean. The one-row absolute error is 1.5. Backpropagation computes gradients for the weights used in that prediction, and Adam updates the trainable model parameters. Validation uses labels from the held-out part of <code>train.csv</code>; using hidden test labels to choose settings would invalidate a test of generalization.</p>
+    </details>
+    <details class="oa-reveal">
+      <summary>Compare with a sample interview answer</summary>
+      <p class="speak">“The inputs were prompts and the labels were fractional quality scores, so I set the task up as regression. I split the labeled data first, then built a vocabulary and chose a length cap using the training rows. PyTorch looks up a trainable vector for each token. I average only the real tokens, then use a small network to produce one score from 0 to 5. I compare it with the label using absolute error and choose the epoch by validation MAE. The main tradeoff is that averaging loses word order. Finally I predict in test order so every score is attached to the right prompt.”</p>
+    </details>
+  </div>
+</details>
+
+  <p class="oa-extra">Python and SQL questions</p>
+  <details class="oa-question" id="assessment-sumtable">
+    <summary>Python · SumTable rectangle queries</summary>
+    <div class="oa-body">
+      <h3>What to build</h3>
+      <p>Implement <code>SumTable(arr)</code>. The test runner reads a rectangle with <code>table[i1:i2, j1:j2]</code> and replaces one cell with <code>table[i, j] = k</code>. In a slice, the start is included and the stop is excluded. For example, <code>table[0:2, 1:3]</code> reads rows 0 and 1, columns 1 and 2.</p>
+      <p class="oa-note">The original screenshot wording could not be recovered. The earlier chat records a matrix up to 500 × 500, up to 100,000 operations and at most 50 assignments.</p>
+
+      <h3>How to solve it</h3>
+      <ol>
+        <li><strong>Use the workload to choose the method.</strong> Most operations are reads. Scanning the rectangle on every read could touch up to 25 billion cells. Spend some work up front so each read takes four lookups.</li>
+        <li><strong>Make a table of sums from the top left.</strong> <code>P[r][c]</code> holds the sum of the first <code>r</code> rows and the first <code>c</code> columns. For example, <code>P[2][2]</code> sums rows 0 and 1 and columns 0 and 1. The extra row and column of zeros give you <code>P[0][c] = P[r][0] = 0</code>. To fill each cell, add the running sum of the current row to the prefix directly above it.</li>
+        <li><strong>Read the rectangle.</strong> Start with the big prefix <code>P[i2][j2]</code>. Subtract the part above the rectangle and the part to its left. Those two parts overlap, so add the top left overlap back once:
+          <p><code>P[i2][j2] - P[i1][j2] - P[i2][j1] + P[i1][j1]</code></p></li>
+        <li><strong>Assign by the change in value.</strong> Keep a copy of the matrix so you can find the current value. Compute <code>delta = new - old</code> and update the cell. Then add <code>delta</code> to every prefix with <code>r &gt;= i + 1</code> and <code>c &gt;= j + 1</code>. These are exactly the prefixes that include row <code>i</code> and column <code>j</code> at the same time.</li>
+      </ol>
+
+      <h3>Walk the recovered sample</h3>
+      <div class="oa-worked">
+        <p>Start with <code>[[1, 2, 3], [4, 5, 6]]</code>. Query <code>[0:2, 1:3]</code>. The whole prefix is 21, the strip at the left is 5, and the top strip and overlap are zero. The answer is <strong>21 − 0 − 5 + 0 = 16</strong>.</p>
+        <p>Replace cell <code>(0, 1)</code> with 10. It was 2, so the change is +8. The whole prefix becomes 29 and the left strip stays 5, so the same query returns <strong>24</strong>. Next replace <code>(0, 0)</code> with −3. Query <code>[0:1, 0:2]</code> to get <strong>−3 + 10 = 7</strong>.</p>
+        <p><strong>Why add the overlap?</strong> Before either update, query just the 5 with <code>[1:2, 1:2]</code>. The prefix of the full 2 × 2 corner is 12, the top strip is 3, and the left strip is 5. Both strips contain the top left 1, so the result is <code>12 - 3 - 5 + 1 = 5</code>.</p>
+      </div>
+
+      <details class="oa-reveal">
+        <summary>Show the Python class</summary>
+        <p class="oa-note">Worked solution from the chat. Python calls <code>__getitem__</code> with two slice objects and <code>__setitem__</code> with two integer indices. Keep the runner supplied by the question.</p>
+        <pre><code>class SumTable:
+    def __init__(self, arr):
+        self.n, self.m = len(arr), len(arr[0])
+        self.data = [row[:] for row in arr]
+        self.prefix = [[0] * (self.m + 1) for _ in range(self.n + 1)]
+
+        for r in range(1, self.n + 1):
+            row_sum = 0
+            for c in range(1, self.m + 1):
+                row_sum += self.data[r - 1][c - 1]
+                self.prefix[r][c] = self.prefix[r - 1][c] + row_sum
+
+    def __getitem__(self, key):
+        rows, cols = key
+        i1, i2 = rows.start, rows.stop
+        j1, j2 = cols.start, cols.stop
+        p = self.prefix
+        return p[i2][j2] - p[i1][j2] - p[i2][j1] + p[i1][j1]
+
+    def __setitem__(self, key, value):
+        i, j = key
+        delta = value - self.data[i][j]
+        self.data[i][j] = value
+        if delta == 0:
+            return
+        for r in range(i + 1, self.n + 1):
+            for c in range(j + 1, self.m + 1):
+                self.prefix[r][c] += delta</code></pre>
+      </details>
+
+      <h3>Cost and checks</h3>
+      <p>Build and storage are <code>O(nm)</code>. Each read takes <code>O(1)</code>. A write at <code>(i,j)</code> touches at most <code>(n-i)(m-j)</code> prefixes. At most 50 writes means at most 12.5 million prefix updates at the largest dimensions. Check a single cell, both matrix edges, a negative change, and assigning the same value twice. Compare random queries with direct summation as a check.</p>
+
+      <h3>Try it aloud</h3>
+      <p>On <code>[[1, 2], [3, 4]]</code>, assign <code>table[1, 0] = 8</code>. Which prefixes change, what does the bottom row sum become, and why does the top row stay the same?</p>
+      <details class="oa-reveal">
+        <summary>Check your trace</summary>
+        <p>The change is <code>8 - 3 = 5</code>. Only <code>P[2][1]</code> and <code>P[2][2]</code> include that cell, so they each go up by 5. The bottom row now sums to 12. No prefix ending at row boundary 1 includes row index 1, so the top row stays at 3.</p>
+      </details>
+      <details class="oa-reveal">
+        <summary>Compare with a sample interview answer</summary>
+        <p class="speak">“The task was to return sums for parts of a grid even after cell assignments. Since at most 50 operations change the grid, I used a prefix table to make reads constant time. I take the sum from the top left to the far corner, remove the area above and to the left, and add the overlap back once. On assignment I look up the old value and add the difference to the prefixes that contain the cell. I checked the sample and compared random operations with direct summation. For frequent writes, I’d consider a 2D Fenwick tree, which makes both operations logarithmic in each dimension.”</p>
+      </details>
+    </div>
+  </details>
+
+  <details class="oa-question" id="assessment-transfers">
+    <summary>MySQL · Report repeated transfers</summary>
+    <div class="oa-body">
+      <h3>What to return</h3>
+      <p>Given <code>transactions(dt, sender, recipient, amount)</code>, keep every row belonging to a directed <code>(sender, recipient)</code> pair that appears at least twice. Return one row per sender. Include the first and last qualifying times and a formatted amount summary. Sort the senders by numeric total, largest first.</p>
+      <p class="oa-note">This reconstructs the question from the prior answer and the output pasted into the chat. The dates were stored as text and amounts as decimals with six places. No time gap limit was recorded.</p>
+
+      <h3>How to solve it</h3>
+      <ol>
+        <li><strong>Find repeated pairs.</strong> Group by <code>sender, recipient</code> and keep groups with <code>HAVING COUNT(*) &gt;= 2</code>. If the rows are <code>A → X</code>, <code>A → Y</code>, <code>A → X</code>, the pair <code>(A, X)</code> qualifies and <code>(A, Y)</code> does not. A transfer in the reverse direction belongs to another pair.</li>
+        <li><strong>Select the original rows for those pairs.</strong> Use <code>WHERE (sender, recipient) IN (...)</code> or join on both columns. You need the original rows to calculate sums and times and to keep duplicate amounts.</li>
+        <li><strong>Group the kept rows by sender.</strong> Count the rows, sum all amounts and take the earliest and latest full timestamps. Only then display the time of day, so a transfer after midnight is placed correctly. Use <code>GROUP_CONCAT(amount ORDER BY amount DESC)</code> to make the descending amount list.</li>
+        <li><strong>Format at the end.</strong> Use <code>SUBSTRING_INDEX</code> to keep up to three amounts. Replace their commas with <code>' + '</code>. If the count is above three, add <code>' + .. '</code> followed by <code>count - 3</code> and <code>' more'</code>. Add <code>' = '</code> and the total to six decimal places. Order by the numeric total column.</li>
+      </ol>
+
+      <h3>Walk a tiny example</h3>
+      <div class="oa-worked">
+        <p>Sender A makes these transfers on one day: 40 to X at 09:00, 500 to Y at 09:05, 60 to X at 09:10, and 10, 20 and 30 to Z at 09:15, 09:20 and 09:25. Keep X and Z. There are five qualifying rows. The 500 has no effect. The 10 and 20 count toward the sum even though the report hides them.</p>
+        <p><strong>Trace what each query returns:</strong> the innermost query returns two pairs, <code>(A,X)</code> and <code>(A,Z)</code>. The filter keeps five transaction rows. Grouping those by sender produces one row with <code>n=5</code>, <code>total=160</code>, and a comma-separated list in the order <code>60,40,30,20,10</code>. The outer query changes only how those results are displayed.</p>
+        <pre class="oa-result">A | 09:00:00 - 09:25:00 | 60.000000 + 40.000000 + 30.000000 + .. 2 more = 160.000000</pre>
+      </div>
+
+      <details class="oa-reveal">
+        <summary>Show the complete MySQL query</summary>
+        <p class="oa-note">This is the compact MySQL 8 query proposed in the chat, with the spacing applied. The common table expression, or CTE, named <code>s</code> holds the numbers for each sender. The outer select turns the numbers into the final strings.</p>
+        <pre><code>WITH s AS (
+    SELECT sender,
+           MIN(CAST(dt AS DATETIME)) AS first_dt,
+           MAX(CAST(dt AS DATETIME)) AS last_dt,
+           COUNT(*) AS n,
+           SUM(amount) AS total,
+           GROUP_CONCAT(amount ORDER BY amount DESC) AS amounts
+    FROM transactions
+    WHERE (sender, recipient) IN (
+        SELECT sender, recipient
+        FROM transactions
+        GROUP BY sender, recipient
+        HAVING COUNT(*) &gt;= 2
+    )
+    GROUP BY sender
+)
+SELECT sender,
+       CONCAT(TIME(first_dt), ' - ', TIME(last_dt)) AS period,
+       CONCAT(
+           REPLACE(SUBSTRING_INDEX(amounts, ',', 3), ',', ' + '),
+           IF(n &gt; 3, CONCAT(' + .. ', n - 3, ' more'), ''),
+           ' = ', CAST(total AS DECIMAL(65, 6))
+       ) AS transactions
+FROM s
+ORDER BY total DESC;</code></pre>
+      </details>
+
+      <h3>How the debugging went</h3>
+      <p>The isolated <code>GROUP_CONCAT(amount ORDER BY amount DESC)</code> ran successfully. The exact cause of error 1064 in the earlier full query is unknown. The pasted rows from the later query matched the visible amounts and totals; the visible difference was spaces around each plus. The expected first row showed three amounts plus 60 hidden, so its total covered 63 transfers. No final judge result was recorded.</p>
+      <p>When debugging, run the query for the pair list first, then the numeric summary, then the strings. Put <code>ORDER BY</code> inside <code>GROUP_CONCAT(...)</code> with no comma before it. The quoted delimiter <code>','</code> belongs to the outer <code>SUBSTRING_INDEX</code> call. Check one-off rows, repeated equal amounts, a group of exactly three and a group of four.</p>
+
+      <h3>Try it aloud</h3>
+      <p>A sends amounts of 10, 10, 3 and 2 to X, and sends 500 one time to Y later that day. What goes in the amount summary? Does the late transfer change the displayed period?</p>
+      <details class="oa-reveal">
+        <summary>Check your trace</summary>
+        <p><code>10.000000 + 10.000000 + 3.000000 + .. 1 more = 25.000000</code>. The two 10s both count. The 500 does not change the total or the end of the period, because the pair with Y never qualifies.</p>
+      </details>
+      <details class="oa-reveal">
+        <summary>Compare with a sample interview answer</summary>
+        <p class="speak">“I used two grouping levels. First I grouped by sender and recipient to find pairs with two or more transfers. Then I kept those transfers and grouped by sender to get the count, time range and total. I picked the three largest amounts for display, while the total used every qualifying row. I kept the numeric total for sorting and formatted the text last. During debugging I ran the ordered concatenation by itself and compared the visible output with the expected line. The mismatch I could confirm was the spacing around the plus signs.”</p>
+      </details>
+    </div>
+  </details>
+
+</section>
+
+<div id="footer"></div>
   </main>
 </div>
 
@@ -17393,6 +18352,38 @@ function renderCard(q){
   wrap.appendChild(acts);
   return card;
 }
+
+/* The assessment is a standalone study view, outside study progress. */
+var assessmentKey = "__assessment__";
+var sourceUpdateNav = updateNav;
+updateNav = function() {
+  sourceUpdateNav();
+  var active = state.seg === assessmentKey;
+  var button = el('button', 'navbtn' + (active ? ' on' : ''));
+  button.id = 'assessmentTab';
+  button.setAttribute('type', 'button');
+  button.setAttribute('aria-controls', 'assessmentPanel');
+  button.setAttribute('aria-pressed', String(active));
+  button.appendChild(el('span', null, 'Online Assessment'));
+  button.appendChild(el('span', 'cnt', 'Review'));
+  button.addEventListener('click', function() {
+    state.seg = assessmentKey;
+    render();
+    var title = document.getElementById('assessmentTitle');
+    if (title.focus) title.focus();
+    try { window.scrollTo(0, 0); } catch (e) {}
+  });
+  document.getElementById('navBtns').appendChild(button);
+};
+var sourceRender = render;
+render = function() {
+  var active = state.seg === assessmentKey;
+  document.getElementById('layout').classList.toggle('assessment-active', active);
+  document.getElementById('topbar').classList.toggle('assessment-active', active);
+  document.getElementById('assessmentPanel').hidden = !active;
+  if (active) updateNav();
+  else sourceRender();
+};
 
 /* ---------- architecture render ---------- */
 var mermaidReady=false, mermaidTried=false, diagramSeq=0, diagramCache={};
