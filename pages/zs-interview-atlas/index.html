@@ -219,6 +219,91 @@ mark{background:#4a3a12;color:var(--txt);border-radius:3px}
 .oa-result { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
 .oa-extra { margin: 22px 0 7px; color: var(--dim); font-weight: 650; font-size: .88rem; }
 </style>
+<!-- visiondev-copilot:style:begin -->
+<style>
+#layout.visiondev-copilot-active #howto,
+#layout.visiondev-copilot-active #content,
+#layout.visiondev-copilot-active #footer,
+#layout.visiondev-copilot-active #search,
+#layout.visiondev-copilot-active #progressWrap,
+#layout.visiondev-copilot-active #navBtns ~ *,
+#topbar.visiondev-copilot-active #focusBtn,
+#topbar.visiondev-copilot-active #resetBtn { display:none }
+#visiondevCopilotMobile{display:none}
+.vdc[hidden],.vdc [hidden] {display:none!important}
+.vdc {--vd-bg:#101721;--vd-panel:#161f2a;--vd-raised:#1e2c3b;--vd-line:#3b4e62;--vd-fg:#eef4fa;--vd-muted:#bdcad8;--vd-coral:#ffb184;--vd-mint:#a8e5d4;--vd-link:#a9d3ff;color:var(--vd-fg);color-scheme:dark;max-width:1240px;margin:0 auto 44px;min-width:0;line-height:1.55}
+.vdc *, .vdc *::before,.vdc *::after{box-sizing:border-box}
+.vdc h2,.vdc h3,.vdc h4,.vdc p,.vdc blockquote{margin:0;overflow-wrap:anywhere}
+.vdc a{color:var(--vd-link);text-decoration:underline;text-underline-offset:3px}
+.vdc :focus-visible{outline:2px solid var(--vd-mint);outline-offset:3px}
+.vdc-hero{padding:clamp(12px,2.5vw,32px) 0 20px;border-bottom:1px solid var(--vd-line);margin-bottom:20px}
+.vdc .vdc-kicker{font:700 .75rem/1.35 ui-monospace,monospace;letter-spacing:.08em;color:var(--vd-coral)}
+.vdc .vdc-hero h2{font-size:clamp(2rem,5.2vw,3.8rem);letter-spacing:-.055em;line-height:1.05;margin:.15em 0 .22em}
+.vdc .vdc-hero h2 span{color:var(--vd-coral)}
+.vdc .vdc-hero>p:not(.vdc-kicker){color:var(--vd-muted)}
+.vdc .vdc-meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:.82rem}
+.vdc-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(225px,1fr);align-items:start;gap:clamp(12px,2vw,25px)}
+.vdc-card,.vdc-map{min-width:0;padding:clamp(12px,2vw,21px);background:var(--vd-panel);border:1px solid var(--vd-line);border-radius:14px}
+.vdc .vdc-question-menu{display:grid;gap:4px;margin-bottom:14px;font-size:.82rem;color:var(--vd-muted)}
+.vdc select,.vdc button{font:inherit;min-width:0;color:var(--vd-fg);background:var(--vd-bg);border:1px solid var(--vd-line);border-radius:8px;padding:7px 9px}
+.vdc select{width:100%;text-overflow:ellipsis}
+.vdc button{cursor:pointer}
+.vdc button:disabled{cursor:default;opacity:.52}
+.vdc button:hover:enabled{border-color:var(--vd-mint)}
+.vdc button.vdc-primary{background:var(--vd-coral);color:#24130a;border-color:var(--vd-coral);font-weight:750}
+.vdc #vdc-question{font-size:clamp(1.17rem,2.6vw,1.65rem);line-height:1.28;margin:.32em 0 .35em;letter-spacing:-.024em}
+.vdc #vdc-context,.vdc .vdc-muted{color:var(--vd-muted)}
+.vdc figure{margin:12px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.vdc figure img{image-rendering:pixelated;max-width:100%;height:auto;border-radius:6px}
+.vdc figcaption{font-size:.8rem;color:var(--vd-muted);max-width:29ch}
+.vdc .vdc-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:12px;font-size:.83rem}
+.vdc .vdc-cycle{justify-content:space-between;padding-top:12px;border-top:1px solid var(--vd-line)}
+.vdc .vdc-hint{margin-top:10px;border-inline-start:3px solid var(--vd-mint);padding:5px 10px;color:var(--vd-mint)}
+.vdc-answer{margin-top:14px;padding-top:12px;border-top:1px solid var(--vd-line)}
+.vdc #vdc-steps{margin:8px 0 0;padding-inline-start:25px}
+.vdc #vdc-steps li{padding-inline-start:3px;margin-bottom:9px}
+.vdc li::marker{color:var(--vd-mint);font-weight:700}
+.vdc #vdc-steps strong{display:block}
+.vdc #vdc-steps p{color:var(--vd-muted)}
+.vdc .vdc-source{display:flex;flex-wrap:wrap;gap:7px 12px;font-size:.84rem;margin:11px 0}
+.vdc .vdc-say,.vdc .vdc-probe{padding:9px 12px;border-inline-start:3px solid var(--vd-mint);background:var(--vd-bg);margin-top:10px}
+.vdc .vdc-probe{border-color:var(--vd-coral)}
+.vdc h4{font-size:.89rem}
+.vdc summary{color:var(--vd-mint);cursor:pointer;font-weight:700;overflow-wrap:anywhere}
+.vdc details{margin-top:12px}
+.vdc details pre{white-space:pre-wrap;overflow-wrap:anywhere;font: .82rem/1.5 ui-monospace,monospace;background:var(--vd-bg);padding:10px;border:1px solid var(--vd-line);border-radius:8px}
+.vdc .vdc-map h3{font-size:1.18rem;margin:.15em 0}
+.vdc .vdc-modes button[aria-pressed="true"]{background:var(--vd-mint);color:#11251e;border-color:var(--vd-mint);font-weight:750}
+.vdc .vdc-map .vdc-muted{font-size:.8rem;margin-top:8px}
+.vdc-flow{list-style:none!important;padding:0;margin:13px 0 6px;display:grid;gap:0}
+.vdc-flow li{margin:0;padding:0;list-style:none}
+.vdc-flow button{text-align:start;width:100%;display:grid;grid-template-columns:2ch minmax(0,1fr);gap:6px;font-size:.83rem;line-height:1.32}
+.vdc-flow button[aria-current="step"]{border-color:var(--vd-coral);background:var(--vd-raised)}
+.vdc-flow .vdc-flow-number{color:var(--vd-coral);font:700 .75rem/1.5 ui-monospace,monospace}
+.vdc-flow small{display:block;font-size:.72rem;color:var(--vd-muted);overflow-wrap:anywhere}
+.vdc-flow .vdc-connector{display:block;margin-inline-start:15px;font-size:.85rem;color:var(--vd-mint);line-height:1.22}
+.vdc-folders{border-top:1px solid var(--vd-line);padding-top:9px;font-size:.82rem}
+.vdc-folders ul{margin:.45em 0 0;padding-inline-start:20px}
+.vdc-folders li{margin-bottom:6px;overflow-wrap:anywhere}
+.vdc-play{margin-top:14px;padding:12px;background:var(--vd-bg);border:1px solid var(--vd-line);border-radius:9px;min-width:0}
+.vdc-play h4{color:var(--vd-mint);margin-bottom:5px}
+.vdc-play output{display:block;color:var(--vd-muted);margin-top:9px;overflow-wrap:anywhere}
+.vdc-play button[aria-pressed="true"]{border-color:var(--vd-mint);color:var(--vd-mint);font-weight:700}
+.vdc-play .vdc-bar{margin-top:8px;display:flex;height:9px;border-radius:9px;overflow:hidden;background:var(--vd-line)}
+.vdc-play .vdc-bar span{display:block;background:var(--vd-coral)}
+.vdc-play .vdc-toyrow{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+.vdc-play .vdc-toyrow span{border:1px solid var(--vd-line);border-radius:5px;padding:3px 6px;font-size:.77rem}
+.vdc-play .vdc-toyrow .vdc-yes{border-color:var(--vd-mint)}
+.vdc #vdc-step-count{color:var(--vd-muted)}
+.vdc #vdc-title,.vdc #vdc-question,.vdc #vdc-deeper{scroll-margin-top:95px}
+@media(max-width:900px){.vdc-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:860px){
+  #topbar:has(#visiondevCopilotMobile){flex-wrap:wrap;gap:6px 8px}
+  #visiondevCopilotMobile{display:inline-block;border-color:var(--accent);min-height:38px}
+}
+@media(pointer:coarse){.vdc button,.vdc select{min-height:44px}}
+</style>
+<!-- visiondev-copilot:style:end -->
 </head>
 <body>
 <script type="application/json" id="bank">{
@@ -18104,6 +18189,75 @@ ORDER BY total DESC;</code></pre>
 
 </section>
 
+<!-- visiondev-copilot:panel:begin -->
+<section id="visiondevCopilotPanel" class="vdc" aria-labelledby="vdc-title" hidden>
+  <header class="vdc-hero">
+    <p class="vdc-kicker">PROJECT PRACTICE · COMPUTER VISION</p>
+    <h2 id="vdc-title" tabindex="-1">VisionDev Copilot<span aria-hidden="true">.</span></h2>
+    <p>Trace a classifier mistake from the validation batch to the report. Try each question aloud before opening the walkthrough.</p>
+    <p class="vdc-meta"><span id="vdc-rating-note">Self-study · unscored</span> <a href="https://github.com/aniketqw/vision_dev_project/tree/94e88d7ead6ba275e0c40872426cc1ff27e1dca4">Pinned project source ↗</a></p>
+  </header>
+  <div class="vdc-grid">
+    <article class="vdc-card" aria-labelledby="vdc-question">
+      <div class="vdc-question-menu">
+        <label for="vdc-jump">Jump to a question</label>
+        <select id="vdc-jump"></select>
+      </div>
+      <p class="vdc-kicker" id="vdc-position" aria-live="polite"></p>
+      <h3 id="vdc-question" tabindex="-1"></h3>
+      <p id="vdc-context"></p>
+      <figure id="vdc-image-wrap" hidden><img id="vdc-image" width="112" height="112" alt=""><figcaption id="vdc-image-label"></figcaption></figure>
+      <div class="vdc-actions">
+        <button type="button" id="vdc-hint-button" aria-controls="vdc-hint" aria-expanded="false">Show hint</button>
+        <button type="button" id="vdc-answer-button" class="vdc-primary" aria-controls="vdc-answer" aria-expanded="false">Walk through the answer</button>
+      </div>
+      <p id="vdc-hint" class="vdc-hint" hidden></p>
+      <section id="vdc-answer" class="vdc-answer" aria-label="Worked answer" hidden>
+        <p id="vdc-status" class="vdc-kicker"></p>
+        <ol id="vdc-steps"></ol>
+        <div class="vdc-actions"><button type="button" id="vdc-step-button">Reveal next step</button><span id="vdc-step-count" role="status"></span></div>
+        <div id="vdc-deeper" tabindex="-1" hidden>
+          <div id="vdc-play" class="vdc-play" hidden></div>
+          <details id="vdc-excerpt" hidden><summary id="vdc-excerpt-label">Read the pinned code</summary><pre><code id="vdc-code"></code></pre></details>
+          <p class="vdc-source"><a id="vdc-source" href="">Open pinned source ↗</a><a id="vdc-secondary" href="" hidden></a></p>
+          <div class="vdc-say"><h4>Say it aloud</h4><blockquote id="vdc-say"></blockquote></div>
+          <div class="vdc-probe"><h4>Follow-up</h4><p id="vdc-probe"></p></div>
+        </div>
+      </section>
+      <nav class="vdc-actions vdc-cycle" aria-label="Move between VisionDev questions">
+        <button type="button" id="vdc-previous">← Previous</button>
+        <button type="button" id="vdc-next">Next question →</button>
+      </nav>
+    </article>
+    <aside class="vdc-map" aria-labelledby="vdc-map-title">
+      <p class="vdc-kicker">THE PIPELINE</p>
+      <h3 id="vdc-map-title">Architecture explorer</h3>
+      <div class="vdc-actions vdc-modes" role="group" aria-label="Architecture version">
+        <button type="button" id="vdc-current" aria-pressed="true">Implemented</button>
+        <button type="button" id="vdc-proposed" aria-pressed="false">Proposed</button>
+      </div>
+      <p id="vdc-map-caption" class="vdc-muted">Select a stage to open its first question.</p>
+      <ol id="vdc-flow" class="vdc-flow"></ol>
+      <p id="vdc-map-note" class="vdc-muted"></p>
+      <details class="vdc-folders">
+        <summary>Repository folder map</summary>
+        <ul>
+          <li><code>pipe/test.py</code> calls Lightning; Lightning calls <code>debug_logger.py</code>.</li>
+          <li><code>pipe/export_misclassified.py</code> copies failure rows into a dedicated JSON.</li>
+          <li><code>pipe/distortion_diagnostic_report.py</code> extracts PNGs and selects examples.</li>
+          <li><code>pipe/vision_reasoning_report.py</code> combines JSON, image metadata and optional notes.</li>
+          <li><code>pipe/logs/</code> holds JSON, PNGs and callback plots; <code>pipe/reports/</code> holds archetypes and a diagnostic plot.</li>
+          <li><code>pipe/best.pt</code> is the optional YOLO Git LFS weight. <code>ai_reasoning_summary.md</code> is a saved output.</li>
+          <li><code>exp/</code> is earlier work. <code>logger_setup.py</code> uses root <code>logs/</code>; <code>monitor.py</code> watches files; <code>downloadModel/</code> is a separate download helper.</li>
+        </ul>
+      </details>
+    </aside>
+  </div>
+  <noscript><p>Enable JavaScript to explore the questions, or open the pinned project source above.</p></noscript>
+</section>
+
+<script type="application/json" id="vdc-data">{"cards":[{"id":"V001","stage":"system","topic":"The purpose of VisionDev","context":"The panel already has the classifier’s overall accuracy. They want to know why you built a separate tool to study its mistakes.","question":"If the panel already knows the classifier’s accuracy, what does VisionDev add, and what decision does its report help an engineer make?","hint":"Think about the difference between a single score and seeing individual mistakes.","say":"I built VisionDev to turn classification errors into evidence for the next experiment. A single accuracy number does not tell me which examples to inspect.","next":"Name one decision the report can inform and one decision it cannot settle on its own.","worked":[["Find the gap","Overall accuracy hides the actual images and class pairs behind each mistake."],["Collect review material","Save the wrong prediction, expected label and image. Group the failures by likely distortion and inspect examples."],["Make a decision","Pick a failure pattern worth testing. A report can prioritize an experiment; it cannot identify the cause by itself."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/test.py#L97-L132","status":"Implemented"},{"id":"V002","stage":"system","topic":"The file-based workflow","context":"The workflow has a training process and separate command-line scripts.","question":"What is the order of the main stages, and what does each stage hand to the next?","hint":"Start with the batch. Follow the files the report consumes.","say":"Training captures the evidence. Separate scripts export it, choose examples and build the report. JSON and image files connect them.","next":"Which steps still make sense if you already have the saved logs and cannot train a model?","worked":[["In training","The Lightning Trainer calls SimpleCNN and DebugLogger in one process. The callback writes a training JSON and two diagnostic plots."],["Between commands","The exporter copies failure rows. The diagnostic CLI can take the export, training JSON or an existing image folder. It writes PNGs when decoding JSON, plus archetype JSON and a plot."],["In reporting","The report reads three JSON inputs, finds images where available, and renders Markdown. A separately started vLLM server is used only for optional generated notes."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L760-L836","status":"Implemented"},{"id":"V021","stage":"system","topic":"Repository map","context":"You open the repository at the pinned commit and need the actual entry point.","question":"Where would you look for the demo, metrics, earlier experiments and model weights?","hint":"Start in pipe/ and distinguish the two logs folders.","say":"I start in pipe/. The train entry and callback make training JSON; three separately run scripts handle export, examples and reporting.","next":"What path changes if you launch training from the repository root?","worked":[["Entry and outputs","Use pipe/test.py and pipe/debug_logger.py for the demo. Run from pipe/ to write ./logs there. pipe/logs holds experiment JSON, PNGs and callback plots; pipe/reports holds the example-selection JSON and plot."],["Earlier or optional pieces","exp/helperFunc has notebooks and exploratory training and image-call work. Root logger_setup.py writes the separate root logs/vision_dev.log. monitor.py logs development file events. downloadModel/ provides a separate historical download list."],["Weights","pipe/best.pt is the optional YOLO checkpoint, stored through Git LFS. The pinned Git object is a pointer; a usable local copy needs the payload. The local payload matched the pinned hash; it was not loaded in the audit."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/test.py#L114-L126","status":"Implemented","excerpt":"# Initialize DebugLogger\nprint(\"\\n📝 Initializing DebugLogger...\")\nbest_pt_path = os.path.join(os.path.dirname(__file__), 'best.pt')\ndebug_logger = DebugLogger(save_dir='./logs', distortion_model_path=best_pt_path)\nprint(\"✓ DebugLogger initialized\")\n\n# Create trainer with DebugLogger callback\nprint(\"\\n🚀 Creating Trainer...\")\ntrainer = pl.Trainer(\n    max_epochs=3,\n    callbacks=[debug_logger],\n    enable_progress_bar=True,\n    logger=False  # Disable default logger for cleaner output","excerptLabel":"pipe/test.py:114–126","secondary":["Open the pipeline usage guide","https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/help.md#L1-L43"]},{"id":"V022","stage":"system","topic":"Four models","context":"The project contains four models that are easy to conflate.","question":"Which model predicts the object, which tags the distortion, which helps pick examples, and which writes notes?","hint":"Each model consumes a different part of the workflow.","say":"The CNN predicts the object, YOLO tags likely distortion, ResNet18 supplies sampling features, and Qwen drafts notes.","next":"What remains available if only YOLO is missing?","worked":[["Classify and tag","SimpleCNN predicts the object class. Optional YOLO runs only on wrong predictions and tags likely distortion."],["Choose","ResNet18 gives each saved image a feature representation. Ordinary code uses the reduced features to choose example images."],["Explain","Qwen2.5-VL looks at a selected image and metadata. It can suggest an interpretation. It does not train or repair the classifier."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L284-L293","status":"Implemented","excerpt":"# Pretrained feature extractor (ResNet18 without final classification)\nmodel = models.resnet18(pretrained=True)\nmodel = nn.Sequential(*(list(model.children())[:-1]))  # remove classifier\nmodel.eval().to(device)\n\ntransform = T.Compose([\n    T.Resize((224, 224)),\n    T.ToTensor(),\n    T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),\n])","excerptLabel":"pipe/distortion_diagnostic_report.py:284–293","secondary":["Open the CNN trainer","https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/test.py#L19-L78"]},{"id":"V003","stage":"train","topic":"What SimpleCNN predicts","context":"The data loader sends groups of labeled CIFAR-10 images to the classifier.","question":"For a batch of 32 images, what goes into SimpleCNN, what comes out, and how does the code choose a predicted class?","hint":"Count the color channels, image dimensions and class scores.","say":"One input image produces ten class scores. The index of the largest score is the predicted class.","next":"If the final batch has 12 images, which dimensions change?","worked":[["Batch in","Images are [B, 3, 32, 32]; one integer class ID accompanies each image in [B]."],["CNN shapes","Convolution and pool blocks give [B, 32, 16, 16], [B, 64, 8, 8], then [B, 128, 4, 4]. Flatten to [B, 2048], project to 256, apply dropout during training, then project to [B, 10]."],["Read scores","A logit is an unnormalized class score. argmax along the class axis produces one predicted ID per image. Cross-entropy consumes the logits and true IDs."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/test.py#L40-L78","status":"Implemented","visual":"shapes"},{"id":"V023","stage":"train","topic":"Training loop and split","context":"The training demo uses CIFAR-10 and a Lightning Trainer.","question":"How do the loaders, loss and optimizer connect, and why is the official test split already used?","hint":"Check the train flag in the validation loader.","say":"Lightning trains with Adam and validates on the official CIFAR-10 test split, so I would reserve a fresh set before judging a change.","next":"What can go wrong if you tune augmentation using these same validation failures?","worked":[["Load","The training split is shuffled and the official test split becomes the ordered validation loader. ToTensor and normalization with mean and standard deviation 0.5 map pixel values from [0,1] to [-1,1]."],["Optimize","training_step returns cross-entropy over logits and class IDs. Lightning uses Adam at learning rate 0.001; its fit call is configured for three epochs."],["Validate and qualify","validation_step measures loss and accuracy. The official test split was inspected during development; keep a separate untouched set for a later claim. A dataset download or loader error is not caught here."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/test.py#L81-L92","status":"Implemented","excerpt":"def setup_data_loaders(batch_size=32):\n    \"\"\"Setup CIFAR-10 data loaders\"\"\"\n    transform = transforms.Compose([\n        transforms.ToTensor(),\n        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))\n    ])\n\n    train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)\n    val_dataset = datasets.CIFAR10(root='./data', train=False, transform=transform, download=True)\n\n    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)\n    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)","excerptLabel":"pipe/test.py:81–92"},{"id":"V005","stage":"capture","topic":"Who calls the callback?","context":"The Lightning validation step already ran the classifier once.","question":"Why can the current callback run the classifier again, and how could you remove the extra work?","hint":"Check which data the validation step returns to the caller.","say":"The callback recomputes predictions because the current validation output does not carry them. I would pass the predictions through and check that the failure set stays the same.","next":"What would you compare to show the change saves time without changing the captured rows?","worked":[["Follow the caller","Lightning calls the registered callback after each validation batch, passing the module and batch."],["Find the duplicate work","validation_step returns loss, so this callback does not get class predictions from it. It runs pl_module(x) and takes argmax again."],["Proposed improvement","Return detached predictions or logits with the validation output. Compare the old and new masks on the same fixed batch before measuring runtime."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L191-L196","status":"Implemented","excerpt":"logits = pl_module(x)\npreds = torch.argmax(logits, dim=1)\n\n# Store all predictions and labels\nself.all_predictions.extend(preds.cpu().numpy().tolist())\nself.all_labels.extend(y.cpu().numpy().tolist())","excerptLabel":"pipe/debug_logger.py:191–196"},{"id":"V004","stage":"capture","topic":"The failure filter","context":"A validation batch has true classes [7, 3, 5] and predictions [3, 3, 7]. Each pair is for the same image.","question":"Which images does VisionDev keep for diagnosis, and how does the callback keep the images and labels aligned?","hint":"Compare each pair in order. Keep the positions where the numbers differ.","say":"I create one mask by comparing predictions with labels. I apply it to all three inputs, so the image and the two labels stay together.","next":"Write the rule for a batch where all predictions are correct.","worked":[["Compare aligned positions","Compare predictions [3, 3, 7] against labels [7, 3, 5]. The result is [True, False, True]."],["Apply the same mask","Use it on the images, predictions and labels. This keeps positions 1 and 3 together with their own labels."],["Hand off the failures","The first retained image is true 7, predicted 3. The second is true 5, predicted 7. Convert these images for logging and optional tagging."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L209-L213","status":"Implemented","excerpt":"misclassified_mask = (preds != y)\nif misclassified_mask.any():\n    misclassified_images = x[misclassified_mask].cpu()\n    misclassified_preds = preds[misclassified_mask].cpu().numpy()\n    misclassified_labels = y[misclassified_mask].cpu().numpy()","excerptLabel":"pipe/debug_logger.py:209–213","visual":"mask"},{"id":"V006","stage":"capture","topic":"Distortion tags and uncertainty","context":"The first model predicts the object class. A second model can label an image condition such as blur.","question":"When the distortion tagger returns no result, what does the callback do, and what does a saved tag tell you?","hint":"Separate the tagger’s prediction from the classifier’s mistake.","say":"The tag groups failures for review. I keep unknowns and check the tagger against labeled examples before relying on its output.","next":"What would you change to distinguish an uncertain image from an unavailable tagger?","worked":[["Load optional weights","YOLO loads best.pt if it is available. If loading fails, capture continues without a tagger."],["Make one decision per failure","Run YOLO on the 8-bit image, take the highest confidence box, and retry at 0.0 if the initial 0.01 threshold returns no label."],["Keep uncertainty visible","No result, no model or inference failure becomes unknown in this path. A weak score is not a calibrated probability or evidence of causation."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L233-L273","status":"Implemented","visual":"tagger"},{"id":"V024","stage":"capture","topic":"Failure record and encoding","context":"A captured failure becomes a row that other commands can read.","question":"Which fields identify the sample, carry the image, and distinguish object class from distortion?","hint":"The exact tensor hash and PNG are made from different byte representations.","say":"One saved row joins exact image identity to its encoded PNG, source labels, optional tag and repeat count.","next":"If distortion_type says dog and distortion_predicted says blur, which field should you count as distortion?","worked":[["Prepare the image","Convert CHW to HWC, undo normalization and convert to 8-bit pixels. Encode it as PNG, then base64 so the bytes can live in JSON."],["Identify the row","Take SHA-1 of the original normalized tensor bytes, not of the PNG. Store that value as hash and later use it as the filename stem."],["Read the fields","true_label and predicted_label are object IDs. distortion_predicted and distortion_confidence describe the tagger. Legacy distortion_type is the predicted object-class name. epoch is captured on the observation; count is added on deduplication."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L222-L228","status":"Implemented","excerpt":"img_bytes = img.cpu().numpy().tobytes()\nimg_hash = hashlib.sha1(img_bytes).hexdigest()\n\n# Convert to base64\nbuffer = BytesIO()\nimg_pil.save(buffer, format='PNG')\nimg_base64 = base64.b64encode(buffer.getvalue()).decode()","excerptLabel":"pipe/debug_logger.py:222–228","secondary":["Open the complete record","https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L275-L289"]},{"id":"V007","stage":"capture","topic":"Unique images versus observations","context":"The same image can fail in more than one validation pass.","question":"If image A fails three times and image B fails once, what does the training log save, and what does each count mean?","hint":"Think about the number of keys in the dictionary versus the total of their counters.","say":"Two unique hashes and four failure observations are both correct. I state which unit I use before reporting a percentage.","next":"What information is lost if you keep only the first record for a hash?","worked":[["Count observations","Three failures of A and one of B are four observations, even if a later prediction differs."],["Group by exact bytes","The SHA-1 comes from the normalized tensor bytes. That merges exact repeats, rather than similar-looking pictures."],["Write representative rows","A keeps its first row and count 3. B keeps count 1. A later wrong label, epoch or tag cannot be reconstructed from the saved row."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L405-L410","status":"Implemented","excerpt":"unique = {}\nfor entry in self.misclassified_data:\n    h = entry['hash']\n    if h not in unique:\n        unique[h] = {**entry, 'count': 0}\n    unique[h]['count'] += 1","excerptLabel":"pipe/debug_logger.py:405–410","visual":"dedup"},{"id":"V025","stage":"capture","topic":"Hooks and metrics","context":"The callback handles both epoch-level metrics and error inspection.","question":"What does each Lightning hook save, and which metrics use all predictions rather than saved failure rows?","hint":"Separate temporary epoch buffers from the list of failure observations.","say":"Epoch metrics use all buffered predictions; the archive only stores distinct failure rows with counts.","next":"Does total_correct_batches count individual correct images?","worked":[["Starting hooks","on_train_start inspects the loader for class names and resolution, falling back to Unknown on resolution failure. on_train_epoch_start records the start time."],["Batch end","Record input statistics, loss and accuracy. The last-batch branch computes class precision, recall, F1 and support from all buffered predictions and clears those buffers. If last-batch detection fails, that finalization does not run."],["Training end","Save summary, epochs, batch/class metrics, gradient and learning-rate observations, timing and failure samples. The distortion bar plot uses observations; the nearby PCA plot uses flattened pixels. The later archetype code uses ResNet features instead."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L329-L340","status":"Implemented","excerpt":"# Calculate class-wise metrics for the epoch\nif self.all_predictions:\n    precision, recall, f1, support = precision_recall_fscore_support(\n        self.all_labels, self.all_predictions, average=None, zero_division=0\n    )\n    self.class_metrics.append({\n        'epoch': trainer.current_epoch,\n        'precision_per_class': precision.tolist(),\n        'recall_per_class': recall.tolist(),\n        'f1_per_class': f1.tolist(),\n        'support_per_class': support.tolist(),\n    })","excerptLabel":"pipe/debug_logger.py:329–340","secondary":["Open the plot and JSON writer","https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L415-L495"]},{"id":"V026","stage":"sample","topic":"Export and image recovery","context":"The diagnostic stage can start with a JSON file rather than an image folder.","question":"How does a failure row get from the training JSON into a PNG folder, and which errors can the decoder skip?","hint":"Look for the saved hash, category and image_base64.","say":"Export moves the JSON rows; the diagnostic step decodes image bytes and gives them portable identities.","next":"What happens if a row has valid bytes and an unknown tag?","worked":[["Slice the rows","The optional exporter copies misclassified_samples as-is, or takes the first --max_samples rows. It adds source_log, created_at and n_misclassified. Taking a prefix of count-sorted rows is not random sampling."],["Recover the PNG","Decode image_base64 to \u003cexport_stem>_images/\u003ctag>/\u003chash>.png. Unsupported tags map to unknown. A missing hash uses img_\u003cindex>."],["Handle missing data","Skip absent base64, existing paths and caught decode or write errors. A JSON with no failure rows stops extraction. The feature stage uses only blur, jpeg, pixelate and noise."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L92-L104","status":"Implemented","excerpt":"for idx, sample in enumerate(samples):\n    b64 = sample.get(\"image_base64\")\n    if not b64:\n        continue\n\n    distortion = sample.get(\"distortion_predicted\") or sample.get(\"distortion_type\") or \"unknown\"\n    if distortion not in categories:\n        distortion = \"unknown\"\n\n    fname = sample.get(\"hash\") or f\"img_{idx:06d}\"\n    out_path = out_dir / distortion / f\"{fname}.png\"\n    if out_path.exists():\n        continue","excerptLabel":"pipe/distortion_diagnostic_report.py:92–104","secondary":["Open the exporter","https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/export_misclassified.py#L38-L55"]},{"id":"V011","stage":"sample","topic":"What the feature map is for","context":"The project needs a few useful images to review out of thousands of errors.","question":"Why use ResNet18 features and a 2D map before selecting image examples? Does that step discover the distortion groups?","hint":"Ask where the group labels come from before the map is made.","say":"I used feature vectors and a 2D view to choose cases for review within known groups. The view is a sampling aid.","next":"Why might you choose samples in feature space and keep the 2D plot only for display?","worked":[["Extract features","Resize each PNG to 224×224 and normalize it. Use pretrained ResNet18 without the classifier head and flatten the features."],["Make the display","PCA reduces feature dimensions to 50. t-SNE reduces those vectors to two coordinates with seed 42."],["Choose inside known groups","The distortion tags already exist. The plot illustrates local neighborhoods; distances do not establish reliable global image similarity. The callback's raw-pixel PCA plot is a separate artifact."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L282-L309","status":"Implemented"},{"id":"V012","stage":"sample","topic":"Typical and unusual examples","context":"An example group has three points on a line: 0, 1 and 5. The script selects one nearest and one farthest from the group mean.","question":"Which point is typical and which is an outlier under this rule? Show the calculation.","hint":"Calculate the mean first. Then measure each absolute distance to it.","say":"Within each tag group, I find its center and sort by distance. The closest and farthest examples give the reviewer different cases to inspect.","next":"What happens to both roles if the group contains only one image?","worked":[["Compute a center","The points at x = 0, 1 and 5 with y = 0 have a mean of (2, 0)."],["Measure distance","The distances to the center are 2, 1 and 3."],["Rank within this tag","Point 1 is typical and 5 is farthest. The real code can put a small group's image in both lists; later sampling skips duplicate paths."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L153-L155","status":"Implemented","excerpt":"centroid = np.mean(cat_embeddings, axis=0)\ndists = np.linalg.norm(cat_embeddings - centroid[None, :], axis=1)\norder = np.argsort(dists)","excerptLabel":"pipe/distortion_diagnostic_report.py:153–155","visual":"centroid"},{"id":"V030","stage":"sample","topic":"Sampling limits and repeatability","context":"The CLI accepts --max-samples and --dry-run.","question":"Does the sample cap always hold, and why can a tiny diagnostic input still fail?","hint":"Read what the loop does after a category has filled the list.","say":"The declared cap can be exceeded, and the fixed PCA step can fail on small inputs.","next":"What do you expect when the first category fills the budget and the next is nonempty?","worked":[["Read the loop as written","It clips the current group only while the list has room. After that it still extends the list. The pinned loop selected four images with a cap of two in a toy local probe."],["Check minimum size","PCA requests 50 components and needs enough images and features. t-SNE also needs more samples than its perplexity. --dry-run does not skip those steps. An unreadable selected image can stop feature extraction."],["Limit repeatability claims","Diagnostic folders are sorted and t-SNE uses seed 42. Changing inputs or libraries can change the map. The report's seeded fallback shuffles the directory listing without sorting it first."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L271-L277","status":"Verified in this session","excerpt":"for cat in categories:\n    cat_paths = images.get(cat, [])\n    if args.max_samples and len(all_paths) \u003c args.max_samples:\n        remaining = args.max_samples - len(all_paths)\n        cat_paths = cat_paths[:remaining]\n    all_paths.extend(cat_paths)\n    all_labels.extend([cat] * len(cat_paths))","excerptLabel":"pipe/distortion_diagnostic_report.py:271–277","visual":"cap"},{"id":"V013","stage":"report","topic":"Linking the image to its data","context":"The report sampler finds a PNG with a hash as its filename.","question":"How does the report attach the correct true and predicted classes to that image, and what happens if the lookup misses?","hint":"Find the common identifier in the filename and the saved failure record.","say":"The saved hash links the image file to its labels and tag. I distinguish missing metadata from a valid zero.","next":"How would you prevent a relocated archive from breaking the join?","worked":[["Index the JSON","Build a dictionary with the saved image hash as key and failure metadata as value."],["Resolve the path","Try the saved path, then the specific archive-to-home alternate. Skip unavailable paths; use an available category folder for fallback."],["Join by stem","Strip the extension and look up the stem. A missing metadata row does not erase an existing image. The renderer can show ? for classes and a displayed 0.0000 as a fallback."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L223-L225","status":"Implemented","excerpt":"stem = p.stem\nmeta = hash_to_meta.get(stem)\ncollected.append({\"path\": p, \"role\": role, \"distance\": distance, \"meta\": meta})","excerptLabel":"pipe/vision_reasoning_report.py:223–225","visual":"join"},{"id":"V031","stage":"report","topic":"Inputs and sample priority","context":"The report can infer inputs or receive explicit paths.","question":"How does the script choose files and images, and where can two runs be mixed?","hint":"Separate file discovery from the typical → outlier → random order.","say":"I pass explicit files and check that they come from one run; the script's latest-file search can mix them.","next":"With five resolvable typical images and a limit of three, how many outliers are used?","worked":[["Find mandatory JSONs","Training and failure logs are independently chosen by newest modification time unless explicit paths are passed. Archetype JSON also must exist. Missing mandatory files stop the script."],["Fill image slots","Default is three per known distortion. Fill typical first, then outlier, then random folder images, skipping repeated paths. If enough typical images resolve, the default can have no outliers."],["Read the evidence","The saved report header pairs 012558 training with 005331 failures. Explicit, matched file paths avoid ambiguous discovery but the current script does not compare run IDs."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L765-L778","status":"Implemented","excerpt":"# ── 1. Discover / validate input files ────────────────────────────────────\ntraining_log_path = args.training_log or find_latest_file(logs_dir, \"training_log_*.json\")\nif training_log_path is None or not training_log_path.exists():\n    sys.exit(f\"ERROR: No training_log_*.json found in {logs_dir}. Use --training-log.\")\nlogger.info(f\"Training log  : {training_log_path}\")\n\nmc_path = args.misclassified or find_latest_file(logs_dir, \"misclassified_*.json\")\nif mc_path is None or not mc_path.exists():\n    sys.exit(f\"ERROR: No misclassified_*.json found in {logs_dir}. Use --misclassified.\")\nlogger.info(f\"Misclassified : {mc_path}\")\n\nreport_path = args.report.resolve()\nif not report_path.exists():\n    sys.exit(f\"ERROR: distortion_report.json not found at {report_path}. Use --report.\")","excerptLabel":"pipe/vision_reasoning_report.py:765–778"},{"id":"V014","stage":"report","topic":"What Qwen can and cannot explain","context":"The report can send a chosen image to an optional image-and-text model.","question":"What does Qwen receive, and why can its answer not prove what the CNN was thinking?","hint":"Check what the call carries and what it leaves out.","say":"Qwen drafts observations for selected images. I check those observations against the image and use experiments for causal claims.","next":"What additional evidence would make a claim about the effect of blur stronger?","worked":[["Prepare the input","Read the selected PNG and encode it. Add object labels, distortion tag, role and tagger score to the prompt."],["Invoke once in this function","LangChain composes the text and image request for the local OpenAI-compatible vLLM endpoint. The function contains one explicit chain.invoke; this does not rule out client retries."],["Review the result","The model sees pixels and labels, not the CNN's activations. Treat its visual explanation as a hypothesis."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L427-L435","status":"Implemented","excerpt":"raw_response = chain.invoke({\n    \"distortion_type\": dist_type,\n    \"true_label\": true_lbl,\n    \"pred_label\": pred_lbl,\n    \"role\": role,\n    \"dist_confidence\": f\"{dist_conf:.4f}\",\n    \"image_data\": img_b64,\n})\nsections = parse_vlm_sections(raw_response.strip())","excerptLabel":"pipe/vision_reasoning_report.py:427–435"},{"id":"V015","stage":"report","topic":"Text parsing and report structure","context":"The model returns text. It sometimes misses the heading the report expects.","question":"How does the report handle text that does not contain a recognized section heading? Can you say it is validated against a schema?","hint":"Look for the fallback path. A section heading is different from a required field.","say":"The current report parses headings and falls back to raw text. I would add a schema and explicit status if downstream consumers need guarantees.","next":"How would you test that an indented or missing heading does not silently look like valid structured output?","worked":[["Read the returned text","The parser looks for seven known headings followed by a colon at the start of a line."],["Keep what it recognizes","It can return just the sections it found. When no heading matches it keeps the text under _raw. Pydantic does not validate this path."],["Render honestly","The renderer displays parsed sections or the raw fallback. Its recommendations table is static and may contain example percentages."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L398-L407","status":"Implemented","excerpt":"    if not matched and current_key:\n        current_lines.append(line.strip())\n\nif current_key:\n    result[current_key] = \" \".join(current_lines).strip()\n\nif not result:\n    result[\"_raw\"] = raw.strip()\n\nreturn result","excerptLabel":"pipe/vision_reasoning_report.py:398–407","visual":"parser"},{"id":"V016","stage":"report","topic":"The no-model report","context":"The panel asks what happens when you cannot start the local image model.","question":"What can the report still show with --no-vlm, and what input files does that mode still require?","hint":"Separate the counts calculated from saved files from text produced by the model.","say":"The model enriches the report. The measured tables come from saved data, so they do not depend on a model response.","next":"How would you distinguish skipped, unavailable and failed analysis in the report?","worked":[["Load the usual inputs","Training JSON, failure JSON and archetype JSON are required even with --no-vlm. The image folder can be absent."],["Skip only model access","Explicit --no-vlm skips the readiness check and image requests. A health timeout also leaves the model chain unset. The report can still gather available images."],["Render what remains","Counts, confusion pairs, available image cards and static recommendations remain. No new image analysis is generated. The current renderer can misleadingly display a failed-call message after a deliberate skip."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L760-L836","status":"Verified in this session","visual":"server"},{"id":"V010","stage":"report","topic":"Reading a real failure","context":"The slide shows a saved example from run 005331. It has the label horse, the prediction cat, and the distortion tag blur.","question":"What does each of those three labels mean, and what can you tell the panel from this record alone?","hint":"Name the source of each label: dataset, object classifier or distortion tagger.","say":"The record shows what the image was labeled, what the classifier predicted, and what condition the tagger suggested. Those are three separate facts.","next":"Where would you look to show that an image also appears in the saved visual report?","worked":[["Read the object fields","Horse is the true CIFAR-10 label. Cat is the CNN's wrong object prediction."],["Read the separate tag","Blur is the distortion tagger's predicted label. The tagged record and its archived PNG match."],["Stop at the evidence","This example was verified to the PNG. For a second real image verified all the way to the saved report, open the cat-to-dog trace."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L275-L285","status":"Observed in saved artifacts","excerpt":"entry = {\n    'hash': img_hash,\n    'image_base64': img_base64,\n    'true_label': int(true_label),\n    'predicted_label': int(pred),\n    # keep legacy distortion label (dataset class) for backwards compatibility\n    'distortion_type': distortion,\n    # add distortion model prediction if available\n    'distortion_predicted': distortion_pred,\n    'distortion_confidence': distortion_conf,\n    'epoch': trainer.current_epoch","excerptLabel":"pipe/debug_logger.py:275–285","image":"data:image/png;base64,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"},{"id":"V032","stage":"report","topic":"Trace a saved failure into Markdown","context":"This example uses a real cat → dog error from run 005331.","question":"How can you prove that the cat-to-dog card refers to the same saved failure without rerunning Qwen?","hint":"Follow the same hash and compare fields at each handoff.","say":"I can trace the exact hash from the training row into the saved report, without claiming its visual hypothesis is causal.","next":"What evidence could you still show if the Qwen server were unavailable?","worked":[["Training and export","Find hash 56cb777d94a395bc7eab6d1caed556e72dc75a44. The rows match: true cat, predicted dog, blur tag, confidence 0.0228 rounded, epoch 2 and count 1."],["PNG and archetype","The decoded row bytes match the committed PNG under blur/. Its stem matches the hash. The saved blur.typical list names the same file, about 0.289 from its center."],["Report card","The Markdown has the same hash, role, labels, confidence and distance. This checks artifact linkage. It does not prove the historical call path or the cause of the CNN error."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/ai_reasoning_summary.md#L75-L109","status":"Observed in saved artifacts","image":"data:image/png;base64,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","visual":"trace","secondary":["Open the saved PNG","https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/logs/misclassified_20260317_005331_images/blur/56cb777d94a395bc7eab6d1caed556e72dc75a44.png"]},{"id":"V008","stage":"evaluate","topic":"The headline number","context":"In saved run 005331, the export contains 1,949 unique failures tagged blur and 4,816 unique logged failures overall.","question":"What does 1,949 divided by 4,816 measure, and what extra data would you need to calculate the classifier’s error rate on blurred images?","hint":"Say what each denominator contains before you divide.","say":"Blur was the largest predicted tag group among the saved failures. That fraction tells me what to investigate, not the classifier’s error rate under blur.","next":"If four blurred inputs failed out of 100 blurred inputs, what would that other rate be?","worked":[["Count the numerator","Select the 1,949 unique 005331 failure rows whose predicted tag is blur."],["Choose the denominator","Use all 4,816 unique failure rows, including the 620 unknown-tag rows. 1,949 ÷ 4,816 = 40.47%."],["Name the missing data","The archive includes failures. An error rate among all blurred inputs also needs blurred inputs the model got right. Causation needs a controlled comparison."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L489-L501","status":"Observed in saved artifacts","visual":"runs"},{"id":"V009","stage":"evaluate","topic":"Two runs, two denominators","context":"The saved Markdown uses a training summary from 012558 and a failure export from 005331.","question":"A panelist points to 10,012 in the report. Why can you not use it as the denominator under 1,949?","hint":"Check both the run name and whether the rows count repeats.","say":"I check that the run and the unit match before dividing. The training total in the saved report comes from a different run and counts repeats.","next":"What would you include in a run manifest to prevent this mix-up?","worked":[["Read the headers","The saved Markdown pairs the training summary of 012558 with the failure export of 005331."],["Separate units","10,012 counts repeated failure observations from 012558. Its distinct-image denominator is 4,935. Its 2,402 blur-tagged rows give 48.67%."],["Keep ratios in their own runs","The 1,949 rows came from 005331 and divide by 4,816. Neither ratio measures improvement or the error rate on blurred inputs."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/ai_reasoning_summary.md#L1-L18","status":"Observed in saved artifacts","visual":"runs"},{"id":"V020","stage":"improve","topic":"Improving the pipeline","context":"The current report can open input files from different runs, and the example selector has a limit that may be exceeded.","question":"What would you fix first to make the results reproducible, and how would you check that the fix works?","hint":"Choose a small change that makes incorrect inputs fail early.","say":"I would make the inputs explicit and reject a mixed run. Then I would test the selection cap and repeatability separately.","next":"What does a passing unit test show here, and what would it still not tell you about tagger quality?","worked":[["Tie files to a run","Pin dataset split, model checkpoint, code, parameters and relative artifact paths in a run manifest."],["Fail visibly on mismatch","The 012558 training summary and 005331 failure export should fail validation if the manifest expects one run."],["Test portability","Move the run directory. Matching inputs should still resolve. Test the current diagnostic cap separately with a category that fills it."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L271-L277","status":"Proposed","excerpt":"for cat in categories:\n    cat_paths = images.get(cat, [])\n    if args.max_samples and len(all_paths) \u003c args.max_samples:\n        remaining = args.max_samples - len(all_paths)\n        cat_paths = cat_paths[:remaining]\n    all_paths.extend(cat_paths)\n    all_labels.extend([cat] * len(cat_paths))","excerptLabel":"pipe/distortion_diagnostic_report.py:271–277"},{"id":"V027","stage":"improve","topic":"All predictions and stable IDs","context":"Failure records cannot supply the number of correct blurred predictions.","question":"How would you separate metrics from inspection data and retain cross-epoch identity?","hint":"Give a dataset item and an observation different IDs.","say":"I would store outcomes for the full denominator and a separate bounded collection for inspection.","next":"What happens to the sample ID when the dataset version changes?","worked":[["Preserve identity","Identify the source item by dataset version, split and index. Add run, checkpoint and transform context to observation IDs. Keep hashes for checking bytes."],["Keep metric inputs complete","Reuse validation predictions and record correct and wrong outcomes with known slice labels. Log a smaller image set just for failure inspection. The trade-off is more outcome records and less image storage."],["Acceptance test","For six known blurred inputs with two errors, the error rate remains 2/6 even if only one failure image was retained. The same sample across epochs retains its stable ID."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L190-L208","status":"Proposed"},{"id":"V028","stage":"improve","topic":"Sampling and tag uncertainty","context":"The current method can force weak tags and ranks points in a fragile 2D display.","question":"How would you bound capture and design a repeatable, uncertainty-aware sampling policy?","hint":"Put the budget on image payloads; keep exact totals outside it.","say":"I would keep full counts, select within a fixed image budget, and show low confidence rather than forcing a tag.","next":"Why might a pretrained object representation still be a poor measure of distortion similarity?","worked":[["Budget storage","Count all failures online but retain a bounded image sample with explicit group quotas. The trade-off is that some errors cannot be opened later."],["Define the feature policy","Rank near and far in a normalized feature space with a stable ID tie break. Keep t-SNE for display. Audit whether the feature vectors emphasize object identity more than distortion."],["Show abstentions","Audit a labeled subset and separate uncertain tags, model-not-run and inference errors. This reduces coverage. Test that a low score becomes uncertain, that a group of one is not both roles, and that a full early group cannot overflow the limit."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L265-L309","status":"Proposed"},{"id":"V029","stage":"improve","topic":"Provenance and unit tests","context":"A generated root cause can look as authoritative as a computed count.","question":"How would you separate report evidence from speculation and test the fallback paths?","hint":"An unavailable model, raw text, and a valid note deserve different statuses.","say":"I would make each report claim traceable and test the rules offline before judging model quality.","next":"If the model changes, which parts of the report must stay identical for the same data?","worked":[["Provenance","Keep run ID, sample ID, prompt and model identifier with each note. Label measured facts, hypotheses and recommendations separately."],["Fallback","Validate the note format or retain raw text with a clear status. Distinguish skipped analysis from failed or malformed analysis. Keep measured counts independent of that status."],["Acceptance tests","Use tiny local fixtures and a fake client. Test duplicate observations with changed predictions, missing file and missing metadata, a filled quota, and raw versus structured text. This improves repeatability but does not benchmark generation quality."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L595-L669","status":"Proposed"},{"id":"V017","stage":"improve","topic":"A controlled test for the effect of blur","context":"The report suggests a blur experiment because blur tags are frequent among logged failures.","question":"How would you test whether blur reduces classifier accuracy without changing the training first?","hint":"Keep the original image fixed and change one input condition.","say":"I would compare each clear image with controlled blurred copies using the same model. That gives a more direct test than a failure-only count.","next":"Why should the clear and blurred examples come from the same original image?","worked":[["Freeze the comparison","Freeze the current model and reserve an untouched evaluation split."],["Change just blur","For every image, keep a clear copy and create versions at defined blur severities. Compare predictions at the same sample IDs."],["Read the result","Report paired accuracy changes and uncertainty by severity. When the sample supports it, inspect class slices separately."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/test.py#L81-L94","status":"Proposed","visual":"pair"},{"id":"V018","stage":"improve","topic":"Whether to train with blur augmentation","context":"Suppose the team wants to try adding blurred examples to training.","question":"How would you design a fair training comparison, and what result would make you decline to use the new model?","hint":"Choose one training change. Define a limit for performance loss on clear inputs before the test.","say":"I would test blur augmentation against a baseline and protect clear-image accuracy. The observed failure mix justifies the test, not the outcome.","next":"If blurred accuracy improves but the confidence interval includes zero gain, what would you do next?","worked":[["Hold the rest fixed","Train baseline and blur-augmented models with matching splits, architecture and training budget."],["Evaluate both","Measure them on the same clear and blurred evaluation pairs."],["Decide before looking","Agree on a blurred-image improvement target and a maximum clear-image loss. A drop of two points fails a one-point limit, even when blur accuracy improves."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/test.py#L97-L132","status":"Proposed"},{"id":"V019","stage":"improve","topic":"The panel close","context":"The panel asks for your result, the recommendation, and the limit of the evidence.","question":"How would you close the VisionDev presentation in three short sentences without overstating what you measured?","hint":"Use one sentence each for what you built, what you saw and what you would test.","say":"VisionDev turns classifier mistakes into records we can review. In run 005331, 1,949 of 4,816 unique failures had a blur tag. I would test blur on paired clear and blurred inputs before changing training.","next":"Name the most important limit in your own words so it sounds natural in the interview.","worked":[["Name the workflow","Say it captures wrong predictions, selects examples and writes an evidence-linked review."],["Name the measurement","Say 1,949 of 4,816 unique failures were tagged blur in export 005331."],["Name your next test","Propose a controlled paired blur comparison. Limit any ownership claim to work you can defend."]],"url":"https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L489-L501","status":"Interview rehearsal"}],"stages":[{"id":"system","title":"Architecture","short":"CIFAR-10 → report","note":"Separate command-line jobs exchange files. Lightning calls the capture hook inside training.","first":"V001"},{"id":"train","title":"Train & validate","short":"Batches → class scores","note":"SimpleCNN produces object-class logits. Lightning runs optimization and validation.","first":"V003"},{"id":"capture","title":"Capture failures","short":"Wrong predictions → JSON","note":"The callback keeps aligned mistakes, optionally tags distortion, and saves one row per exact hash.","first":"V005"},{"id":"sample","title":"Export & sample","short":"Failure JSON → PNG + archetypes","note":"An offline diagnostic selects near and far examples inside existing tag groups.","first":"V026"},{"id":"report","title":"Build the report","short":"Three JSON inputs → Markdown","note":"The report counts failures, joins image metadata, and can ask a separate vLLM process for image notes.","first":"V013"},{"id":"evaluate","title":"Read the evidence","short":"Saved runs → defensible claims","note":"Keep failure shares, unique images and repeated observations separate.","first":"V008"},{"id":"improve","title":"Propose & defend","short":"Evidence → controlled test","note":"Require reproducible inputs, then measure the effect of blur before testing augmentation.","first":"V020"}],"proposed":[{"id":"1","title":"Run manifest","short":"Proposed","note":"Pin the data split, model, code, settings and output files. Reject mixed runs.","first":"V020"},{"id":"2","title":"One prediction pass","short":"Proposed","note":"Reuse validation outputs and record all prediction outcomes for slice metrics.","first":"V027"},{"id":"3","title":"Bounded inspection sample","short":"Proposed","note":"Keep stable IDs, exact counters, fixed feature-space quotas and explicit tag uncertainty.","first":"V028"},{"id":"4","title":"Evidence and model notes","short":"Proposed","note":"Record provenance. Keep optional model hypotheses separate from measured tables.","first":"V029"},{"id":"5","title":"Controlled test","short":"Proposed","note":"Freeze the model and compare paired clear and blurred images in an untouched split.","first":"V017"}],"visuals":{"shapes":{"title":"Follow the tensor shapes","choices":[{"label":"Input","result":"One label per image. RGB images use [batch, channels, height, width].","tiles":["32 images","3 channels","32 × 32"],"highlight":null,"bar":null},{"label":"After pooling","result":"The three blocks halve height and width each time while increasing channels.","tiles":["32 × 16 × 16","64 × 8 × 8","128 × 4 × 4"],"highlight":null,"bar":null},{"label":"Output","result":"Flatten each sample to 2,048 values, project to 256, then return ten logits. argmax gives one predicted class ID.","tiles":["[32, 2048]","[32, 256]","[32, 10]"],"highlight":null,"bar":null}]},"mask":{"title":"Try the failure filter · toy batch","choices":[{"label":"Full batch","result":"Compare three aligned predictions and targets. The middle prediction (3) equals its true class (3).","tiles":["#1: 7 → 3","#2: 3 → 3","#3: 5 → 7"],"highlight":null,"bar":null},{"label":"Apply preds != y","result":"Mask = [True, False, True]. Keep row 1 and row 3 in all three arrays.","tiles":["#1 kept","#2 discarded","#3 kept"],"highlight":[0,2],"bar":null}]},"tagger":{"title":"Follow the optional tagger · toy cases","choices":[{"label":"Box found","result":"Use the highest confidence box at the configured threshold. The tag says what the tagger detected, not what caused the CNN error.","tiles":["threshold 0.01","best box","save tag"],"highlight":null,"bar":null},{"label":"No box","result":"Retry at 0.0. If it still has no label, store unknown.","tiles":["threshold 0.01","retry 0.0","tag or unknown"],"highlight":null,"bar":null},{"label":"No weights / error","result":"Keep the failure record. Save unknown rather than guessing a tag.","tiles":["keep image","keep object labels","unknown"],"highlight":null,"bar":null}]},"dedup":{"title":"Change the unit · toy repeats","choices":[{"label":"Observations","result":"A appears three times and B appears once. The observation count is four.","tiles":["A (epoch 0)","A (epoch 1)","A (epoch 2)","B (epoch 1)"],"highlight":null,"bar":null},{"label":"Saved rows","result":"The JSON keeps two rows. A keeps its first record and count 3. B has count 1.","tiles":["A · count 3","B · count 1"],"highlight":null,"bar":null}]},"runs":{"title":"Compare the two saved runs","choices":[{"label":"005331 export","result":"1,949 ÷ 4,816 = 40.47% of unique failures tagged blur. Includes 620 unknown-tag rows; 9,963 counts repeat observations.","tiles":["1,949 blur-tagged","4,816 unique"],"highlight":null,"bar":40.47},{"label":"012558 training log","result":"2,402 ÷ 4,935 = 48.67% of unique failures tagged blur. 10,012 counts repeat observations, which cannot be the unique denominator.","tiles":["2,402 blur-tagged","4,935 unique"],"highlight":null,"bar":48.67}]},"centroid":{"title":"Rank three points · toy group","choices":[{"label":"Positions","result":"At x = 0, 1 and 5 on one line, the center is x = 2.","tiles":["0","1","center: 2","5"],"highlight":[2],"bar":null},{"label":"Distances","result":"Distance to x = 2 is 2, 1 and 3. The smallest is 1; the largest is 3.","tiles":["0 → 2 away","1 → 1 away","5 → 3 away"],"highlight":[1,2],"bar":null},{"label":"Selected roles","result":"Point 1 is typical and point 5 is the outlier in this toy view.","tiles":["typical: 1","outlier: 5"],"highlight":[0,1],"bar":null}]},"join":{"title":"Resolve a report image · toy cases","choices":[{"label":"Path and hash match","result":"The filename stem finds the metadata. The image card displays its saved object labels and tagger score.","tiles":["image found","hash matched","full card"],"highlight":null,"bar":null},{"label":"Image only","result":"The image can still be selected. Metadata is absent; the template shows ? for labels and 0.0000 for confidence.","tiles":["image found","no metadata","partial card"],"highlight":null,"bar":null},{"label":"Missing path","result":"Try the specific alternate archive path. Skip unresolved entries; the script can fill remaining slots from available category PNGs.","tiles":["path absent","try alternate","skip or fall back"],"highlight":null,"bar":null}]},"parser":{"title":"Inspect the parser output · toy responses","choices":[{"label":"Known heading","result":"ROOT CAUSE: Possible blur matches the expected heading. It produces one section, not a fully validated response.","tiles":["heading → section"],"highlight":null,"bar":null},{"label":"No known heading","result":"Text with no matched heading is stored in _raw and shown as unstructured output.","tiles":["text → _raw"],"highlight":null,"bar":null},{"label":"No response","result":"A caught encoding or model call failure returns None. There is no text to parse.","tiles":["call failed → None"],"highlight":null,"bar":null}]},"server":{"title":"Change the model availability","choices":[{"label":"Ready","result":"With required JSON and reachable images, the report can add optional Qwen notes. Computed counts come from the files.","tiles":["summary","counts","image cards","optional notes"],"highlight":[3],"bar":null},{"label":"Skipped or timed out","result":"Same required JSONs. Counts, available image cards and static recommendations remain. No generated visual analysis; the template may display a failed-call message.","tiles":["summary","counts","image cards","no generated notes"],"highlight":null,"bar":null},{"label":"Missing archetype JSON","result":"The script stops at mandatory-input validation. --no-vlm does not bypass that check.","tiles":["required file absent","stops before report"],"highlight":[1],"bar":null}]},"pair":{"title":"Read paired outcomes · toy example","choices":[{"label":"Clear","result":"The frozen model gets A, B and C right on the clear set: 3/3.","tiles":["A ✓","B ✓","C ✓"],"highlight":null,"bar":null},{"label":"Blurred","result":"At this toy severity it gets A and C right but misses B: 2/3. Compare by sample ID, then repeat on enough data for uncertainty estimates.","tiles":["A ✓","B wrong","C ✓"],"highlight":[1],"bar":null}]},"cap":{"title":"Run the cap logic · toy folders","choices":[{"label":"First group","result":"Ask for 2. A blur folder with three candidates is sliced to 2.","tiles":["limit: 2","blur: b1, b2"],"highlight":null,"bar":null},{"label":"Next group","result":"The list is full. The current loop skips slicing the next group but extends the list anyway, producing 4.","tiles":["blur: 2","JPEG: +2","selected: 4"],"highlight":[2],"bar":null}]},"trace":{"title":"Follow the real 005331 record","choices":[{"label":"Training → export","result":"Both JSONs have the same row: cat → dog, blur tag, confidence 0.0228 rounded, epoch 2, count 1.","tiles":["training JSON","same hash","export JSON"],"highlight":[1],"bar":null},{"label":"PNG → archetype","result":"Decoded PNG bytes match the committed image. Its filename stem and the first blur.typical entry use the same hash; saved distance ≈ 0.289.","tiles":["PNG bytes","same filename","typical blur"],"highlight":[1],"bar":null},{"label":"Archetype → Markdown","result":"The saved card shows the same hash, class pair, role, score and distance. The generated prose is only a hypothesis.","tiles":["same hash","cat → dog","saved card"],"highlight":[0],"bar":null}]}}}</script>
+<!-- visiondev-copilot:panel:end -->
 <div id="footer"></div>
   </main>
 </div>
@@ -18354,6 +18508,283 @@ function renderCard(q){
   return card;
 }
 
+/* visiondev-copilot:script:begin */
+/* VisionDev is an independent study view; it does not alter Atlas scores. */
+(function () {
+  "use strict";
+  var key = "__visiondev_copilot__";
+  var prefix = "#visiondev-copilot";
+  var link = /^#visiondev-copilot(?:-(V\d{3}))?$/i.exec(window.location && window.location.hash || "");
+  var controller;
+  var wasActive = false;
+  var get = function (id) { return document.getElementById(id); };
+  function make(tag, text, className) {
+    var node = document.createElement(tag);
+    if (text != null) node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+  function updateLink(id) {
+    try {
+      var page = window.location.pathname + window.location.search;
+      window.history.replaceState(null, "", page + (id ? prefix + "-" + id : ""));
+    } catch (_) {}
+  }
+  function start() {
+    var data = JSON.parse(get("vdc-data").textContent);
+    var cards = data.cards;
+    var index = Math.max(0, cards.findIndex(function (card) { return link && card.id.toLowerCase() === (link[1] || "").toLowerCase(); }));
+    var revealed = 0;
+    var proposed = false;
+    function text(id, value) { get(id).textContent = value || ""; }
+    function visible(id, show) { get(id).hidden = !show; }
+    var select = get("vdc-jump");
+    data.stages.forEach(function (stage) {
+      var group = make("optgroup");
+      group.label = stage.title;
+      cards.filter(function (q) { return q.stage === stage.id; }).forEach(function (q) {
+        var option = make("option", q.id + " · " + q.topic);
+        option.value = q.id;
+        group.appendChild(option);
+      });
+      select.appendChild(group);
+    });
+    function paintMap() {
+      var q = cards[index];
+      var list = get("vdc-flow");
+      list.replaceChildren();
+      get("vdc-current").setAttribute("aria-pressed", String(!proposed));
+      get("vdc-proposed").setAttribute("aria-pressed", String(proposed));
+      text("vdc-map-caption", proposed ? "Suggested design · select a change to defend it." : "Select a stage to open its first question.");
+      var nodes = proposed ? data.proposed : data.stages.filter(function (item) { return item.id !== "improve"; });
+      nodes.forEach(function (item, i) {
+        var row = make("li");
+        var button = make("button");
+        button.type = "button";
+        button.dataset.question = item.first;
+        var active = proposed ? item.first === q.id : item.id === q.stage;
+        if (active) button.setAttribute("aria-current", "step");
+        button.appendChild(make("span", String(i + 1).padStart(2, "0"), "vdc-flow-number"));
+        var label = make("span");
+        label.appendChild(make("strong", item.title));
+        label.appendChild(make("small", item.short));
+        button.appendChild(label);
+        row.appendChild(button);
+        if (i < nodes.length - 1) {
+          var arrow = make("span", "↓", "vdc-connector");
+          arrow.setAttribute("aria-hidden", "true");
+          row.appendChild(arrow);
+        }
+        button.addEventListener("click", function () { go(item.first); });
+        list.appendChild(row);
+      });
+      var stage = data.stages.find(function (item) { return item.id === q.stage; });
+      var selectedProposal = data.proposed.find(function (item) { return item.first === q.id; });
+      text("vdc-map-note", proposed ? (selectedProposal ? selectedProposal.note : "These changes are proposals. They are separate from the pinned implementation.") : stage.note);
+    }
+    function paintCard() {
+      var q = cards[index];
+      select.value = q.id;
+      text("vdc-position", q.id + " · QUESTION " + (index + 1) + " / " + cards.length);
+      text("vdc-question", q.question);
+      text("vdc-context", q.context);
+      text("vdc-hint", q.hint);
+      text("vdc-status", q.status);
+      text("vdc-say", q.say);
+      text("vdc-probe", q.next);
+      var img = get("vdc-image");
+      visible("vdc-image-wrap", Boolean(q.image));
+      if (q.image) {
+        img.src = q.image;
+        img.alt = "Saved CIFAR-10 failure image from run 005331";
+        text("vdc-image-label", "Saved CIFAR-10 failure · run 005331");
+      } else {
+        img.removeAttribute("src");
+        img.alt = "";
+      }
+      var source = get("vdc-source");
+      source.href = q.url;
+      source.textContent = q.status === "Proposed" ? "Open related current source ↗" : "Open pinned source ↗";
+      var secondary = get("vdc-secondary");
+      secondary.hidden = !q.secondary;
+      if (q.secondary) {
+        secondary.href = q.secondary[1];
+        secondary.textContent = q.secondary[0] + " ↗";
+      } else {
+        secondary.removeAttribute("href");
+        secondary.textContent = "";
+      }
+      get("vdc-excerpt").open = false;
+      visible("vdc-excerpt", Boolean(q.excerpt));
+      text("vdc-excerpt-label", q.excerpt ? "Read the code · " + q.excerptLabel : "");
+      text("vdc-code", q.excerpt);
+      get("vdc-previous").disabled = index === 0;
+      get("vdc-next").disabled = index === cards.length - 1;
+      get("vdc-steps").replaceChildren();
+      revealed = 0;
+      paintHint(false);
+      paintAnswer(false);
+      clearPlay();
+      paintMap();
+    }
+    function clearPlay() {
+      var panel = get("vdc-play");
+      panel.replaceChildren();
+      panel.hidden = true;
+    }
+    function paintHint(open) {
+      visible("vdc-hint", open);
+      var button = get("vdc-hint-button");
+      button.textContent = open ? "Hide hint" : "Show hint";
+      button.setAttribute("aria-expanded", String(open));
+    }
+    function paintAnswer(open) {
+      var q = cards[index];
+      var button = get("vdc-answer-button");
+      visible("vdc-answer", open);
+      button.textContent = open ? "Hide walkthrough" : "Walk through the answer";
+      button.setAttribute("aria-expanded", String(open));
+      visible("vdc-deeper", open && revealed === q.worked.length);
+      visible("vdc-step-button", revealed >= q.worked.length ? false : open);
+      text("vdc-step-count", (open && revealed) ? "Step " + revealed + " of " + q.worked.length : "");
+    }
+    function nextStep() {
+      var q = cards[index];
+      if (revealed >= q.worked.length) return;
+      var step = q.worked[revealed++];
+      var row = make("li");
+      row.appendChild(make("strong", step[0]));
+      row.appendChild(make("p", step[1]));
+      get("vdc-steps").appendChild(row);
+      if (revealed === q.worked.length && q.visual) showPlay(q.visual);
+      paintAnswer(true);
+      if (revealed === q.worked.length && document.activeElement === get("vdc-step-button")) {
+        get("vdc-deeper").focus();
+      }
+    }
+    function go(id) {
+      var target = cards.findIndex(function (q) { return q.id === id; });
+      if (target < 0) return;
+      if (index !== target) {
+        index = target;
+        paintCard();
+      }
+      updateLink(cards[index].id);
+      get("vdc-question").focus();
+    }
+    function showPlay(key) {
+      var widget = data.visuals[key];
+      var panel = get("vdc-play");
+      panel.replaceChildren();
+      panel.hidden = false;
+      panel.appendChild(make("h4", widget.title));
+      var choices = make("div", null, "vdc-actions");
+      choices.setAttribute("role", "group");
+      choices.setAttribute("aria-label", widget.title);
+      panel.appendChild(choices);
+      var graphic = make("div");
+      graphic.setAttribute("aria-hidden", "true");
+      panel.appendChild(graphic);
+      var output = make("output");
+      output.setAttribute("aria-live", "polite");
+      panel.appendChild(output);
+      var buttons = [];
+      function choose(entry, active) {
+        buttons.forEach(function (button, i) { button.setAttribute("aria-pressed", String(i === active)); });
+        graphic.replaceChildren();
+        if (entry.bar != null) {
+          var bar = make("div", null, "vdc-bar");
+          var mark = make("span");
+          mark.style.width = entry.bar + "%";
+          bar.appendChild(mark);
+          graphic.appendChild(bar);
+        }
+        if (entry.tiles) {
+          var row = make("div", null, "vdc-toyrow");
+          entry.tiles.forEach(function (tile, i) {
+            row.appendChild(make("span", tile, (entry.highlight || []).indexOf(i) !== -1 ? "vdc-yes" : ""));
+          });
+          graphic.appendChild(row);
+        }
+        output.textContent = entry.result;
+      }
+      widget.choices.forEach(function (entry, i) {
+        var button = make("button", entry.label);
+        button.type = "button";
+        buttons.push(button);
+        choices.appendChild(button);
+        button.addEventListener("click", function () { choose(entry, i); });
+      });
+      choose(widget.choices[0], 0);
+    }
+    select.addEventListener("change", function () { go(select.value); });
+    get("vdc-hint-button").addEventListener("click", function () { paintHint(get("vdc-hint").hidden); });
+    get("vdc-answer-button").addEventListener("click", function () {
+      if (!get("vdc-answer").hidden) paintAnswer(false);
+      else if (!revealed) nextStep();
+      else paintAnswer(true);
+    });
+    get("vdc-step-button").addEventListener("click", nextStep);
+    get("vdc-previous").addEventListener("click", function () { if (index > 0) go(cards[index - 1].id); });
+    get("vdc-next").addEventListener("click", function () { if (index < cards.length - 1) go(cards[index + 1].id); });
+    get("vdc-current").addEventListener("click", function () { proposed = false; paintMap(); });
+    get("vdc-proposed").addEventListener("click", function () { proposed = true; paintMap(); });
+    paintCard();
+    return { id: function () { return cards[index].id; } };
+  }
+
+  var priorNav = updateNav;
+  var mobile = make("button", "VisionDev Copilot", "tbtn");
+  mobile.type = "button";
+  mobile.id = "visiondevCopilotMobile";
+  mobile.setAttribute("aria-controls", "visiondevCopilotPanel");
+  get("topbar").appendChild(mobile);
+  function openVision() {
+    state.seg = key;
+    render();
+    updateLink(controller.id());
+    get("vdc-title").focus();
+    try { window.scrollTo(0, 0); } catch (_) {}
+  }
+  mobile.addEventListener("click", function () {
+    if (state.seg !== key) { openVision(); return; }
+    state.seg = "__all__";
+    render();
+    mobile.focus();
+  });
+  updateNav = function () {
+    priorNav();
+    var active = state.seg === key;
+    get("layout").classList.toggle("visiondev-copilot-active", active);
+    get("topbar").classList.toggle("visiondev-copilot-active", active);
+    get("visiondevCopilotPanel").hidden = !active;
+    mobile.textContent = active ? "← All segments" : "VisionDev Copilot";
+    mobile.setAttribute("aria-expanded", String(active));
+    if (!active && wasActive) updateLink(null);
+    wasActive = active;
+    var button = make("button", null, "navbtn" + (active ? " on" : ""));
+    button.type = "button";
+    button.id = "visiondevCopilotTab";
+    button.setAttribute("aria-controls", "visiondevCopilotPanel");
+    button.setAttribute("aria-pressed", String(active));
+    button.appendChild(make("span", "VisionDev Copilot"));
+    button.appendChild(make("span", "32 Q", "cnt"));
+    button.addEventListener("click", openVision);
+    get("navBtns").appendChild(button);
+  };
+  var priorRender = render;
+  render = function () {
+    if (state.seg !== key) {
+      priorRender();
+      return;
+    }
+    if (!controller) controller = start();
+    updateNav();
+  };
+  if (link) state.seg = key;
+})();
+
+/* visiondev-copilot:script:end */
 /* The assessment is a standalone study view, outside study progress. */
 var assessmentKey = "__assessment__";
 var sourceUpdateNav = updateNav;
