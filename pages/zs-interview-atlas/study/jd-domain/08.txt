@@ -1,0 +1,75 @@
+JD / Domain | Card 08
+Difficulty: Advanced
+
+QUESTION
+Show how you would get the latest accepted submission per bounty without counting duplicates from a join.
+
+WHY THIS QUESTION MATTERS
+SQL/DBMS preparation from role research; test grain, joins, ranking and ties.
+
+CONTEXT
+Reporting errors often come from counting at the wrong grain rather than a difficult SQL operator. Define what one output row means before choosing ranking, joins or aggregation.
+
+TERMS
+grain: What one result row represents.
+window function: A calculation over related rows that retains their individual identities.
+
+MECHANISM
+1. Specify one row per bounty, the accepted-status rule and a deterministic definition of latest. Filter eligible submissions and order within each bounty using timestamp plus a stable tie-breaker.
+2. Choose one ranked submission before joining it to the bounty relation. A left join retains bounties without accepted submissions if later predicates do not reject their introduced nulls.
+3. Inspect multiplication before summing money or counting entities. Aggregate each many-row relation to the needed grain first, then verify with zero-match, tie and duplicate-join fixtures.
+
+TECHNICAL EXPLANATION
+ROW_NUMBER with a total order selects one row per partition, whereas RANK can keep tied top rows and violate a one-row-per-bounty contract. Define the tie-breaker with the business owner rather than letting storage order make the choice. A right-side predicate in WHERE can remove null-extended rows from a left join; filtering the right relation first or placing the intended predicate in ON preserves the desired inclusion rule. Counting joined rows measures relationships, not necessarily bounties. Preaggregate comments or other many-row relations to the needed grain before summing bounty amounts. Then examine an actual query plan for the real cardinalities and predicates before prescribing an index. The fixture and reasoning here are illustrative; no SQL query is represented as executed production evidence.
+
+WORKED EXAMPLE
+Bounty A has accepted submissions at 10:00 (ID 7) and 10:00 (ID 9). With order by time descending, ID descending, ID 9 wins. Bounty B has none; a left join retains B with null submission fields. These are hypothetical test rows.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+An underspecified tie rule makes results unstable; filtering after a left join can change which entities exist in the report.
+
+TEST EVIDENCE
+Proposed SQL fixture: tied timestamps, zero accepted submissions, several pending submissions and a many-row comments join. Query code is not embedded or claimed executed here.
+
+SPEAKABLE ANSWER
+I first state the output grain: one row per bounty. I would filter submissions to accepted status, rank each bounty's submissions by acceptance time descending and a stable ID tie-breaker, then choose rank one. A window function preserves each submission row while assigning a position; grouping alone does not safely return all columns from the latest record. If the report must include bounties without an accepted submission, I left join the already filtered latest-submission relation. Putting its status predicate in the outer WHERE clause could accidentally remove the unmatched rows. Before summing rewards, I check whether a join has multiplied bounty rows. I would ask what latest means and how timestamps and ties are defined rather than guessing a business rule.
+
+SELF-CHECK
+Why might joining comments before summing bounty rewards inflate the total?
+One bounty row may repeat for every matching comment. The joined rows no longer represent one bounty each, so summing its repeated reward counts the same business amount several times.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What happens if comments are joined before summing bounty rewards?
+Each bounty can appear once per matching comment, so summing the repeated bounty reward inflates the amount. The output rows represent bounty-comment relationships rather than one bounty each. Aggregate comments to one row per bounty or keep the reward aggregation separate before joining. Verify the grain after each transformation, because a correct individual reward value does not make its sum correct after a multiplying join.
+
+1.1. Why is DISTINCT on the reward amount not a general repair?
+Two different bounties can legitimately have the same reward. Summing distinct amounts would collapse those separate business entities while removing some multiplication. Deduplicate or aggregate using the actual entity key and intended grain instead of the value being measured. A small fixture with two equal-reward bounties and several comments exposes this mistake: the correct total includes both bounties exactly once, regardless of how many comments each has.
+
+1.1.1. How would you verify the report independently on a small fixture?
+Write the expected entity list and amounts by hand before running the query. Include equal reward values, zero related rows and multiple related rows, then compare both the selected keys and aggregate total. This catches a query that accidentally gets the right total through offsetting errors. The fixture validates the specified examples; inspect production query plans separately for performance because correctness on small data does not establish scalability.
+
+2. Why is ordering only by timestamp insufficient for selecting one latest row?
+Several submissions can share the same timestamp, leaving no specified choice between them. A plan or storage change may then select a different row. Add a stable tie-breaker only after confirming the business rule, and use a total order with ROW_NUMBER when exactly one row is required. The tie-breaker makes selection deterministic under that rule; it does not mean the larger ID is intrinsically the more meaningful business event.
+
+2.1. How would RANK behave differently from ROW_NUMBER on a tie?
+RANK assigns the same rank to rows tied under the ordering criteria, so filtering rank one can return multiple rows for a bounty. ROW_NUMBER assigns a unique position, but needs a total order for a reproducible chosen row. Select the operator according to whether the business wants all ties or exactly one result. An output-grain requirement should drive that decision rather than treating window functions as interchangeable syntax.
+
+2.1.1. What if the business cannot decide which tied record should win?
+Expose the ambiguity instead of silently choosing a row and presenting it as authoritative. The report may need to show all ties, a conflict flag or a rule requiring an additional event sequence field. Document the chosen semantics and add a tie fixture. A deterministic arbitrary choice can be acceptable for some interfaces, but it must be agreed and distinguished from a claim about which submission truly occurred last.
+
+3. How can a right-side predicate change the meaning of a left join?
+An unmatched left row receives null values for the right-side columns. A WHERE predicate requiring right-side status to equal ACCEPTED is not true for those nulls, so it removes the unmatched row. If the report must retain all bounties, filter accepted submissions before the join or place the intended condition in ON. Confirm the desired inclusion semantics rather than applying a mechanical rewrite without checking the business question.
+
+3.1. How should an unmatched row be represented in a report?
+Keep the bounty identity and label the absence of an accepted submission explicitly. Do not confuse an introduced null from no matching row with a source record whose field happens to be missing. If needed, carry a matched submission ID or explicit presence indicator to distinguish them. Downstream counts should define whether they count all bounties, matched submissions or non-null values, because those denominators can differ.
+
+3.1.1. What performance check follows once the join semantics are correct?
+Inspect the actual execution plan and cardinalities for the filters, partition ordering and join keys on representative data. Consider indexes that support those access patterns, then measure their effect and write cost. An index name or theoretical fit is not evidence that the planner uses it or that it improves the workload. Keep the correctness fixture while tuning so a faster query does not accidentally change inclusion or tie behavior.
+
+OPTIONAL PRACTICE RESOURCES
+SQL Joins (Database Design Fundamentals for Software Engineers - AI-Powered Course): https://www.educative.io/courses/database-design-fundamentals/sql-joins
+Using Window Functions (The Art of PostgreSQL - AI-Powered Course): https://www.educative.io/courses/the-art-of-postgresql/using-window-functions

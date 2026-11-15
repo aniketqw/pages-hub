@@ -1,0 +1,71 @@
+Behavioural & Experience | Card 07
+Difficulty: Intermediate
+
+QUESTION
+Describe a disagreement about a technical choice. How did you use evidence and share credit?
+
+WHY THIS QUESTION MATTERS
+Behavioral ownership, collaboration and trade-off communication without fabricating a conflict.
+
+CONTEXT
+A disagreement answer is not a contest story; it tests whether you can understand another constraint, use evidence, change your view, and share credit. The bank deliberately does not provide a private team incident. The answer must be built from a real situation, with the proposals and outcome filled in. A hypothetical technical contrast can illustrate reasoning only when labeled as hypothetical.
+
+TERMS
+trade-off: A choice that improves one objective while accepting a cost elsewhere.
+decision record: A short account of alternatives, rationale and review conditions.
+
+MECHANISM
+1. Describe the actual disagreement and each proposal in terms of the requirement it optimized.
+2. Name the evidence available at the time and separate measured results from assumptions.
+3. State the decision, your individual contribution, how you supported the team, and any revisit condition.
+
+TECHNICAL EXPLANATION
+Choose a real example before practicing the wording. Do not invent a teammate, conflict, consensus, or outcome to fit an interview template. A strong account fairly represents the other proposal, names the shared decision owner, and makes your own role concrete. Explain how you used evidence; if no experiment happened, say what reasoning informed the decision and what remained uncertain. If the discussion was unresolved, describe the escalation or revisit path only if one existed. The interviewer cares about behavior under disagreement, not whether you “won.” Add the actual division of work and credit. If no suitable event exists, answer transparently with a design trade-off and label it as a hypothetical.
+
+WORKED EXAMPLE
+Hypothetical trade-off: a model judge handles semantic support more flexibly, while exact-number checks are cheaper and reproducible. Neither alone proves all claims true. Use this comparison only as a teaching example unless it was the actual disagreement.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Do not invent a teammate, disagreement, consensus, leadership role or outcome.
+
+TEST EVIDENCE
+Story remains deliberately incomplete pending true user details. Technical contrast is supported by the Resume Builder code map and audit; it is not evidence of a personal conflict.
+
+SPEAKABLE ANSWER
+I would use one real disagreement and explain both sides fairly. [FILL BEFORE INTERVIEW: choose an actual situation, each person's proposal, your role and the final outcome.] My structure is the requirement, the constraint each proposal optimized, the evidence we could gather, and the decision with its remaining trade-off. For example, choosing deterministic verification rather than a second model judge is a technical contrast I can explain from Resume Builder, but I must not invent a teammate argument around it. I would state which component I implemented and which part belonged to someone else. If the evidence changed my view, I would say so directly. If the team chose a different approach, I would explain how I supported that decision and what check we agreed would trigger reconsideration. A convincing answer needs a true interaction and result, not just a plausible design debate.
+
+SELF-CHECK
+If your preferred proposal won but later evidence shows it was worse, what would you do?
+Acknowledge the result, update the decision, and credit the evidence and people who surfaced it. I would explain the earlier assumption, its impact, and what changed. A good disagreement story values the quality of the decision over defending my prior position.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What was the actual proposal and evidence in the disagreement?
+I would describe both positions in terms of the constraint each optimized, then state what evidence the team had. [FILL BEFORE INTERVIEW: supply the real people, proposals, your role, and decision.] Do not manufacture a disagreement around deterministic verification just because that is a useful design contrast from Resume Builder.
+
+1.1. How did you test the competing options?
+Use a small decision-relevant comparison: representative cases, failure modes, cost, and maintenance burden. If the team did not run an experiment, say what reasoning informed the decision and what remained uncertain. [FILL BEFORE INTERVIEW: name the actual evidence.] A story should not imply a benchmark that never happened.
+
+1.1.1. What if the team chose the option you opposed?
+I would explain how I supported the decision, which risks I helped track, and what signal would prompt reconsideration. [FILL BEFORE INTERVIEW: give the true outcome and your response.] Do not claim consensus or a later success unless it is supported by memory and evidence.
+
+2. How would you respond if the other proposal had stronger evidence?
+I would update my view and explain which evidence changed the decision. That is not a loss; it is the purpose of comparing options. [FILL BEFORE INTERVIEW: state whether this happened in the real example.] I would credit the colleague’s contribution and describe my own work precisely.
+
+2.1. How do you give credit without minimizing your contribution?
+Separate the shared decision from the specific analysis or implementation I performed. Use “we” for team outcomes and “I” for work I personally did. [FILL BEFORE INTERVIEW: name the true division of work.] Credit should be concrete, not a generic thank-you added after the story.
+
+2.1.1. How would you handle a disagreement that remained unresolved?
+Agree on a decision owner, the risk accepted for now, and an observable revisit condition. If the choice affects safety or data integrity, use the escalation path rather than leaving it implicit. [FILL BEFORE INTERVIEW: describe only a real process you followed.]
+
+3. Which measurable signal would trigger reconsideration?
+A useful revisit condition is observable and connected to the decision: an error rate, latency threshold, support burden, or newly available evidence. The team should record who reviews it and when. [FILL BEFORE INTERVIEW: state the actual signal if the example had one.] “We will revisit later” is not a control.
+
+3.1. How would you choose the threshold?
+Set it from the user impact and a baseline, then check whether measurement is reliable enough to trigger action. A threshold should include a window or sample size so noise does not cause constant reversals. If none was agreed in the original event, do not retroactively claim one; say the decision could have been clearer.
+
+3.1.1. What if the signal crosses but the original option still seems best?
+Reopen the evidence and document why the decision remains, or change course if the risk has shifted. A revisit trigger promises review, not automatic reversal. [FILL BEFORE INTERVIEW: explain whether the true team had such a follow-up.] State which new evidence was considered and who accepted the remaining risk, rather than treating a review checkpoint as a promise to reverse the decision.

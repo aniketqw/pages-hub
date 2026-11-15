@@ -1,0 +1,33 @@
+MULTI UNIVERSITY BOUNTY SYSTEM
+
+Open one text card at a time.
+
+01. How does an authenticated bid acceptance move from HTTP to PostgreSQL, and what race does the transaction actually close?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/01.txt
+
+02. Can Serializable prevent a duplicate reputation award when the same submission review is delivered twice?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/02.txt
+
+03. What does Redis cache on a detail read, and how do you reason about stale data and Redis failure?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/03.txt
+
+04. A PostgreSQL write commits but Redis event publication fails. What state is left behind?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/04.txt
+
+05. How does the Redis Streams worker handle a Mongo update failure, and what does recovery really mean?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/05.txt
+
+06. Why use MongoDB for cross-university search while PostgreSQL stays authoritative, and what can you say about a Redis prefix index?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/06.txt
+
+07. What does the Docker Compose topology establish, and what can you honestly claim about failure behavior?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/07.txt
+
+08. Which reads must use the PostgreSQL primary, and what freshness contract does the separate Prisma read client actually provide?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/08.txt
+
+09. What does the JWT middleware authenticate, and where is ownership or role authorization actually enforced?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/09.txt
+
+10. How do pagination grain and search indexes affect this bounty endpoint, and what would you measure before tuning it?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/10.txt

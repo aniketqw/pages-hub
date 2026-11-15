@@ -1,0 +1,75 @@
+JD / Domain | Card 03
+Difficulty: Advanced
+
+QUESTION
+Design a basic RAG pipeline over changing client documents. Where would you measure retrieval before touching the prompt?
+
+WHY THIS QUESTION MATTERS
+JD: embeddings, chunking, vector stores and a basic retrieval pipeline.
+
+CONTEXT
+A RAG system answers using external documents instead of depending only on model memory. The central debugging question is whether the needed evidence reached generation, with the correct version and permissions.
+
+TERMS
+chunk: A retrievable portion of a document with source metadata.
+recall@k: The proportion of queries whose relevant evidence appears in the top k candidates.
+
+MECHANISM
+1. Give each source a stable identity, version and access metadata. Chunk content without losing the context needed to interpret tables or headings, then embed and index those chunks.
+2. At query time enforce the caller's access constraints, retrieve candidates and optionally rerank them. Record which evidence actually enters the bounded generation request.
+3. Check source recall separately from claim support. A faithful quotation of an outdated source can still answer the business question incorrectly; test freshness and abstention as explicit outcomes.
+
+TECHNICAL EXPLANATION
+Recall at k needs a relevance definition: some tasks label a source document, while others require the particular passage containing the answer. State whether the reported metric counts queries with at least one relevant hit or relevant items recovered across all labels. Chunk overlap trades repeated tokens for boundary preservation and can inflate apparent evidence diversity when several hits repeat the same text. Reranking can improve candidate ordering but cannot recover a passage excluded from the candidate set. Document updates should build a complete new version, validate it, switch the active version consistently and retire old chunks. Permissions must constrain evidence before it reaches generation. A citation is a pointer to inspect, not proof that its source supports the sentence or remains current.
+
+WORKED EXAMPLE
+For a question about the 2026 policy, retrieving a 2024 paragraph is a retrieval/versioning failure even if the generated answer quotes it perfectly. Track source version in the index and in the final citation.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Retrieval can return stale, irrelevant or unauthorized content. Citations alone do not prove support.
+
+TEST EVIDENCE
+Proposed tests: relevant-source recall@k, stale-version replacement, permission-filter enforcement, unsupported questions and conflicting-source handling. These are design tests, not a claimed deployed client system.
+
+SPEAKABLE ANSWER
+I would ingest documents with source IDs, versions and access metadata, split them into coherent chunks, embed them and index the vectors. At query time I apply access and metadata filters, retrieve candidate chunks, optionally rerank, and give the model bounded evidence with citations. I measure retrieval separately from answer quality. If the correct document never reaches the prompt, prompt polishing cannot fix that failure. My evaluation set would identify the expected source passage for each question, including an unanswerable group. Chunk boundaries should preserve useful context such as a table header and its rows; I would tune size and overlap against measured recall and redundant-token cost. Updating a source must replace or invalidate its old chunks rather than leaving contradictory versions searchable.
+
+SELF-CHECK
+If the answer quotes a 2024 policy perfectly for a question about 2026, which stage would you inspect first?
+Inspect source selection and version filtering first. The generator may be faithful to the wrong evidence; changing answer wording alone cannot establish current-policy correctness.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What metric tells you whether generation received useful evidence?
+Label the relevant source passages and check which appear in the retrieved set that reaches generation. Specify the metric: the fraction of queries with any relevant hit is a query success measure, while recall across all labeled relevant items has a different denominator. Also inspect rank and context sufficiency. A passage mentioning the right topic but missing the needed table header may count as a poor retrieval result for the actual task.
+
+1.1. Can a reranker recover evidence missing from the candidate set?
+A reranker that only sees retrieved candidates can reorder those candidates, but it cannot introduce an omitted passage by itself. Separate first-stage candidate recall from final top-k quality to locate the failure. If the relevant source is absent initially, inspect indexing, filtering and the retrieval query. If it is present but ranked low, reranking may help. This decomposition prevents tuning generation prompts to compensate for evidence that was never available.
+
+1.1.1. How would you evaluate questions that have no supported answer in the collection?
+Include an explicitly unanswerable group with a defined abstention behavior. Retrieval will often return something even when nothing supports the requested fact, so a nonempty candidate list is not evidence of answerability. Evaluate whether the system identifies insufficient evidence rather than inventing a response from a nearby topic. Report unsupported-answer frequency separately from recall on answerable questions, because those metrics target different failures.
+
+2. Why can fixed character chunks break a table interpretation?
+A chunk boundary can separate a row from column names, currency units, date ranges or footnotes that determine its meaning. The model may then quote a real number under the wrong interpretation. Preserve those dependencies using structure-aware chunks or repeated contextual headers and source locations. Evaluate actual question-answer pairs rather than assuming a fixed overlap percentage solves every table; the useful boundary depends on the document structure and task.
+
+2.1. Could increasing overlap solve this without any downside?
+More overlap can preserve nearby context but also duplicates retrieved text, consumes prompt budget and makes several hits look like independent evidence when they repeat one passage. It may still fail when a header is far from a row or spans pages. Measure answer-bearing coverage and redundant tokens together, and deduplicate overlapping hits when constructing the prompt. Structure-aware metadata may solve the dependency more directly than continually increasing chunk size.
+
+2.1.1. How would you trace a wrong financial number back to the retrieval representation?
+Record the source document version, page or section, chunk identities and the exact text supplied to generation. Inspect whether the number, column header, units and relevant footnote were all present. If the source itself is ambiguous, do not blame chunking without evidence. This trace distinguishes missing context from generation misinterpretation and gives a reproducible fixture for comparing a revised chunking method.
+
+3. How would you avoid exposing half an updated document?
+Build and verify a new source version before making it active, then change the active-version reference consistently. Keep chunk identity tied to that version so old and new content are not merged accidentally. Retire or filter the old version according to the rollback and retention policy. The exact atomicity mechanism depends on the store; describe it as a proposed design until implemented and tested under concurrent queries.
+
+3.1. What other derived state must change when the active source version changes?
+Caches, citations, reranking artifacts and stored answer references can still point at the old version even after the vector index is updated. Include source version in derived-state identity or invalidate the affected entries explicitly. Record which evidence version produced a displayed answer so it can be interpreted later. Updating only the index does not establish end-to-end freshness if a cached response or user interface still serves an older result.
+
+3.1.1. How would you test the update and rollback without relying on a visual demo?
+Use two source versions with deliberately conflicting values and issue controlled queries before, during and after the switch. Assert that each answer cites one complete active version and that no forbidden mixture appears. Then restore the previous version and verify the associated cache behavior. These tests exercise the intended consistency contract; they do not establish global transactional guarantees beyond the stores and concurrency patterns actually exercised.
+
+OPTIONAL PRACTICE RESOURCES
+What Is RAG and Why Use It? (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/what-is-rag-and-why-use-it
+Chunking Strategies and Embedding Model Selection (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/chunking-strategies-and-embedding-model-selection

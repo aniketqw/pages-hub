@@ -1,0 +1,33 @@
+SANDBOXED CODE-EXECUTION AGENT
+
+Open one text card at a time.
+
+01. Trace one tool call from the model through execution and back; where does reflection re-enter?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/01.txt
+
+02. The graph says “15 steps.” What exactly counts, and does a new REPL turn get a fresh budget?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/02.txt
+
+03. The code has MAX_RETRIES=3. What evidence says the retry bound works?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/03.txt
+
+04. Would you run untrusted Python in this Docker setup? Define the actual boundary.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/04.txt
+
+05. The HTTP helper truncates large responses. Does that bound network or storage usage?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/05.txt
+
+06. What is actually portable between the `opus` and `ollama` providers?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/06.txt
+
+07. What do the human approval tool and 14 integration cases establish about safety?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/07.txt
+
+08. What happens if two `execute_python` tool calls run at once while writing the temporary script?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/08.txt
+
+09. What state survives a process restart in this graph, and what does the fixed thread ID actually guarantee?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/09.txt
+
+10. How do tool schemas, dispatch, and approval interact, and where is the human-in-the-loop boundary enforced?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/10.txt

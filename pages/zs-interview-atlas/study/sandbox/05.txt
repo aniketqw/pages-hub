@@ -1,0 +1,96 @@
+Sandboxed Code-Execution Agent | Card 05
+Difficulty: Intermediate
+
+QUESTION
+The HTTP helper truncates large responses. Does that bound network or storage usage?
+
+WHY THIS QUESTION MATTERS
+Tests whether I can distinguish context-size control from response acquisition and resource limits.
+
+CONTEXT
+The HTTP helper’s preview threshold controls model context, not acquisition. It fetches and writes the body before truncating the returned message, and both transport paths disable TLS verification.
+
+TERMS
+streaming: Processing a response incrementally instead of buffering it all
+TLS verification: Checking that a certificate belongs to the intended server
+context window: The text the model can consider in one request
+
+MECHANISM
+1. Trace response receipt through file write and only then the character-length branch.
+2. Distinguish characters in a serialized body from bytes transferred and stored.
+3. Use streaming limits and timeouts to stop oversized bodies during receipt.
+4. Keep certificate verification enabled and define partial-file cleanup and retention.
+5. For example, a huge response can already consume bandwidth and disk before the displayed character count is checked. Place the byte limit in the receive loop and remove partial files on cancellation; that is a proposed repair, not current bounded receipt.
+
+TECHNICAL EXPLANATION
+The response is fetched and persisted before the return-size branch runs. So the preview is a context-management choice, not a network or disk quota. A true cap must stop reading after a maximum byte count, and the file path needs lifecycle rules. Disabling certificate checks weakens server identity verification and can expose the request to interception. The helper writes the full body to a response file, then checks whether the serialized string exceeds 2,000 characters and returns a 500-character preview. Thus large content is already on disk before the preview decision. Requests and curl use disabled certificate verification, and a requests exception can cause a second curl attempt whose first POST may already have reached the server. Add streaming byte limits, method-aware retries, idempotency for mutations, TLS verification, quotas, retention, and partial-file cleanup.
+
+WORKED EXAMPLE
+A 40 MB JSON body can still be downloaded and written to disk even though only 500 characters are shown to the LLM.
+
+SOURCE
+sandbox-agent/tools/implementations.py:111-125
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/tools/implementations.py#L111-L125
+
+    body = parsed.get("body")
+    if body is not None:
+        body_str = json.dumps(body) if isinstance(body, (dict, list)) else str(body)
+        if len(body_str) > 2000:
+            body_preview = body_str[:500] + "... [truncated]"
+            return {
+                "status": parsed.get("status"),
+                "body_preview": body_preview,
+                "full_response_file": response_file,
+                "note": f"Full response saved to {response_file}"
+            }
+    return parsed
+
+
+# ------------------------------------------------------------
+
+The branch checks serialized body length after the response is already available and returns a truncated preview plus pointer. That controls message size; I would implement streaming limits earlier in the request path.
+
+LIMIT
+Large payloads can consume bandwidth and disk; disabled TLS verification weakens trust in the remote endpoint.
+
+TEST EVIDENCE
+I inspected the helper statically and did not rerun the HTTP integration tests.
+
+SPEAKABLE ANSWER
+In `tools/implementations.py:http_request`, a response body over 2,000 characters is saved under `/workspace/http_responses/`; the tool returns a 500-character preview and file pointer. That bounds what goes back into the model message, but it does not bound bytes fetched or saved. I also found TLS verification disabled in both the requests and curl paths, which is a transport-security caveat. I would add streaming with a byte cap, timeouts, content-type checks, safe TLS verification, and cleanup or retention limits. I have not rerun the HTTP integration tests.
+
+SELF-CHECK
+A response is 5 MB but serializes to a long string. What does the current 2,000-character check limit?
+It limits only the returned model-facing representation after the full body has already been fetched and written. It does not cap network bytes or disk use.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Where would you place a hard response limit?
+Use streaming reads and stop once the configured byte maximum is exceeded, then discard or explicitly record the partial response. Also cap duration and clean up stored bodies.  The helper fetches the complete response and writes it to disk before checking the serialized body length. Thus the 2,000-character branch affects the model-facing payload only; it cannot stop a huge download from consuming bandwidth or filesystem space. I would stream and enforce byte limits during receipt.
+
+1.1. How would streaming enforce a byte limit?
+Request the response as a stream, count bytes as chunks arrive, and stop reading once the configured cap is crossed. Close the connection, remove any partial file, and return a structured size-limit result. Also set connect and total timeouts. The current helper’s timeout does not bound response size, and its file write occurs before truncation. I would test a chunked response larger than the cap.
+
+1.1.1. What should happen to a partial file after cancellation?
+Delete it unless the tool explicitly supports resumable downloads with integrity metadata. A partial file can be mistaken for a complete result in a later tool call. I would write to a temporary name, fsync or close successfully, then atomically rename on completion; on limit or error, clean up and report why the artifact is absent. The manifest should mark that output as incomplete.
+
+2. Why does certificate verification matter if the endpoint uses HTTPS?
+HTTPS without certificate verification does not reliably authenticate the server. I would restore verification and configure trusted certificates when needed.  The fallback path disables certificate checks too, so using curl after a requests failure does not restore server identity validation. I would keep TLS verification enabled in both paths and make trusted custom certificate configuration explicit. A timeout after sending can leave the server-side result ambiguous.
+
+2.1. Could a timeout cause fallback to issue the same POST twice?
+Yes. Requests may have sent the POST before timing out, and then curl may retry it. For a non-idempotent endpoint that can duplicate a side effect. I would avoid automatic cross-client retry for POST unless an idempotency key is used, and include method-specific retry rules. A deterministic test server should accept the first request then delay its response to reproduce the ambiguous outcome.
+
+2.1.1. Which request methods are safer to retry?
+GET is generally intended to be safe, while POST semantics depend on the endpoint. PUT can be idempotent by contract but still needs careful payload handling. I would classify operations based on API semantics, attach a stable idempotency token for mutations, and record whether the first attempt may have reached the server. The current helper retries broadly after exceptions and does not expose that ambiguity.
+
+3. How can the agent use the remainder without loading all of it?
+The file pointer enables follow-up tools such as bounded range reads or grep, but those tools should also enforce per-read limits and avoid exposing secrets.  The saved path is under the shared workspace, so many large responses can accumulate even though only a preview enters the conversation. I would add retention, quotas, and content-type validation; a context limit is not a storage policy.
+
+3.1. What cleanup policy would you use?
+Store each response under a run-specific directory, enforce a total byte quota and per-file limit, and remove artifacts after a documented retention period or explicit session cleanup. Preserve a small manifest with hash, size, status, and creation time if auditability matters. I would test cleanup after success, timeout, parse failure, and cancellation so every branch has defined artifact behavior. Apply cleanup to both success and error exits.
+
+3.1.1. How should the tool return a truncated response?
+Return status, saved-file pointer, received byte count, truncation reason, and a small preview. Follow-up reads should be range-bounded and sanitize secrets before model exposure. The current response includes a preview and file pointer but no total byte cap. I would keep tool output structured so the model can distinguish partial content from a complete body. Do not claim storage is bounded until this path is tested.
+
+OPTIONAL PRACTICE RESOURCES
+Types of Fine-Tuning: Supervised, Instruction, and RLHF (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/types-of-fine-tuning-supervised-instruction-and-rlhf

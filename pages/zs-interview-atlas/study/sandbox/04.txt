@@ -1,0 +1,97 @@
+Sandboxed Code-Execution Agent | Card 04
+Difficulty: Advanced
+
+QUESTION
+Would you run untrusted Python in this Docker setup? Define the actual boundary.
+
+WHY THIS QUESTION MATTERS
+Tests threat modeling and whether I can separate resource limits from isolation guarantees.
+
+CONTEXT
+Docker provides an execution boundary, but the actual boundary depends on mounts, privileges, resources, and network. This checkout caps memory and mounts a writable host workspace; browser automation includes a host-side path.
+
+TERMS
+bind mount: A host directory made visible inside a container
+egress: Network traffic leaving the execution environment
+threat model: The attacker abilities and assets the design must account for
+
+MECHANISM
+1. List the container’s mounts and the data each process can read or modify.
+2. Inspect effective user, capabilities, CPU/process limits, and network egress.
+3. Treat host-side browser tools as a separate trust boundary.
+4. Use disposable negative tests for filesystem escape, blocked egress, resource exhaustion, and cleanup.
+
+TECHNICAL EXPLANATION
+Docker process isolation and resource controls are separate controls. `mem_limit="1g"` constrains memory, while the rw bind mount exposes host-backed files to the container. The run configuration inspected does not establish CPU quotas or egress blocking. Also, `tools/educative_tool.py` spawns headful Playwright on the host, so the system boundary spans both container and host processes. `start_sandbox` sets a one-gigabyte memory limit and mounts a writable host directory at `/workspace`. The inspected exec call does not establish CPU, egress, dropped-capability, or non-root restrictions. `tools/educative_tool.py` is a host-side browser exception. A safer design starts from an explicit threat model, then uses ephemeral containers, per-job mounts, least privilege, egress policy, process/CPU limits, and cleanup. Verify effective runtime settings in a disposable environment; this checkout has not undergone hostile-code testing.
+
+WORKED EXAMPLE
+A script can write into `/workspace`, and because that directory is bind-mounted, those changes persist in the host workspace; a one-gigabyte memory cap does not prevent network access or host-file changes within that mount.
+
+SOURCE
+sandbox-agent/sandbox/container.py:78-94
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/sandbox/container.py#L78-L94
+
+    _container = client.containers.run(
+        image=IMAGE,
+        name=CONTAINER_NAME,
+        command="tail -f /dev/null",
+        detach=True,
+        volumes={
+            WORKSPACE_HOST: {
+                "bind": WORKSPACE_CONTAINER,
+                "mode": "rw",
+            }
+        },
+        working_dir=WORKSPACE_CONTAINER,
+        mem_limit="1g",
+    )
+
+    print(f"[Sandbox] Container '{CONTAINER_NAME}' is running (ID: {_container.short_id})")
+
+
+The volume mapping makes the host-to-container relationship visible, and mem_limit is only one resource setting. I would explain each control separately and name what the snippet does not configure.
+
+LIMIT
+A writable shared mount, no inspected egress restriction, and host-side browser execution weaken the hostile-code boundary.
+
+TEST EVIDENCE
+I reviewed the container configuration and tool code statically; I did not execute adversarial code or claim a containment test.
+
+SPEAKABLE ANSWER
+In `sandbox/container.py:start_sandbox`, the container gets a one-gigabyte memory limit and a writable bind mount from the host workspace to `/workspace`. That gives a useful execution boundary, but it is not enough evidence to call this hostile-code isolation: the mount is writable, and the inspected run does not set CPU, network-egress, dropped-capability, or non-root controls. Some browser and Educative flows run on the host as well. I would first state the threat model, then restrict mounts, credentials, network, and container privileges before accepting adversarial code.
+
+SELF-CHECK
+The container has a one-gigabyte memory limit. Does that cap CPU usage or network access?
+No. Memory is one resource constraint; CPU, process count, network, capabilities, and host mounts require separate controls. The inspected settings do not establish those limits.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What would you change first if execution is genuinely untrusted?
+Use a per-job temporary mount with least-privilege access, remove host secrets, run as a non-root user, and apply CPU, memory, process, syscall, and network restrictions according to the threat model.  The writable `/workspace` bind mount lets executed code persist files into the host-backed workspace, so isolation includes a data-sharing boundary. A one-gigabyte memory cap does not constrain CPU, processes, network, or Linux capabilities. I would list the allowed filesystem and network actions before calling this a sandbox.
+
+1.1. How could a tool read secrets outside its intended workspace?
+If the container mount or environment exposes them, untrusted code can read those paths or variables. I would use a per-job directory with only required files, avoid mounting credentials, and inspect inherited environment and Docker socket access. The source audit found a writable workspace mount but did not test filesystem escapes, so I would describe the exposure as a configuration question to verify, not claim an exploit occurred.
+
+1.1.1. What would you verify in the container at runtime?
+Inspect effective user, mounts, capabilities, seccomp profile, process and memory limits, network routes, environment variables, and available devices. Then attempt controlled access to paths and hosts that should be denied in a disposable environment. Static Docker arguments are evidence of intent; runtime inspection verifies the effective boundary. No adversarial container test was run in this audit. I would run these checks only in a disposable container.
+
+2. How would you make the browser path fit the same boundary?
+Move browser execution into an isolated worker with explicit network and file permissions, or treat it as a separate trusted service. The current Educative tool launches host-side Playwright, so I would not describe all tools as containerized.  The Educative browser tool runs on the host, so the Docker boundary does not cover every tool. This matters because browser credentials and downloaded files may have a different trust zone than code execution. I would document the host exception and isolate browser work separately.
+
+2.1. What is the risk of a host-side browser tool?
+A page can trigger downloads, access logged-in sessions, or interact with local browser state outside the container boundary. I would use a dedicated browser profile with minimal credentials and explicit domain allowlists, or run automation in an isolated worker. The exact controls depend on the browser plugin and environment. This repository audit found the host-side path but did not execute a hostile page.
+
+2.1.1. Would a browser in a second container solve everything?
+It would reduce direct access to the host profile, but still needs network policy, credential isolation, download handling, and resource limits. Browser automation can also expose authenticated content to model context. I would define which pages may be opened and what data can be returned, then test those boundaries. A container is one layer, not a complete browser security policy.
+
+3. What evidence would you require before making that claim?
+I would inspect the full image and daemon configuration, verify effective user and capabilities, test filesystem and egress policies in a disposable environment, and review secret exposure. This checkout’s static settings do not prove those properties.  Before running untrusted code, I would distinguish accidental bugs from adversarial input. A developer container may be suitable for controlled snippets, while hostile multi-tenant code needs stronger isolation and cleanup. The repository’s current settings do not establish that stronger threat model.
+
+3.1. Which controls would you add for hostile multi-tenant execution?
+Use ephemeral per-job containers, non-root identity, no Docker socket, read-only base filesystem, narrow workspace mount, CPU/memory/process limits, dropped capabilities, seccomp or stronger isolation, and egress restrictions. Reap the container and output directory after completion. I would validate effective controls with negative tests and threat-model review before accepting tenant code. These are proposed controls, not changes in this checkout. Record the effective policy after the container starts.
+
+3.1.1. What negative tests give useful evidence?
+Try to exceed memory and CPU budgets, spawn excess processes, read outside the mounted directory, reach blocked network hosts, and retain data after cleanup. Each test should have a bounded timeout and isolated environment. Passing these probes does not prove absolute security, but it demonstrates the configured controls behave as intended for that threat model. I would avoid using a general integration pass as a substitute.
+
+OPTIONAL PRACTICE RESOURCES
+Create the Dockerfile (Docker Guide for Beginners - AI-Powered Course): https://www.educative.io/courses/beginners-guide-to-docker/create-the-dockerfile

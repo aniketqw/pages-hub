@@ -1,0 +1,72 @@
+Behavioural & Experience | Card 09
+Difficulty: Intermediate
+
+QUESTION
+Tell me about a time you had to communicate a technical risk and negotiate what to prioritize.
+
+WHY THIS QUESTION MATTERS
+Tests judgment under time pressure, early risk communication, and whether I can separate evidence from an unverified story.
+
+CONTEXT
+Risk communication requires a ranking method and an accountable decision, even when likelihood is uncertain. Severity, reversibility, evidence quality, and time to reduce uncertainty help distinguish a stop-ship integrity risk from a reversible presentation issue. This answer must use a true example or stay explicitly hypothetical; preparation cannot manufacture a workplace incident.
+
+TERMS
+reversibility: How easy it is to undo a decision
+decision owner: The person accountable for choosing among options
+revisit condition: An observable signal that should reopen a decision
+
+MECHANISM
+1. Describe the event, risk, audience, competing deadline, and evidence; use the fill marker for facts only you know.
+2. Offer comparable options with time, scope, risk reduced, and what remains unknown; make a recommendation and name the decision owner.
+3. Report the actual outcome and revisit signal, or state that impact was not measured rather than inventing success.
+
+TECHNICAL EXPLANATION
+Use the decision process without pretending the story happened. A strong response tells the listener why the issue mattered, which facts were known, what uncertainty remained, and what choices were available. Compare options on consistent dimensions and recommend one while leaving acceptance to the right owner. If there was no measurable outcome, say so and describe what you would track next time. The real event, stakeholders, and outcome belong in the fill marker. Avoid retroactively adding a threshold or escalation path that the team did not use. Practice in a concise narrative, then be ready to defend the risk ranking and what evidence could have changed it.
+
+WORKED EXAMPLE
+For example, a report could be technically complete while its inputs come from mismatched runs. The responsible priority is to pause the affected conclusion, explain the scope, and offer a fast provenance check rather than silently polishing the output.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Without a concrete event, a polished hypothetical can sound like a claimed experience. I should not use a project audit as a workplace incident unless that is what actually happened.
+
+TEST EVIDENCE
+Before the interview, verify the event, timeline, stakeholders, and outcome against what I remember and may disclose. Practice a 60-second version that states the risk, evidence, options, decision owner, and result; label any unmeasured impact as unknown.
+
+SPEAKABLE ANSWER
+I want to use a real example, so I will not invent the incident here. [FILL BEFORE INTERVIEW: name the situation, the risk you observed, who needed to know, and what deadline or competing task mattered.] My decision process is to state the impact in the stakeholder’s terms, show the evidence and uncertainty, then offer two or three scoped options with the cost of delaying each. I would recommend the smallest safe next step and ask who owns the decision. [FILL BEFORE INTERVIEW: add the true choice and outcome.] If no such example is available, I will say that and answer with the process I would use rather than imply I handled an incident I did not.
+
+SELF-CHECK
+If the evidence is incomplete but the deadline is close, should you hide the uncertainty to keep the plan moving?
+No. I would state what is verified, what is assumed, and the consequence of each option. Then I would propose the cheapest decisive check or a contained scope and ask the accountable owner to accept the residual risk.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How do you rank a risk when probability is uncertain?
+Separate severity from likelihood and state which parts are measured versus assumed. If probability is uncertain, use a range or a qualitative category and explain what evidence would narrow it. I would prioritize irreversible data loss, safety, or integrity issues differently from a reversible presentation defect. [FILL BEFORE INTERVIEW: apply this to the actual risk in the story.]
+
+1.1. What evidence would change the priority?
+A reproduction, affected-record count, downstream dependency, or a test showing no impact can change the estimate. I would gather the cheapest decisive evidence first and update the stakeholder rather than defend an initial ranking. If the evidence remains incomplete, make the residual uncertainty part of the option and decision record.
+
+1.1.1. How do you avoid using an arbitrary risk matrix?
+Tie categories to concrete consequences and response actions. A color label alone does not explain why work stops or continues. Agree on who can accept the risk and what safeguard remains. The specific scale should fit the team’s process; [FILL BEFORE INTERVIEW: name the real process only if you used one.]
+
+2. What should each option tell the decision owner?
+Each option should state its scope, expected time, risk reduced, and what remains unverified. I would include a recommendation, but keep the choice with the accountable owner. For example, ship a narrowed result with a follow-up check or delay the affected claim until validation finishes. The real options belong in the fill marker.
+
+2.1. How do you make the options comparable?
+Use the same dimensions for each: user impact, delivery time, reversibility, and evidence quality. Avoid comparing a guaranteed benefit in one option with a vague risk in another. If estimates are uncertain, show ranges and assumptions. That makes disagreement about values visible instead of disguising it as a technical fact.
+
+2.1.1. What if there is no safe option before the deadline?
+Say so early, explain the impact of proceeding, and propose a containment or escalation path. Do not label an unsafe shortcut as a trade-off that has already been approved. [FILL BEFORE INTERVIEW: state whether the actual story had a decision and what happened.]
+
+3. What should you say if the story’s outcome is not measurable?
+Describe the decision and observable follow-through, but do not invent a percentage or claim that the intervention worked. If there was no outcome measure, say it was not quantified and explain what you would track next time. A truthful limitation is stronger than an unsupported success statement.
+
+3.1. How can you still show that your communication helped?
+Point to a verifiable process result, such as a decision documented, a test assigned, or a scope changed, only if it truly occurred. If none can be established, focus on the quality of the decision process rather than claiming impact. [FILL BEFORE INTERVIEW: insert the real outcome or say it is unknown.]
+
+3.1.1. What would you measure in a future version?
+Track time to decision, whether the risk was resolved before release, and any downstream rework or incident, with a baseline. Choose measures that reflect the actual goal and avoid claiming causality from one event. Mark this as a future measurement plan, not retrospective evidence.

@@ -1,0 +1,75 @@
+JD / Domain | Card 07
+Difficulty: Advanced
+
+QUESTION
+Does valid JSON mean an LLM output is safe to use? Walk through the checks before writing to a database.
+
+WHY THIS QUESTION MATTERS
+JD: prompting, structured outputs, evaluation and readable API code.
+
+CONTEXT
+A model output crosses several independent boundaries before it becomes a database mutation. Parsing is only the first: structure, meaning, permissions and current state need different checks.
+
+TERMS
+schema: A contract for field names, types and structural rules.
+semantic validation: Checking whether values make sense for the task and its evidence.
+
+MECHANISM
+1. Parse the response and validate required fields, allowed types and unknown-field policy. A well-formed object is a candidate command, not authorization to execute it.
+2. Check values against source evidence and domain rules, including units and ownership. A valid account ID can still belong to another tenant; an integer can still be the wrong amount.
+3. Perform the final authoritative check and write atomically where state can change concurrently. Bound model repair attempts and prevent retries from repeating successful side effects.
+
+TECHNICAL EXPLANATION
+A date-shaped string can represent an impossible day, an allowed integer can have the wrong currency unit, and a valid foreign key can identify another tenant. Those demonstrate why syntax, schema, semantics and authorization need separate gates. Coercion must be explicit because silently turning strings into numbers can mask an upstream contract error. If a write depends on a balance or record status, recheck that predicate in the authoritative transaction or conditional update. A repair loop should receive only the necessary validation error, remain bounded and never repeat a successful side effect. Handle the ambiguous timeout after commit with an idempotency or reconciliation mechanism rather than asking the model whether the operation probably succeeded. Each gate deserves a negative fixture that passes earlier checks but fails that boundary.
+
+WORKED EXAMPLE
+The JSON amount 1000 is an integer and may satisfy the schema, but a receipt showing 100 makes it factually wrong. A valid customer ID belonging to another tenant must fail authorization even when its format is correct.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Schema validation reduces malformed outputs; it does not establish truth, permission or transaction invariants.
+
+TEST EVIDENCE
+Proposed tests: missing and extra fields, wrong types, boundary amounts, unsupported facts, another tenant's ID and stale-state writes. No database was changed for this teaching discussion.
+
+SPEAKABLE ANSWER
+Valid JSON only means the text parses. I would next validate the schema, then domain constraints, authorization and current database state. A schema can require an integer amount and an allowed action, but it cannot by itself prove the account belongs to the caller or that the amount is correct. I would use a typed boundary for model output, reject unknown or missing fields according to the contract, and keep sensitive writes behind a deterministic service. Few-shot examples can clarify the desired shape, and constrained decoding can reduce formatting failures, but neither proves factual support. Invalid output should lead to a bounded repair attempt or an explicit failure, not silent coercion. A successful answer also needs evidence checks when it makes factual claims.
+
+SELF-CHECK
+What remains wrong if JSON parses and validates but its amount disagrees with the receipt?
+The value fails factual or semantic validation. Structural validity says the field fits the contract, not that the source supports it or that the caller may act on it.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What should a repair prompt contain, and what must remain outside it?
+Supply the minimal structural or semantic validation error, the permitted output contract and only the evidence needed to correct the field. Do not expose credentials or unrelated private records as debugging context. Bound the number of attempts and preserve an explicit failure outcome when repair does not work. Repair is a new untrusted proposal, so run the same validation gates again rather than assuming a corrected format makes the content safe.
+
+1.1. Why should a repair loop not execute the database action on every attempt?
+The loop may produce several candidate commands or repeat one after a timeout, while the intended business effect should occur once. Separate proposal generation and validation from the authoritative execution step. Execute only an accepted command under the service's permission and idempotency rules. If the action already occurred, retrieve its recorded outcome rather than rerunning it because a model response was malformed or a transport acknowledgment was lost.
+
+1.1.1. How should the application represent an unresolved execution outcome?
+Use an explicit pending or unknown state tied to a stable operation identifier. Query the authoritative service or route to human review before issuing another consequential command. A failed response parse does not prove the write failed. Preserve enough sanitized correlation information to reconcile the outcome, and make the user-facing message distinguish an unconfirmed result from a definite rejection or success. Recovery should follow the service contract, not model speculation.
+
+2. Why can converting a numeric string silently create a business error?
+The string may contain an ambiguous unit, locale convention or identifier that should not be treated as a quantity. Turning 00123 into 123 changes an identifier; interpreting a comma differently can change a monetary amount. Define permitted conversions in the boundary contract and test them. Reject ambiguity rather than letting a permissive parser invent the intended meaning. Type acceptance is useful only when the resulting value still represents the source correctly.
+
+2.1. How would you distinguish a valid amount from an amount with the wrong unit?
+Carry units or currency in the schema and compare both value and unit with source evidence. The integer 100 can mean cents, dollars, percentage points or a count depending on the field. Normalize only through explicit conversion rules and preserve the original representation for review where appropriate. A number matching an allowlist does not establish that the sentence uses it with the right entity, unit or time period.
+
+2.1.1. What negative fixture tests semantic validation after schema validation succeeds?
+Construct a structurally valid command with an allowed field type but a source-inconsistent value, such as amount 1000 when the receipt shows 100. Add another with the correct number and wrong currency or account. Assert that parsing and schema checks pass while semantic or authorization checks reject it without a write. This demonstrates the boundary separation more meaningfully than a test that every validator rejects the same malformed JSON.
+
+3. Why can a correct preflight check still be insufficient?
+Another transaction may change ownership, balance or lifecycle status between the read and the write. A preflight can reject obvious invalid requests early, but the final mutation needs an authoritative transaction-internal recheck or conditional update. Read replicas add a separate staleness concern. Explain the actual code path before claiming protection: a transaction wrapper alone does not prove that every required business condition is checked inside it.
+
+3.1. What does a conditional update add to that protection?
+It makes the write depend on the expected current state, such as updating a row only while its status is OPEN. Check the affected-row count and treat zero updates as a conflict or invalid transition. This narrows a check-then-act race for the encoded condition, but it does not automatically validate ownership or related rows. Multi-row invariants may still require transactions, constraints and a defined retry policy.
+
+3.1.1. Why retry the whole transaction rather than only the last failed statement?
+The reads and decisions made earlier may no longer be valid after a conflict. Retrying only the final write can reuse stale assumptions. Restart the authoritative reads and invariant checks under a bounded policy for known retryable errors, keeping external side effects outside repeated execution or protecting them separately. A transaction retry is correct only when the complete operation and its associated effects respect the intended repeat behavior.
+
+OPTIONAL PRACTICE RESOURCES
+Structured Outputs and Validation (LangGraph: From LangChain User to Agent Builder - AI-Powered Course): https://www.educative.io/courses/langgraph-from-langchain-user-to-agent-builder/structured-outputs-and-validation
+Zero-Shot vs. Few-Shot Prompting (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/zero-shot-vs-few-shot-prompting

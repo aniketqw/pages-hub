@@ -1,0 +1,106 @@
+Multi University Bounty System | Card 02
+Difficulty: Advanced
+
+QUESTION
+Can Serializable prevent a duplicate reputation award when the same submission review is delivered twice?
+
+WHY THIS QUESTION MATTERS
+Tests the implementation boundary, failure modes, and whether I can separate code evidence from assumptions.
+
+CONTEXT
+Submission approval is a business command that changes status and grants value. Distinguish atomicity, which keeps writes together, from idempotency, which makes replay produce no additional award.
+
+TERMS
+idempotency: Repeating a command has no additional business effect.
+terminal state: A state from which the workflow should not accept the same transition again.
+ledger: A record of why a balance changed.
+
+MECHANISM
+1. Load the submission and identify the reviewer’s ownership authority.
+2. Gate on a legal transition from a reviewable state inside the same transaction as the award.
+3. Give the award a stable identity tied to submission and award type; enforce uniqueness in PostgreSQL.
+4. Update the visible reputation counter with the ledger entry and make retries return the existing award rather than apply it again.
+
+TECHNICAL EXPLANATION
+Atomicity asks whether the writes partially commit; idempotency asks whether repeating a command has another business effect. Here the status is set unconditionally, the reputation log is recreated, and points are incremented each time. A conditional transition from a reviewable state plus affected-row check can gate the award. A unique `(submissionId, awardType)` ledger key adds durable deduplication. Concurrent transactions may conflict, but a later replay can be a valid serial execution unless the transition rejects it. For concurrent review, a conditional update from a reviewable status should report whether exactly one row changed. Only that winner writes the award ledger and increments points. A unique `(submissionId, awardType)` key protects against another service path that misses the guard. If the request timed out after commit, the client needs a stable idempotency identity so the response can be replayed without applying a second award.
+
+WORKED EXAMPLE
+If the bounty reward is 25 points, two successful deliveries could produce two +25 increments absent a guard. That is a code-derived scenario, not an observed run.
+
+SOURCE
+BountyHub-main/server/src/services/submissionService.js:39-64
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/services/submissionService.js#L39-L64
+
+    if (status === 'ACCEPTED') {
+      const points = submission.bounty.rewardPoints;
+      const submitterId = submission.submittedBy;
+      const bountyId = submission.bounty.id;
+
+      // Single Serializable transaction: mark submission, award reputation, complete bounty
+      await prisma.$transaction(async (tx) => {
+        await tx.submission.update({ where: { id: submissionId }, data: { status: 'ACCEPTED' } });
+        await tx.reputationLog.create({
+          data: { userId: submitterId, points, reason: `Completed bounty: ${submission.bounty.title}` },
+        });
+        await tx.user.update({ where: { id: submitterId }, data: { reputation: { increment: points } } });
+        await tx.bounty.update({ where: { id: bountyId }, data: { status: 'COMPLETED' } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+      await cacheInvalidate('leaderboard:*');
+      await cacheInvalidate('bounties:*');
+      await cacheInvalidate('trending:*');
+      await publishEvent('SUBMISSION_ACCEPTED', {
+        bountyId,
+        submissionId,
+        submittedBy: submitterId,
+        universityId: submission.bounty.creator?.universityId,
+      });
+    } else {
+      await prisma.submission.update({ where: { id: submissionId }, data: { status } });
+
+The four changes commit together, which avoids partial awards. The missing piece is a state-transition condition that rejects a second acceptance before another log and increment.
+
+LIMIT
+A transaction is not an exactly-once mechanism. The preflight is also a replica read, not authoritative transition state.
+
+TEST EVIDENCE
+No duplicate-review test was run. Call review twice and assert one award row and one increment; then race deliveries and verify the constraint determines the winner.
+
+SPEAKABLE ANSWER
+`reviewSubmission` in `server/src/services/submissionService.js` reads the submission through the replica, checks ownership and status input, then for ACCEPTED marks it accepted, writes a reputation log, increments points, and completes the bounty in one Serializable transaction. Those writes are atomic, but there is no transaction-internal terminal-state guard or unique award key. A later repeated valid request can append another log and increment points again. Serializable does not prevent a logically repeated command from running twice in sequence. I would enforce an allowed state transition inside the transaction and use a unique award key tied to the submission. This is a static audit finding; I did not execute duplicate requests. In an interview I would call out the exact boundary: the accepted status, reputation log, points total, and bounty status belong together, but the command identity is missing. A unique database key is more durable than relying on a frontend button being disabled or on a request arriving only once.
+
+SELF-CHECK
+The client times out after approval commits, so it repeats the same request. What should the second attempt do?
+Find the award by its stable idempotency identity and return the already accepted result without another ledger row or point increment. Serializable cannot provide that behavior alone because a later replay may be a valid serial transaction.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why does atomicity help if idempotency is missing?
+It prevents status, ledger, points, and completion from partially committing. It does not make a second invocation a no-op; that needs a transition guard or deduplication key. A useful replay test is sequential, not only concurrent: call ACCEPTED once, wait for its commit, then send the identical command again. Serializable can order those as two valid transactions, so the second request must fail the status transition or hit a unique award key. I would assert both the reputation total and ledger row count, since checking only response codes misses duplicate side effects.
+
+1.1. Which field would you use as the award idempotency key?
+The stable business identity is the submission plus award type, not the HTTP request ID, because clients may retry with a different request identifier. I would enforce a unique key such as `(submissionId, awardType)` in an award ledger and create it in the same transaction as the points update. The test then retries after a simulated timeout, when the client cannot know whether the first commit succeeded, and verifies one award.
+
+1.1.1. Would you return success or conflict on that retry?
+Either can be correct if the contract is stable. I would usually return the already-recorded accepted result for the same idempotency key, because the requested effect has already happened. A different command after the submission is terminal should receive a conflict. The service should distinguish replay from a new transition, and logs should retain the original award identity so support can explain the result without applying points again.
+
+2. Would a Redis lock solve it?
+A Redis lock reduces some overlap but adds lease failures and is not the durable source of truth. I would put the transition condition and unique award identity in PostgreSQL. I would avoid relying on the submission status alone if concurrent reviewers can both read the old state from the replica. The primary transaction needs a conditional transition and must check that exactly one row changed before writing the ledger. A uniqueness constraint is a second guard if a future service path forgets the conditional update.
+
+2.1. How do you atomically gate the reputation increment on that row count?
+Perform a conditional update from an eligible state on the transaction client, then inspect the affected-row count. Only the transaction that changes one row proceeds to insert the award and increment reputation; zero rows means another reviewer already transitioned it. All steps remain inside the same database transaction, so an award failure rolls the transition back. I would verify the ORM exposes the count and test two synchronized reviewers.
+
+2.1.1. What if the ORM update throws instead of returning zero?
+Treat a known serialization or unique-constraint error as a failed attempt and classify it separately from validation. After the transaction aborts, reread current state and return the idempotent existing result or a conflict. Do not catch an error inside the transaction and continue to award points. The test should include both a zero-row result and a database conflict to prove neither path creates a second ledger entry.
+
+3. What would the regression assert?
+After two calls, accepted status and completed bounty, one award record, and exactly one reward increment; also exercise concurrent replay. The log is valuable for auditability, but the displayed reputation total is a materialized counter that can drift if any other code updates it outside this transaction. I would make the ledger authoritative or run a reconciliation that recomputes totals from awards. That is a design option; this checkout currently increments the user column directly.
+
+3.1. Would you compute reputation from the ledger on every profile read?
+That is simplest for correctness but may be expensive as the ledger grows. A common compromise is an append-only ledger plus a transactionally maintained cached total, with periodic reconciliation and an alert on mismatch. The key is that the award record is the source for the delta and carries a unique submission identity. I would benchmark the read path before adding a separate cache, and test that repair never double-applies historical awards.
+
+3.1.1. How would you repair a mismatch without creating another award?
+Recompute the aggregate total from immutable award rows into a separate projection or update the cached total under a controlled repair job. Record the old and new totals, reconciliation window, and job version; do not insert replacement award rows merely to make the counter match. I would dry-run first, compare users with mismatches, and make the repair idempotent so rerunning it produces the same total.
+
+OPTIONAL PRACTICE RESOURCES
+Isolation Levels (Introduction to Big Data and Hadoop - AI-Powered Course): https://www.educative.io/courses/introduction-to-big-data-and-hadoop/isolation-levels

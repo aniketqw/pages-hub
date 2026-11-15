@@ -1,0 +1,98 @@
+Resume Builder Agent | Card 07
+Difficulty: Advanced
+
+QUESTION
+Which resume score should a user trust, and how do you explain what the number means?
+
+WHY THIS QUESTION MATTERS
+Tests score decomposition, distinction between legacy rubric and JD matching, and calibration caveats.
+
+CONTEXT
+A matching score answers a narrow question: how closely does this chosen resume match this particular job description? It combines three kinds of clues. Start with the fraction each clue gets, then do one small sum. This number does not measure whether a resume claim is true or whether a recruiter will hire you.
+
+TERMS
+dense similarity: Similarity between model-produced vectors under a fixed embedding representation.
+effective weights: The weights actually applied after unavailable channels are removed.
+uncalibrated score: A numeric proxy without a validated mapping to a real-world outcome probability.
+
+MECHANISM
+1. Choose the two inputs: the enabled resume text and a job description. A preset role is a stand-in, not the employer's actual posting.
+2. Read three values on the same 0–1 scale. Dense asks whether the texts are related in meaning. BM25 asks which words overlap. Skills asks which listed requirements are present.
+3. Give half of the weight to meaning, one fifth to words, and three tenths to skills. Multiply each value by its weight and add the products.
+4. If a channel is unavailable, split its share proportionally among the remaining channels. A missing value and a measured zero are different.
+5. Know what the encoder reads. It scores resume sections and entries in separate chunks. Each chunk and the job text can still hit the 512-token limit.
+
+TECHNICAL EXPLANATION
+Follow the data from routes/score.py to document_chunks and score_many. The chunker emits a header, section-owned content and eligible entries. It skips empty entries. The local embedder still applies its 512-token ceiling per input. The dense channel takes a weighted mean of the available chunk vectors using their text lengths in characters, then renormalizes the pooled vector before comparing it with the job description vector. So a later section can now matter without forcing the first section out of the window. This does not recover all text from a very long entry or model interactions across sections. The BM25 and skill channels remain separate; missing channels change effective weights. A preset role creates a synthetic target, while a pasted JD provides actual target text. The CLI comparison uses separate role-fit advice. There is no calibrated mapping from this score to hiring outcomes.
+
+A weighted sum exposes every part, so one resume–job pair can be scored directly. A rank-only method would need a set of candidates ordered by each channel, and the resulting positions are not the same as these similarity values. The project notes cite retrieval research as design rationale. They do not show that these weights are optimal for this project's job-matching data. A reference percentile, where available, ranks the score against reference pairs; it does not predict the chance of hiring.
+
+WORKED EXAMPLE
+Toy example: meaning is 0.8, words is 0.4, and skills is 0.5. Take half of 0.8 = 0.40, one fifth of 0.4 = 0.08, and three tenths of 0.5 = 0.15. Together they make 0.63. If meaning is missing, divide 0.2 and 0.3 by their remaining total of 0.5. That gives 0.4 and 0.6; 0.4 × 0.4 + 0.6 × 0.5 = 0.46. Neither is a hiring probability.
+
+SOURCE
+resume-builder-agent/v2/src/rba/ats/fusion.py:104-117
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/ats/fusion.py#L104-L117
+
+    weights = weights or CHANNEL_WEIGHTS
+    present = channels.available()
+    if not present:
+        return FusedScore(raw=0.0, band=ordinal_band(0.0))
+
+    total = sum(weights[name] for name in present)
+    if total <= 0:
+        return FusedScore(raw=0.0, band=ordinal_band(0.0))
+
+    used = {name: weights[name] / total for name in present}
+    raw = sum(present[name] * used[name] for name in present)
+    raw = max(0.0, min(1.0, raw))
+    return FusedScore(raw=raw, band=ordinal_band(raw),
+                      channels=dict(present), weights_used=used)
+
+Select available channels. Add their weights. Divide each active weight by that total, then multiply and sum. Finally keep the result in the 0–1 range and return the weights used.
+
+LIMIT
+Section and entry chunking improves coverage without guaranteeing every token is read. Per-input truncation remains. Length weights are a design choice, and the result is a matching proxy.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+I explain this as a local resume-to-job matching score. The dense channel measures semantic similarity. It splits a structured resume into sections and entries, embeds them, then pools the vectors by character length. BM25 measures word overlap. A skill check adds a third signal. The nominal weights are 0.5, 0.2 and 0.3. If a channel is unavailable, the scorer redistributes its weight. Chunking avoids one 512-token truncation across the entire structured resume. A single long chunk or long job description can still hit that token limit. The CLI's role-fit advice uses a separate rubric. Neither score gives a hiring probability.
+
+SELF-CHECK
+Does chunking remove the 512-token limit entirely?
+No. It removes the single limit across a structured resume. The encoder still caps each chunk and the JD, and flat inputs can still use the old prefix path.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What calculation does that weighted score perform?
+For available channels, it combines their normalized values using the configured weights. With dense0.8, lexical0.4 and skills0.5, the full weighted result is0.63. That number describes this matching formula under a particular target. It is not a measured probability that an employer will select the applicant.
+
+1.1. What happens mathematically when dense is unavailable?
+Its weight is removed and the remaining weights are redistributed proportionally. Lexical0.2 and skills0.3 become0.4 and0.6, respectively. The example then yields0.46. Renormalization avoids treating unknown as zero, but it does not make the degraded formula equivalent to the full one. Display the actual active weights and capability state.
+
+1.1.1. When would rejecting degraded scoring be better than silently continuing?
+When the deployment’s acceptance criteria require the dense model and comparisons assume its contribution. Required-dense startup mode can fail rather than quietly change the formula. A deliberately supported degraded mode can still be useful if clearly labeled and evaluated. Choose the policy from product requirements, not from whether the process can return a number.
+
+2. Why does pooling sections help when the model still has a 512-token limit?
+The limit applies to each encoder input. Using one input for a long resume can hide later sections entirely. With separate chunks, each section or entry gets its own encoder input, so short later entries can contribute to the pooled score. A very long individual input can still be truncated, and independent chunks cannot model every relation across entries.
+
+2.1. Does each chunk have the same weight?
+No. The pooling function divides each chunk's character count by the total character count. A longer chunk has more weight. It sums the weighted vectors and normalizes the result before comparing it to the job vector. This is a specific, inspectable design choice. It has not been shown here to be the best weighting for hiring relevance.
+
+2.1.1. How would you test the remaining per-chunk limit?
+Keep the job target and the first part of one oversized chunk fixed. Change text after the encoder's token limit. Compare the dense result with a control that moves the same relevant text into a short separate entry. Inspect dense separately from BM25 and skills, since those channels can still respond when the dense vector does not.
+
+3. Why is the CLI advice table different from the API matching score?
+The advice rubric assigns hand-written role-oriented points, whereas the matching service compares document and target through dense, lexical and skill channels. A similar display scale does not make those quantities interchangeable. The current CLI/report wording explicitly labels the rubric as advice rather than claiming it is the JD-based ATS score.
+
+3.1. Can either number be described as a hiring probability?
+Not without a validated calibration against the relevant outcome and population. This project does not establish that mapping. A proxy can help compare edits under one target, while employer decisions depend on additional information and policies. State the scoring definition and uncertainty instead of converting a match score into a success percentage.
+
+3.1.1. How would you decide whether an edit is genuinely useful?
+Check factual support, preservation of the user’s meaning, readability and relevance to the actual target alongside the score delta. A high-scoring unsupported accomplishment is unacceptable. A truthful clarification that improves the decision-useful content can be valuable even when the proxy barely moves. The score is one diagnostic signal, not the acceptance owner.
+
+OPTIONAL PRACTICE RESOURCES
+Zero-Shot vs. Few-Shot Prompting (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/zero-shot-vs-few-shot-prompting
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run

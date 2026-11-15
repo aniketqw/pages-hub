@@ -1,0 +1,102 @@
+Multi University Bounty System | Card 03
+Difficulty: Advanced
+
+QUESTION
+What does Redis cache on a detail read, and how do you reason about stale data and Redis failure?
+
+WHY THIS QUESTION MATTERS
+Tests the implementation boundary, failure modes, and whether I can separate code evidence from assumptions.
+
+CONTEXT
+The detail endpoint is cache-aside: it checks Redis, fetches on miss, and best-effort stores a TTL entry. The relevant concepts are cache hit, refill source, invalidation, and the freshness users expect after a write.
+
+TERMS
+cache-aside: Check a cache and load from the source when absent.
+TTL: Time until a cache entry expires.
+read-after-write: A client sees its latest successful write in a subsequent read.
+
+MECHANISM
+1. Identify the entity key and the configured TTL; this detail path uses 300 seconds.
+2. On a miss or Redis read error, follow the fetcher to learn whether it reads primary or replica.
+3. After mutation, inspect pattern invalidation and whether it can fail or repopulate stale data.
+4. Plan outage controls for fallback traffic and protect state decisions with primary reads rather than cached status.
+
+TECHNICAL EXPLANATION
+A hit returns parsed JSON without checking PostgreSQL. A write can commit on primary while cache or replica reads lag; invalidation narrows the window but gives no strict freshness guarantee. Redis read errors fall through and SET errors are swallowed. KEYS can block on large keyspaces; SCAN batches or versioned namespaces are alternatives. If read-your-write is required, use primary or a consistency token instead of relying on TTL. Pattern invalidation currently uses KEYS plus DEL, which can block Redis as keyspace grows. SCAN bounds each iteration but does not create an atomic snapshot; versioned namespaces avoid exhaustive deletion but need cleanup. More subtly, invalidating then refilling from a lagging replica can cache the old state again. A primary-backed refill or entity version check is needed when freshness matters.
+
+WORKED EXAMPLE
+If Redis is down, a request still attempts the repository fetch; a burst may shift load to PostgreSQL. This is a failure scenario, not a load test.
+
+SOURCE
+BountyHub-main/server/src/config/redis.js:33-57
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/config/redis.js#L33-L57
+
+async function cacheGet(key, fetcher, ttlSeconds = 300) {
+  if (!redis) return fetcher();
+
+  try {
+    const cached = redisRead ? await redisRead.get(key) : await redis.get(key);
+    if (cached) return JSON.parse(cached);
+  } catch {
+    // cache miss or error — fall through
+  }
+
+  const data = await fetcher();
+
+  try {
+    await redis.setex(key, ttlSeconds, JSON.stringify(data));
+  } catch {
+    // ignore cache write errors
+  }
+
+  return data;
+}
+
+// Helper: invalidate cache keys by pattern
+async function cacheInvalidate(pattern) {
+  if (!redis) return;
+  try {
+
+The helper tries Redis, calls the database fetcher on a miss or error, then best-effort SETEX. That provides an outage fallback, but stale data can remain until invalidation or expiry.
+
+LIMIT
+Redis outage can amplify database traffic. Wildcard invalidation uses KEYS, and the app does not promise read-after-write consistency.
+
+TEST EVIDENCE
+No outage or performance test was run. Force Redis errors in an isolated environment, verify correctness, and measure database concurrency and latency under controlled load.
+
+SPEAKABLE ANSWER
+For a detail read, `getById` in `server/src/services/bountyService.js` asks `cacheGet` in `server/src/config/redis.js` for `bounties:detail:${bountyId}` with a 300-second TTL. The helper checks Redis, falls back to its repository fetcher on miss or read error, then tries to cache the result; cache-write errors are ignored. That is cache-aside and lets reads continue during Redis failure, with possible extra database load and stale data. List and search use separate keys and 600-second TTLs. Writes issue wildcard invalidation, whose Redis KEYS call needs scrutiny at scale. I would measure hit rate and invalidation cost and define read-after-write needs. I inspected code but did not benchmark it. I would also separate the detail cache from the search projection: a cache hit is a temporary copy for a read, while Mongo is a separately maintained query model. Those have different refresh paths and failure modes, so one invalidation policy cannot automatically prove both are fresh.
+
+SELF-CHECK
+Redis goes offline during a traffic spike. Which resource can become the new bottleneck?
+The repository database can receive nearly every request that would otherwise hit cache. The helper’s catch blocks preserve a fallback path, but only a controlled load test can show whether the replica has capacity.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why invalidate if the key expires?
+Invalidation reduces stale reads after mutation; TTL is a backstop. Neither provides strict consistency, especially with replica lag. I would treat this as a load-shedding question as well as a correctness question. If Redis fails, every cache miss can reach the repository, and the repository often uses the replica. A burst could overwhelm that dependency even though each request succeeds functionally. I would set a concurrency limit and measure database saturation before calling the fallback resilient.
+
+1.1. What control would you add before the database is saturated?
+I would use bounded concurrency for fallback reads, a short timeout, and a circuit breaker that fails predictably or serves a known stale value when policy permits. The choice depends on whether bounty detail must be available or fresh. I would measure cache hit rate, fallback request rate, replica CPU, and tail latency during a controlled Redis outage. The existing catch blocks establish fallthrough, not capacity under failure.
+
+1.1.1. Would stale-while-revalidate be safe for bounty status?
+It depends on the field. A stale description may be acceptable briefly, while an OPEN status used to decide whether someone can bid should be rechecked against authoritative data before a write. I would split cacheable display fields from decision-making invariants rather than treat the whole object uniformly. The write service must still validate current state on primary, so cached status never authorizes a mutation.
+
+2. What might replace KEYS?
+At scale, bounded SCAN batches or versioned key namespaces; first inspect exact patterns and measure cost. The invalidation path uses `KEYS` with patterns, which is simple but scans the keyspace synchronously. Under many tenants or many detail keys, that can delay Redis commands. I would first count keys and profile invalidation duration; replacing it without understanding patterns could leave stale namespaces behind.
+
+2.1. Why might SCAN still leave a key behind during invalidation?
+SCAN is incremental and can return duplicates; keys added while the scan runs may not appear in the cursor traversal. A safe migration could use versioned prefixes so a write increments a namespace version and future reads naturally use a fresh keyspace. That avoids relying on one exhaustive deletion pass, but it adds version management and old-key expiry. I would test concurrent writes and invalidations before switching.
+
+2.1.1. How would you clean old namespace versions?
+Let TTL expire old keys when their lifetime is bounded, then monitor memory until the oldest version drains. If the TTL is long or keys are large, run a throttled cleanup using a captured version boundary. The cleanup must not delete the active namespace. I would make version changes atomic for the relevant entity and test that reads during a write use either the old consistent snapshot or the new version.
+
+3. How test Redis outage safely?
+In an isolated environment, fail Redis, verify the fetcher returns correct data, and measure database load at a controlled request rate. TTL values are not measured freshness guarantees: a write can invalidate a matching key, but a subsequent miss can reload from a lagging replica and cache stale data again. For critical fields, the cache policy and repository read source need to agree. I would test write, invalidate, replica lag, refill, and later read as one sequence.
+
+3.1. How could you prevent a stale refill after invalidation?
+For a consistency-sensitive read, refill from primary or carry a minimum version and reject replica data below that version. Another option is to delay cache refill until replica replay catches up, if the database exposes a usable position. The current helper does not provide that contract. I would scope primary reads to the freshness-critical path and monitor the added primary load.
+
+3.1.1. What if the database cannot expose a useful version?
+Then I would use a simpler explicit policy: after a mutation, return its committed data directly and bypass cache for a short bounded window, or route that actor’s immediate read to primary. I would document the maximum window rather than imply strong consistency globally. A controlled test with artificial replica delay can validate the window and ensure normal reads return to the replica afterward.

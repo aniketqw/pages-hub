@@ -1,0 +1,76 @@
+JD / Domain | Card 13
+Difficulty: Advanced
+
+QUESTION
+Explain pretraining, supervised fine-tuning and preference tuning. Where would LoRA fit?
+
+WHY THIS QUESTION MATTERS
+Supplied JD: conceptual understanding of the LLM training pipeline and judgment about RAG versus adaptation.
+
+CONTEXT
+Training stages answer what objective changes model behavior; an update technique answers which parameters change. Keeping these separate prevents treating LoRA as a fact store or a complete training pipeline.
+
+TERMS
+pretraining: Learning broad patterns from a large training corpus before task adaptation.
+SFT: Supervised fine-tuning on examples of desired inputs and outputs.
+LoRA: Learning a low-rank weight update while freezing the base weights.
+
+MECHANISM
+1. Begin with broad sequence learning, then distinguish desired-response examples from preference comparisons. These supervise different behavior even when they use the same base model.
+2. For low-rank adaptation, keep base weights frozen and train a restricted update parameterization. This reduces trainable state without eliminating the base model's inference or memory requirements.
+3. Evaluate adaptation on held-out tasks and inspect regressions. Keep changing facts in traceable evidence when freshness is the real need; successful formatting adaptation does not prove factual correctness.
+
+TECHNICAL EXPLANATION
+For a weight matrix W, a LoRA-style update can be written W plus a scaled product BA, where A and B have a small intermediate rank. That reduces trainable parameters relative to updating every entry of W, but the frozen base still occupies memory and participates in inference. The rank controls the update parameterization; it does not guarantee downstream quality. Training needs compatible data, optimization settings and evaluation. Supervised examples show a target response; preference pairs express which candidate is preferred. Those are different supervision signals. A preference objective can improve rubric-following while retaining factual errors, so factual grounding still requires its own tests. The classic InstructGPT pipeline combines supervised tuning, reward modeling and policy optimization; describing that example does not imply every current model uses that exact pipeline. For a policy changed yesterday, supplying its current text is usually more inspectable than hoping an update memorized it.
+
+WORKED EXAMPLE
+Illustrative case: an extraction model often adds friendly prose around JSON. Good instruction-response examples could teach the required format, while a current product-price table should remain retrieved evidence. Even if adaptation fixes formatting, a price unsupported by that table still fails the task.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+This is conceptual preparation and a proposed method, not a claim that I trained or deployed this system.
+
+TEST EVIDENCE
+Reasoning and illustrative examples reviewed; no training, provider experiment or deployment was performed for this lesson.
+
+SPEAKABLE ANSWER
+I distinguish the training objective from the method used to update weights. Pretraining teaches broad sequence patterns, commonly through next-token prediction. Supervised fine-tuning uses examples of the desired instruction and response behavior. Preference tuning uses comparisons or feedback to favor some responses over others; reward-model-plus-reinforcement-learning is one approach, not the only approach. LoRA is a parameter-efficient update method: it trains low-rank weight updates while the base weights are frozen. It can be used with an adaptation objective; it is not a separate source of factual truth. I would start with prompting and retrieval if the problem is changing knowledge, then consider adaptation only with representative examples and a held-out evaluation. I have used model integrations in my projects; I would not claim to have pretrained a foundation model.
+
+SELF-CHECK
+If LoRA reduces trainable parameters, does that mean the base model is no longer needed at inference?
+No. The adapted computation still uses the base weights plus the learned update, whether the update is applied separately or merged into a compatible base.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why can next-token prediction learn useful language behavior without becoming a truth checker?
+The objective rewards assigning probability to tokens that occur in the training sequence. Text can contain mistakes, fiction and contradictions, so predicting it well does not require every generated claim to be true. A model may learn useful factual associations and reasoning patterns, but the objective alone supplies no live source of truth for a new question. For a current policy answer, inspect supporting evidence and evaluate factual support separately from fluency or likelihood.
+
+1.1. If we reward answers that people prefer, why does factual verification remain necessary?
+Preference feedback measures what raters favor under a rubric and the examples they see. Raters can miss subtle errors or prefer confident wording, and a learned reward model can generalize imperfectly. An optimization process can improve the measured preference while leaving factual failures. Include source-grounded cases and inspect disagreements with a factual evaluator, rather than assuming a higher preference score means a proportionately lower hallucination rate on every domain.
+
+1.1.1. How would you separate genuine improvement from learning the evaluation examples?
+Reserve examples that were not used for training, prompt selection or repeated model choice. If documents or entities repeat, split them at the relevant independence boundary rather than randomly dividing nearly identical rows. Keep a stable final comparison set and record which data each adaptation used. Better scores on familiar examples demonstrate fitting; improvement on appropriately held-out cases gives stronger evidence of generalization, with limits set by the coverage of that evaluation.
+
+2. What parameter savings does a low-rank update actually create?
+For an m-by-n matrix, a full update has m times n entries. A rank-r factorization uses an m-by-r factor and an r-by-n factor, or r times the sum of m and n trainable entries before any additional parameters. For m and n equal to 1000 and r equal to 8, that is 16000 instead of one million. This describes the update parameterization, not the total model memory or a guaranteed quality improvement.
+
+2.1. Why not make the rank as small as possible if it saves parameters?
+A smaller rank restricts the family of updates the model can express. It may be sufficient for one adaptation and insufficient for another, so memory savings must be compared with task quality rather than optimized alone. Evaluate several justified settings on validation data while holding examples and rubric stable. Also inspect regressions outside the main task; a small adapter can still change important behavior. The arithmetic saving does not establish that the restricted update learned the desired solution.
+
+2.1.1. What must you record to reproduce an adapter evaluation?
+Record the exact base model revision, adapter weights, targeted modules, rank and scaling configuration, tokenizer, prompt format and inference settings. An adapter trained against one base is not automatically meaningful on a different revision that happens to share an architecture name. Preserve the held-out inputs and scoring rules too. A saved adapter file identifies only part of the computation; the combined model and evaluation contract are what produced the reported result.
+
+3. Why might retrieval be easier to audit than retraining for a policy update?
+Retrieval can expose the exact current policy passage supplied to generation, including its version and source identity. Replacing or invalidating that source is an explicit data operation, while a weight update does not provide a simple map from an answer to the training passage that caused it. Retrieval still needs freshness, access filtering and support checks. Its advantage here is an inspectable evidence path, not a promise that every retrieved answer is correct.
+
+3.1. Can a current source still be inappropriate evidence for a particular caller?
+Yes. Freshness and authorization are separate properties. A current policy for another client or restricted business unit must not enter this caller's prompt merely because it is semantically relevant. Apply authenticated resource constraints in retrieval or the service boundary, and verify that filtering survives reranking and caching. A source can be recent and factually accurate while its disclosure remains unauthorized, so evaluation needs both relevance and access-control cases.
+
+3.1.1. How would you test freshness, support and access without collapsing them into one score?
+Create distinct fixtures: an old and new policy with conflicting amounts, a correct current passage that does not support the asked claim, and a relevant restricted passage requested by an unauthorized caller. Observe retrieved identities, generated claims and disclosure behavior separately. Each fixture targets a different invariant, so one success cannot compensate for another failure. Report the case counts and outcomes explicitly rather than averaging them into a single reassuring quality number.
+
+OPTIONAL PRACTICE RESOURCES
+When to Fine-Tune vs. When to Use RAG (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/when-to-fine-tune-vs-when-to-use-rag
+What Is an LLM Agent? (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/what-is-an-llm-agent

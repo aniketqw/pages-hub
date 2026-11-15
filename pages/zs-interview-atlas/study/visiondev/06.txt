@@ -1,0 +1,104 @@
+VisionDev | Card 06
+Difficulty: Intermediate
+
+QUESTION
+Why self-host Qwen2.5-VL on vLLM instead of calling a hosted API?
+
+WHY THIS QUESTION MATTERS
+Build-vs-buy for model serving is a live client conversation at ZS. The interviewer tests whether the candidate frames it as a trade-off with decision criteria - cost curve, data residency, ops burden, quality - rather than as ideology in either direction.
+
+CONTEXT
+A local OpenAI-compatible endpoint describes request shape, not equal model behavior or economic advantage. The source configures Qwen2.5-VL with a local vLLM endpoint and bitsandbytes launch instructions, but there is no paired quality, latency, utilization, or total-cost benchmark. Quantization may help fit a model into memory while changing outputs, so both effects need measurement.
+
+TERMS
+vLLM: an inference server with PagedAttention KV-cache management and continuous batching, exposing an OpenAI-compatible API - the standard way to self-host open-weight models efficiently
+quantization: storing model weights at reduced precision (here via bitsandbytes) to fit larger models in limited VRAM, trading some output quality for memory
+data residency: the constraint that data must not leave a machine, network, or jurisdiction - often the decisive argument for self-hosting over hosted APIs
+graceful degradation: designing the pipeline so VLM outage yields a stats-only report rather than a crash - preserving the reliable value layer independently of the fragile one
+
+MECHANISM
+1. Fix the image set, prompts, model revisions, and decoding settings, then compare local and hosted outputs with a blinded task rubric.
+2. Measure latency distributions, GPU memory, concurrency, failure rate, and operational effort under a representative workload.
+3. Compare full-precision and quantized configurations as paired conditions; report any subgroup regressions rather than assuming parity.
+
+TECHNICAL EXPLANATION
+The source documents the Qwen model name, a bitsandbytes launch command and an OpenAI-compatible interface. A compatible API reduces client integration changes but does not establish equivalent vision support, sampling behavior or output quality across providers. The dummy key string local-3090 is not evidence of a specific GPU or its memory capacity. The saved report is an output artifact, not a controlled serving benchmark. Quantization changes representation and may affect task quality; neither its exact impact nor a hosted-model comparison was measured here. The decision should account for compute and operational cost, workload concurrency, data location and a clear degraded-response contract. Model revision and request settings must be pinned before interpreting differences across runs. A fair comparison needs a representative traffic shape, not only one image: include burst concurrency, warm and cold starts, retries, hardware utilization, and the staff time needed to operate a local service. Treat request compatibility, task quality, and economics as three separate hypotheses. The configuration proves the chosen path, not those outcomes.
+
+WORKED EXAMPLE
+Hypothetical outage: the local health endpoint does not respond, so the script can produce a stats-only report from saved logs. That output should clearly distinguish statistics from absent VLM interpretation. No claim is made that the server was frequently down during the original development.
+
+SOURCE
+vision_dev_project/pipe/vision_reasoning_report.py:343-365
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L343-L365
+
+def build_vlm_chain(model_name: str, port: int) -> object:
+    """Build and return the LangChain vision chain."""
+    llm = ChatOpenAI(
+        model=model_name,
+        openai_api_key="local-3090",
+        openai_api_base=f"http://localhost:{port}/v1",
+        temperature=0.1,
+        max_tokens=900,
+    )
+    prompt = ChatPromptTemplate.from_messages([
+        ("user", [
+            {
+                "type": "text",
+                "text": _VLM_PROMPT_TEXT,
+            },
+            {
+                "type": "image_url",
+                "image_url": {"url": "data:image/png;base64,{image_data}"},
+            },
+        ])
+    ])
+    return prompt | llm | StrOutputParser()
+
+
+This is the entire client: ChatOpenAI configured with a placeholder key, the localhost vLLM base URL, temperature 0.1 for near-deterministic analysis, and max_tokens 900 to bound cost and latency per image. The prompt template pairs the fixed analysis instruction with an image_url part whose data URI is filled with each image's base64 - the same multimodal message shape a hosted OpenAI-style API expects. The pipe to StrOutputParser returns plain text, which parse_vlm_sections then structures. The point to notice: nothing here is vLLM-specific, so the serving decision is reversible by changing one URL.
+
+LIMIT
+Honest risks: quantization quality loss I never quantified - I have no side-by-side of bitsandbytes-quantized vs full-precision outputs, so 'some quality cost' is an assumption, not a measurement; single-GPU single-point-of-failure with no monitoring beyond the startup health check; and prompt-format coupling - the seven-section output contract is enforced only by the prompt, so a model upgrade can silently break parsing downstream.
+
+TEST EVIDENCE
+Inspected the documented launch, build_vlm_chain settings, wait_for_server, --no-vlm handling and saved report. No vLLM server, hosted API, GPU memory test, throughput benchmark or quantization-quality comparison was run in this preparation.
+
+SPEAKABLE ANSWER
+The report script is configured for a local Qwen2.5-VL-7B-Instruct service. build_vlm_chain in pipe/vision_reasoning_report.py uses an OpenAI-compatible endpoint at localhost:8000/v1 with temperature 0.1 and max_tokens 900, sending images as base64 data URLs. The documented launch uses bitsandbytes quantization. That is evidence of the integration path, not a measured quality or cost advantage. Self-hosting can give deployment control and avoid sending images to an external inference endpoint when the configured service really is local. It does not have zero marginal cost: compute, electricity and operations remain. wait_for_server checks availability, and failed health checks or --no-vlm allow a stats-only report. I would compare hosted and local serving on the same images for diagnostic quality, latency, memory, concurrency and total cost. The source does not establish a hardware capacity benchmark or prove that quantization had no effect on quality.
+
+SELF-CHECK
+A local model uses less memory after quantization. What conclusion does that support?
+It supports a resource-use observation for that configuration. It does not establish equal diagnostic quality or lower total cost; I would evaluate paired outputs and include serving operations and utilization in the comparison.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Does an API-compatible interface make two providers behaviorally interchangeable?
+No. It can preserve request shape, but models may differ in vision inputs, tool formats, limits, tokenization and output quality. I would run contract and task-level tests before calling a provider change equivalent. A compatibility check must separately cover accepted image encoding, response fields, errors and actual diagnostic quality; preserving the URL and JSON shape proves only part of that contract.
+
+1.1. What contract tests would you share across endpoints?
+I would send a small fixed corpus containing ordinary images, malformed inputs, long prompts, and outputs near the token limit. Check response shape, image acceptance, error handling, and required section coverage, then separately judge diagnostic quality. An OpenAI-compatible URL only covers the interface shape; it does not guarantee equal vision support or answer behavior.
+
+1.1.1. How would you compare quality without letting graders know the provider?
+Use blinded outputs and a fixed rubric with multiple reviewers or adjudication for disagreements. Score factual correctness, evidence linkage, uncertainty, and actionability separately. Freeze prompts and model revisions as much as possible, and report sample size and confidence intervals rather than generalizing from a few examples.
+
+2. How would you check whether quantization changes the diagnosis?
+Use the same labeled images and rubric on quantized and reference configurations, fixing model revision and generation settings as far as possible. Compare diagnostic correctness and resource use; no quality degradation number is established by this code. Keep the same images, prompt and scoring rules so output differences can be attributed more clearly to the model configuration rather than a changed evaluation population.
+
+2.1. Which variables must remain fixed in that comparison?
+Use the same image set, prompt, decoding settings, and evaluation rubric; record exact model revision and quantization configuration. Compare paired outputs so each image is judged in both conditions. Measure latency and memory too, but do not trade away diagnostic quality without making the accepted loss explicit. The existing source records configuration, not this experiment.
+
+2.1.1. What if quantized output is less fluent but equally correct?
+Then fluency alone should not decide. The rubric should weight factual correctness, uncertainty, evidence use, and task completion. If those remain stable while memory use falls, quantization may be a good operational choice. I would still inspect subgroup regressions, especially difficult distortions or minority classes, before recommending deployment.
+
+3. What belongs in the local-versus-hosted cost comparison?
+Compute utilization, energy, platform engineering, maintenance and failures belong alongside any per-request fees. The source contains no measured cost crossover, so I would use a workload-specific comparison rather than invent prices. The comparison also needs equivalent task quality: cheaper requests are not useful savings if their diagnoses fail the acceptance criteria or require substantially more manual correction.
+
+3.1. What workload numbers would you collect first?
+I would estimate request volume, image size, peak concurrency, average and tail latency targets, uptime needs, model utilization, and staff time for serving. Then compare a hosted quote with measured local compute, electricity, maintenance, monitoring, and idle capacity. The project has no such measurements, so I would not present local serving as cheaper.
+
+3.1.1. How would bursty traffic change the comparison?
+A local GPU sized for peak load may sit idle much of the time, while a hosted service may charge per request but scale more easily. Conversely, steady high utilization can change the economics. I would model realistic traffic traces and include failure recovery and capacity headroom, not just divide GPU cost by an assumed token count.
+
+OPTIONAL PRACTICE RESOURCES
+Hosting, Serving, and Scaling LLMs in Production (LLMOps: Building Production-Ready LLM Systems - AI-Powered Course): https://www.educative.io/courses/llmops/hosting-serving-and-scaling-llms-in-production
+Inference Infrastructure: Hardware, Economics, and Latency (LLMOps: Building Production-Ready LLM Systems - AI-Powered Course): https://www.educative.io/courses/llmops/inference-infrastructure-hardware-economics-and-latency

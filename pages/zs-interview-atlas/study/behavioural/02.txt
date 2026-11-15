@@ -1,0 +1,71 @@
+Behavioural & Experience | Card 02
+Difficulty: Intermediate
+
+QUESTION
+Why this ZS role, and how would your agent projects help a client rather than just demonstrate a framework?
+
+WHY THIS QUESTION MATTERS
+Required why-company answer; link motivations to the supplied role instead of invented team knowledge.
+
+CONTEXT
+A “why this role?” answer tests whether motivation connects to the actual posting and whether technical interests can serve a user’s decision. The available context supports a role involving business data, solution building, testing, and communication; it does not establish a guaranteed team or client. Transferable project patterns are useful only when mapped to an acceptance criterion and domain review.
+
+TERMS
+baseline: A simple reference solution against which to compare added complexity.
+client outcome: The useful change a stakeholder can observe and assess.
+
+MECHANISM
+1. Extract two responsibilities from the supplied JD and name why they matter to the user’s decision.
+2. Connect each to a verified project habit, such as provenance, validation, or tool orchestration, without claiming commercial delivery.
+3. Describe how you would learn the domain and measure usefulness before choosing an LLM or agent.
+
+TECHNICAL EXPLANATION
+Keep motivation anchored in the work described rather than prestige or assumptions about team placement. Explain a real problem type that interests you, then show a verified habit from a project that could transfer. Make the boundary explicit: prototypes demonstrate methods, not commercial impact. A convincing answer also says how you would adapt: learn business definitions, inspect representative data, agree on acceptance cases, and work with a domain expert. Avoid promising that a model will help before a baseline exists. Add one true personal reason and one authentic domain-learning example; if neither is ready, the answer can still be strong by discussing the role’s responsibilities and your learning approach. Show how you would check whether the first milestone created value before expanding scope.
+
+WORKED EXAMPLE
+Hypothetical client request: reduce time spent locating a current policy. I would define the correct source and access rules, compare retrieval with a manual lookup baseline, and only then decide whether generation or an agent adds value.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Do not claim a guaranteed AI team, product assignment, interview sequence or client project.
+
+TEST EVIDENCE
+Matched role references to inputs/jd.txt and dated official research. Personal motivation marker remains for the user; no exact PS process was verified.
+
+SPEAKABLE ANSWER
+The supplied JD attracts me because it combines understanding business data, building and testing solutions, and communicating risks early. Its AI column asks for the same fundamentals my projects make concrete: tools, retrieval, output checking and evaluation. I would bring an evidence-first habit: identify the user's decision, build a small baseline, and make limits visible before adding an agent. ZS's public ZAIDYN overview describes AI applications for life-sciences workflows; that gives me a concrete business context to learn, without assuming I know my eventual assignment. I have not delivered a commercial ZS engagement, so I would start by learning the domain and the team's delivery standards. [FILL BEFORE INTERVIEW: add one true reason this work interests you and one genuine example of learning an unfamiliar domain.] My goal is a useful, maintainable outcome, not a demo that only works on chosen inputs.
+
+SELF-CHECK
+If the client task can be solved with a fixed query, what should you recommend?
+Recommend the simplest approach that meets agreed accuracy, maintainability, and review requirements. Compare it with an LLM only if a real requirement needs language flexibility, then measure the added cost and failure modes. The goal is a useful client outcome, not framework use.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you turn a JD responsibility into a first project milestone?
+I would translate a responsibility into a user decision and an observable acceptance criterion before choosing a framework. For example, if the work involves extracting information, define which fields must be correct, what evidence supports them, and what happens when confidence is low. Then build the smallest baseline that can be reviewed with a domain partner.
+
+1.1. What would you do if the user asks for an LLM before defining the task?
+I would ask for representative inputs, the decision they need to make, and the cost of an incorrect answer. A fixed query, rules, or search may be safer and cheaper. I would compare a baseline against the requested approach with the same acceptance criteria, then explain the result rather than arguing from preference.
+
+1.1.1. How would you communicate that a simpler baseline is enough?
+Show examples where it meets the agreed criteria, plus the edge cases it cannot handle and the cost of adding an LLM. If the baseline misses an important case, that becomes evidence for the next experiment. I would frame this as a decision from measured requirements, not a general claim that LLMs are unnecessary.
+
+2. What makes the projects transferable to a ZS client workflow?
+The transferable habits are evidence tracking, explicit validation, and communicating uncertainty; the projects do not prove client-domain delivery. I would first learn the business definitions and data constraints, then map a project pattern such as structured extraction or tool routing to a small workflow with a reviewer. The domain owner decides whether the output is useful.
+
+2.1. How would you measure usefulness for an analyst?
+Agree on a task-specific measure with the analyst: time saved only if quality stays within an accepted range, fewer missed fields, or faster review. Include a baseline and cases where the tool should abstain. I would not claim improvement until a pilot measures the workflow and checks for downstream correction cost.
+
+2.1.1. What would you do if the model score improves but analyst trust falls?
+Investigate where the score and experience diverge: wrong but confident answers, slow review, poor provenance, or a mismatch in the metric. I would inspect representative cases with analysts and change the evidence display or scope before expanding. Aggregate accuracy alone does not establish adoption or safe decision support.
+
+3. How would you explain what you have not delivered commercially?
+I would state the boundary directly: these are projects and design work, not a claim that I delivered a ZS engagement. Then I would connect a verified technical practice to the role and explain how I would learn the client context. The supplied posting and public product overview inform my interest, but they do not reveal my eventual team assignment.
+
+3.1. How can you show readiness without pretending to know the domain?
+Use a concrete learning plan: identify domain terms, map source data, review examples with an expert, and validate a small task against agreed acceptance cases. I can show that I know how to ask these questions, while being clear that I need the team’s definitions and feedback to do the work correctly.
+
+3.1.1. What would you ask a domain expert first?
+I would ask what decision the workflow supports, how key fields are defined, what exceptions matter, and which errors are most costly. I would then repeat the definition back with a few examples for confirmation. [FILL BEFORE INTERVIEW: name one real domain-learning experience only if I can describe it accurately.]

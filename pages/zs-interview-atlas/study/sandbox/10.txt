@@ -1,0 +1,99 @@
+Sandboxed Code-Execution Agent | Card 10
+Difficulty: Advanced
+
+QUESTION
+How do tool schemas, dispatch, and approval interact, and where is the human-in-the-loop boundary enforced?
+
+WHY THIS QUESTION MATTERS
+Tests concurrency behavior at the shared execution boundary and whether I can reason from implementation to a safe redesign.
+
+CONTEXT
+The adapter validates argument shape and constructs tools from the schema/dispatch intersection. That still leaves policy authorization and human approval as separate decisions.
+
+TERMS
+schema validation: Checking an input’s shape and types before code uses it.
+
+MECHANISM
+1. Follow JSON schema types into Pydantic fields and required argument definitions.
+2. Check that every intended schema name has a dispatch implementation and unsupported types fail closed.
+3. Enforce action authorization and approval immediately before side effects.
+4. Test that changing an approved payload prevents execution and requires fresh consent.
+5. A required string field can still name an unauthorized file or destination. The deterministic dispatcher must reject that action under the authenticated caller’s policy, and consent must remain tied to the exact executed payload.
+
+TECHNICAL EXPLANATION
+The adapter maps primitive JSON types and required fields into Pydantic models, then constructs StructuredTools for names present in the dispatch map. Schema validity answers whether arguments fit a shape, not whether a command is permitted or safe. The optional approval tool prompts a human when called, but the model can choose another executor path unless policy checks that route. A robust boundary binds approval to immutable action content and rechecks it immediately before execution. `_create_args_schema_from_openai` maps JSON primitives into Pydantic fields and defaults unknown types to strings; `get_tools` skips schema entries lacking a dispatch implementation. A syntactically valid argument can still request an unauthorized action. The graph does not force `request_approval` before each tool. Fail startup or report schema/dispatch drift, reject unsupported types, and place policy/approval checks at the executor boundary. Approval should hash canonical arguments and expire; any changed path or code requires renewed consent.
+
+WORKED EXAMPLE
+A valid `run_shell_command` argument can still be destructive. Schema validation accepts its string shape; a policy gate must decide whether that command may execute and whether approval is required.
+
+SOURCE
+sandbox-agent/tools/langchain_adapter.py:10-32
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/tools/langchain_adapter.py#L10-L32
+
+def _create_args_schema_from_openai(tool_def: dict) -> Type[BaseModel]:
+    params = tool_def["function"]["parameters"]
+    properties = params.get("properties", {})
+    required = params.get("required", [])
+
+    field_definitions = {}
+    for name, prop in properties.items():
+        field_type = str
+        if prop.get("type") == "integer":
+            field_type = int
+        elif prop.get("type") == "number":
+            field_type = float
+        elif prop.get("type") == "array":
+            field_type = list
+        elif prop.get("type") == "object":
+            field_type = dict
+        elif prop.get("type") == "boolean":
+            field_type = bool
+
+        default = ... if name in required else None
+        field_definitions[name] = (field_type, Field(default, description=prop.get("description", "")))
+
+    return create_model(f"{tool_def['function']['name']}_args", **field_definitions)
+
+
+
+LIMIT
+Correctly typed arguments may still request unsafe operations; approval must be enforced by the executor path.
+
+TEST EVIDENCE
+No live approval flow was run. Test malformed/omitted args, a valid benign call, a blocked destructive call, absent approval, denied approval, and payload changes after approval.
+
+SPEAKABLE ANSWER
+`tools/langchain_adapter.py` converts JSON schemas into Pydantic argument models and binds functions from `TOOL_DISPATCH`. That validates argument shape before the implementation runs, but it is not a policy check. `request_approval` is callable by the model; the graph routes agent tool calls through ToolNode without an unconditional approval interrupt. I would separate schema validation, authorization, and approval, then gate the executor for sensitive operations. No live tool-agent approval flow was executed in this audit.
+
+SELF-CHECK
+An argument is the right type but requests deletion outside the intended workspace. Is it valid to execute?
+It may be schema-valid but policy-invalid. The executor must enforce allowed paths and action rules; typed arguments alone do not authorize side effects.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What does schema validation guarantee here?
+It can ensure the required command field is present and has the expected string type. It does not inspect shell meaning, permissions, or downstream effects. The command may still delete files or access the network if the executor allows it. I would treat Pydantic as input-shape validation and add a separate policy layer before execution. This is why shape validation cannot stand in for authorization.  A type-correct command can still be unauthorized.
+
+1.1. Would an allowlist of commands be enough?
+An allowlist can reduce risk but arguments may still contain dangerous flags or paths, and shells interpret metacharacters. Prefer structured operations over arbitrary shell where possible; otherwise parse and constrain executable, arguments, working directory, and environment. I would test path traversal, quoting, and shell metacharacters. The current schema accepts a command string and does not itself provide a security allowlist.
+
+1.1.1. How would you preserve useful flexibility?
+Expose narrow tools for common tasks such as listing files, reading a bounded range, or running a specific interpreter with a script path. Keep arbitrary shell behind an explicit elevated policy and approval. Measure which workflows need it before removing capability. This reduces the space of allowed operations while retaining useful functionality, and is a proposed design beyond the current dispatch map.
+
+2. How can the graph make approval mandatory for selected tools?
+Before dispatch, classify the requested action and require an approval record for actions in the sensitive set. The tool executor should verify that record rather than trusting a prior message. If approval is absent or denied, return a structured refusal and do not invoke the implementation. The current graph has no universal interrupt before ToolNode, so callable `request_approval` is optional.
+
+2.1. What should approval bind to?
+Bind it to the exact normalized arguments, tool name, caller, and an expiration time. Hashing the canonical payload makes a later argument change invalidate approval. Use a single-use token so the model cannot reuse consent for a different command. I would test that changing one path or command character blocks execution and requires a new approval. The executor must reject absent or stale approval.  The policy check must run before any side effect.
+
+2.1.1. Can a human approve a natural-language plan without seeing code?
+That depends on action risk. For code execution, show the exact code or a stable diff and the environment it will run in; a vague summary is not enough to bind consent. For low-risk read actions, a policy may allow execution without approval. I would define tiers and ensure the interface shows the concrete payload for the high-risk tier. This repository’s prompt displays optional code but does not enforce mandatory approval.
+
+3. What happens if the provider returns an unknown tool name?
+The adapter only constructs tools whose names exist in `TOOL_DISPATCH`, so an unknown name should not become an available StructuredTool. The provider response may still be malformed or rejected by its SDK. I would test that invalid names cannot reach dispatch and that errors return a bounded explanation rather than a raw stack trace. No cross-provider schema compatibility matrix was run. A startup check should report the exact missing tool names.  This catches drift before a user attempts the missing tool.
+
+3.1. How do you avoid silently omitting a declared tool?
+Compare the schema registry with the dispatch map at startup and report missing or extra names. The adapter currently skips definitions absent from the dispatch dictionary, which can make a prompt-visible schema unavailable if registries drift. I would fail startup in strict mode or emit a clear health diagnostic, and add a set-equality test for intended tools. This guards against registry drift.
+
+3.1.1. What about a schema field whose JSON type is unsupported?
+The current adapter defaults unrecognized types to `str`, which can accept a shape different from the provider schema. I would explicitly reject unsupported JSON types or map nested unions and enums deliberately, then validate representative schemas against each provider. This is a compatibility and correctness issue, not a claim that every current tool schema is broken. Unsupported types should fail closed, with a clear diagnostic.  Do not silently coerce unknown types to strings.

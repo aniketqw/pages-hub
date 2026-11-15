@@ -1,0 +1,71 @@
+Behavioural & Experience | Card 01
+Difficulty: Intermediate
+
+QUESTION
+Walk me through your resume in two minutes, and distinguish what you implemented from what you designed.
+
+WHY THIS QUESTION MATTERS
+Required resume walkthrough; test concise ownership, technical coherence and honest scope.
+
+CONTEXT
+An interviewer uses a two-minute walkthrough to test selection, ownership, and consistency across claims, not to hear every line of a resume. A useful answer gives a through-line, names the strongest evidence, and distinguishes implementation from design. Audited project caveats matter: resume-builder tests and saved evaluation are not universal guarantees; Marvell work was designed with no model built; the 99+ cohort is not an individual outcome measure.
+
+TERMS
+ownership: The work and decisions you personally contributed.
+scope: The environment and boundaries within which a claim holds.
+
+MECHANISM
+1. Choose one organizing theme that is true across the resume, such as evidence-led AI prototypes or reliable software systems.
+2. Select two or three projects with one concrete artifact or audited result each; state the limit beside the claim.
+3. Label work as implemented, evaluated, designed, or proposed, and finish with why the role is a sensible next step.
+
+TECHNICAL EXPLANATION
+Build a short arc rather than an inventory. Start with current study and the kinds of problems that connect your projects, then use two examples to show how you work: one with code and one with a clear design boundary. Put the most auditable numbers in context, including run, denominator, and test selection where relevant. Do not spend the time defending every bullet preemptively; choose a concise caveat that signals careful ownership. Reserve the final sentence for fit with the role, not a claim about an unknown assignment. Before the interview, rehearse to time and ask someone to flag any sentence that implies sole ownership, production use, or measured impact beyond the evidence. Fill the markers with real facts, or omit the detail.
+
+WORKED EXAMPLE
+Rehearsal exercise: speak this once with a 120-second timer, then once in 60 seconds keeping one project, one honest limitation and the role connection. This is a proposed drill, not a record of a previous interview.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Unfilled ownership markers or claims of production impact would undermine the entire walkthrough.
+
+TEST EVIDENCE
+Checked education/projects against inputs/resume.txt and technical numbers against the saved audit. Personal ownership and the TA count still require the user's true details; timing practice remains to be done.
+
+SPEAKABLE ANSWER
+I am pursuing an M.E. in Software Systems at BITS Pilani after a CSE degree focused on AI and machine learning. My projects connect AI prototypes with software reliability. Resume Builder turns repository evidence into claims, then checks them deterministically; its saved six-repository evaluation had 39 generated claims, 36 verified, and faithfulness 0.9184. The selected offline test run passed 488, while my resume lists 540; I cannot reconcile that historical count without its exact command. I also built a Docker tool-using agent, a multi-university bounty platform, and VisionDev for examining vision-model failures. At Marvell my work covered state capture and design reasoning for network intelligence; I designed the behavioral identification approach, but no trained model was built. As an AI teaching assistant, my resume records mentoring 99+ students. [FILL BEFORE INTERVIEW: name your exact owned deliverables and one true outcome.] I am interested in work that combines useful AI with evidence, testing and clear communication.
+
+SELF-CHECK
+If the interviewer interrupts after the first project and asks whether you personally built the Marvell model, how should you answer?
+State plainly that no trained model was built in the documented work. Explain the design contribution you can verify, then fill in only your true owned artifact and invite a technical question about that work.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How do you reconcile the resume’s 540 tests with the selected 488-pass run?
+I would keep those counts attached to their evidence rather than invent a reconciliation. The selected offline run shows 488 passed and one deselected; the resume’s 540 needs its exact historical command, commit, and test selection. I can explain the current audit and say plainly what record is missing.
+
+1.1. What evidence would let you compare the two runs fairly?
+The command, commit SHA, environment, selection markers, and collection summary would let me determine whether the suites differ. Until those are available, I should not say tests were added, removed, or moved between versions. The useful answer is transparent: 540 is the submitted resume claim; 488 is the audited pinned run.
+
+1.1.1. How would you describe implementation ownership across the four projects?
+I would use a project-by-project table of artifacts I personally changed, shared work, and designs that remained proposals. Code presence is evidence of implementation in a checkout, not proof of sole authorship. [FILL BEFORE INTERVIEW: name the actual files or deliverables you owned and one boundary where someone else contributed.]
+
+2. How can you substantiate the “99+” teaching-assistant number?
+I would identify the source and denominator before explaining impact: registered cohort, active participants, direct mentees, or students whose artifacts I reviewed. Those counts can differ. [FILL BEFORE INTERVIEW: name the true source and which population the resume number describes.] I should not convert the cohort size into a claim that I personally coached each person.
+
+2.1. What outcome can you claim from that number?
+Only an outcome measured by the evidence I actually have. Enrollment count shows scale of the cohort, not learning gains or individual mentoring results. If I have no evaluated learning measure, I would describe the responsibilities and one true example of support, then say impact was not quantified.
+
+2.1.1. How would you make a future mentoring impact measurable?
+Define a baseline and a direct measure, such as completion of a reviewed exercise or improvement on a common rubric, while accounting for participation and other instructors. [FILL BEFORE INTERVIEW: state only a metric you actually collected.] I would avoid attributing a cohort-wide change to my work without a comparison or contribution analysis.
+
+3. How would you distinguish your own implementation from the project’s overall capability?
+Name the specific module, design artifact or test you personally produced, then separate it from work done by collaborators or inherited code. A repository containing a feature does not by itself establish individual authorship. Use the fill marker to supply the true division of work; if ownership is uncertain, say so. This makes a technical walkthrough defensible without diminishing the shared project outcome.
+
+3.1. What if a resume bullet implies broader ownership than you can substantiate?
+Narrow the wording to the contribution you can explain and support. Distinguish implemented, designed, evaluated and proposed work, and preserve team credit. Do not invent commits, teammates or production results to reconcile an overstated bullet. Before the interview, check the relevant artifact and prepare one example of your own decision. A precise contribution is stronger evidence than an expansive claim that collapses under a follow-up.
+
+3.1.1. How would you demonstrate technical understanding if the work was a design rather than a built model?
+Explain the input, intended output, assumptions, alternatives and test that would establish the design’s behavior. State plainly that the model was not built and avoid quoting unmeasured accuracy or deployment impact. A well-reasoned validation plan demonstrates understanding, while actual implementation is a separate claim. Identify the true artifact you authored and which next experiment would most reduce uncertainty before development.

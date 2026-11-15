@@ -1,0 +1,95 @@
+Resume Builder Agent | Card 02
+Difficulty: Advanced
+
+QUESTION
+How does a repository fact become a claim that the system is willing to use?
+
+WHY THIS QUESTION MATTERS
+Tests bounded evidence construction, quote checking, and the difference between mechanical support and truth.
+
+CONTEXT
+The user wants to know whether a proposed resume sentence deserves their trust. The evidence is what the repo actually says. The claim is what the model wrote. This card traces input → draft → check → what the user sees, so a valid link never gets mistaken for proof of the whole sentence.
+
+TERMS
+AST: A parsed syntax tree used to inspect source structure without executing it.
+partial_source: Recorded gaps where source could not be indexed.
+entailment: Whether the evidence actually establishes the claim, beyond sharing words.
+
+MECHANISM
+1. Read the README, tree, manifests, recent commits and selected files. Full commit hashes let file reads use a particular snapshot when available. A separate README failure does not cancel the remaining reads.
+2. Build a Python syntax index. It describes definitions, calls and routes seen in the fetched text. It cannot see every source file or resolve all runtime calls.
+3. Give the model a compact evidence bundle. Ask for a short claim plus a source quote. The model's draft is not a second source.
+4. Check number presence, path, quote and simple relevance in Python. Assign a status. A declared technology label is filtered separately; the code does not validate every technology word in free prose.
+5. Show claims, statuses and available links in the Evidence tab. Rejected claims stay visible there but are omitted from the editable document. An unresolved claim can still be included with an unverified flag.
+
+TECHNICAL EXPLANATION
+The AST layer gives the model something stronger than file names: actual definitions, line ranges and selected route syntax. It does not execute code, resolve imports or prove a complete call chain. Source truncation can make a valid long file fail parsing, which is recorded as a gap. Quote presence uses normalized matching with a token-overlap fallback, and relevance requires limited shared content words. Neither establishes full entailment: a real sentence can be used with the wrong entity, tense or outcome. _known_path checks the pinned fact set, while _locate finds exact source text and may expand its line range to a containing symbol. A quote accepted through loose matching can still have no exact line range. Those are distinct outcomes, not a reason to invent coordinates. The useful improvement is independent inspectability: a reviewer can follow the source pointer and challenge the claim. Personal contribution and measured impact still need separate evidence. A useful way to trace the types is RepoFacts → RepoBrain plus compact evidence → RepoSummary with candidate claims → checked claim statuses → ResumeDoc bullets. These are different representations with different authority. A model-authored path such as 'files' can resemble an evidence JSON key while naming no repository file. The path check prevents treating that key as a source location. Even after a path is real, quote support and claim support remain distinct. An exact source quote can be located and expanded to its containing symbol; normalized quote acceptance can lack an exact location. Report a missing location rather than manufacturing line numbers. Full SHAs are now kept by both GitHub backends. The README fetch has its own failure boundary, so a missing README does not discard manifests and source reads. The higher source cap avoids cutting ordinary files at the previous 4,000-character boundary, but a file larger than 60,000 characters can still be cut mid-expression. The prompt budget remains separate. The evidence route groups claims by repository and returns the union of claim and index keys. That keeps a rejected claim visible even when a repo has no usable index. The UI shows the first quoted item and a link when supplied; it does not render every evidence quote or necessarily expose the reason alongside an existing quote.
+
+A source link is a pointer. You still have to read the evidence: a passing number test can miss what the number describes, and a real quoted line can be too weak to establish scope or ownership. The current relevance check is a rule, not a factual judge. When a file cannot be indexed, that gap is surfaced rather than turned into an invented graph edge.
+
+WORKED EXAMPLE
+The README says “exposes POST /score.” A model drafts “Built a scoring API.” The quote may support the endpoint, but it does not show who wrote it. If the draft says “cut latency by 40%,” look for a measured latency comparison; the route code alone is not that measurement.
+
+SOURCE
+resume-builder-agent/v2/src/rba_api/routes/github.py:227-237
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba_api/routes/github.py#L227-L237
+
+    all_repos = set(session.repo_graph) | set(by_repo)
+    return {
+        "repos": {
+            repo: {
+                "claims": by_repo.get(repo, []),
+                "graph": (session.repo_graph[repo].to_dict()
+                         if repo in session.repo_graph else None),
+            }
+            for repo in sorted(all_repos)
+        },
+    }
+
+Join the repository names from the graph and claim groups. Attach claims even when the graph is None. This explains why failed or unindexed candidates remain visible in the Evidence tab.
+
+LIMIT
+Python-only sampled static indexing and heuristic support checks do not establish complete architecture, runtime behavior or authorship.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+A repository read gives the model evidence, not permission to invent an achievement. V2 keeps up to twelve ranked Python files with a 60,000-character cap per file. It uses a full commit SHA when available. A Python AST index extracts definitions, calls and routes. A smaller evidence bundle goes to the configured model, which proposes claims and quotes. Code checks numbers, citation paths, quote presence and a relevance rule. The verifier assigns a status and establishes trusted repository, commit and line metadata where it can. The Evidence & Call-Graph tab shows accepted, unresolved and rejected claims. Seeing a claim there does not mean it made it onto the resume. Even a verified link does not prove personal ownership or impact.
+
+SELF-CHECK
+If a quote is real and its path exists, is its claim automatically semantically supported?
+No. The quote may refer to a different entity or merely mention related terms. V2 adds a relevance heuristic and trusted location metadata, but human review or stronger measured support checks are still needed for meaning, impact and ownership.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What does AST parsing prove that a README claim does not?
+It can show that a specific definition or route syntax exists in the fetched source and locate it within that text. It does not prove the code runs, is reachable, is correct or was personally authored by the candidate. Its value is a checkable structural observation that can support a narrower explanation.
+
+1.1. How does bare-name lookup affect a reported call chain?
+The same function name can occur in several files or classes. Without import and receiver resolution, a lookup can join edges that do not form one actual runtime path. Return candidate locations and inspect the relevant callers. A breadth-first chain through that index should be labeled plausible, not a complete resolved call graph.
+
+1.1.1. Would executing every source file solve that uncertainty safely?
+Not as a general repository-inspection method. Execution can have side effects and may need unavailable services or credentials, while one run still does not explore every path. Use bounded static inspection and controlled tests for selected behavior. A stronger analysis adapter can improve resolution without treating arbitrary execution as a trustworthy shortcut.
+
+2. Why are those checks still weaker than semantic support?
+A value can appear in evidence for a different entity, and a quote can share words without establishing the proposed relationship. V2’s path and quote checks narrow fabrication, but its overlap heuristics do not understand all meanings, units or causality. An accepted status describes those implemented checks, not an unrestricted truth certificate.
+
+2.1. What counterexample would you use to test that distinction?
+Use evidence saying one project has twenty tests and another has four endpoints, then propose a claim about twenty endpoints for the second project. Check numeric presence, path and quote behavior separately from the expected semantic judgment. A test should identify which gate rejects it or document the remaining false-positive path.
+
+2.1.1. What is a reasonable response when support remains uncertain?
+Keep the claim visibly unresolved, request the missing artifact or remove it from the final resume. Do not repair uncertainty by inventing a benchmark or broadening a quote. For impact claims, collect a defined measurement with inputs and baseline. For ownership, supply the actual contribution record rather than inferring authorship from repository presence.
+
+3. How does the Evidence tab show a rejected claim without treating it as a resume bullet?
+The session stores the full claim list and the AST index after import. The evidence endpoint groups by repository and returns statuses, evidence and available index data. ResumeDoc conversion is separate: it drops rejected claims. The UI therefore has enough information to show a failed proposal for inspection without adding it to the editable resume.
+
+3.1. What happens if a repository has claims but no Python index?
+The endpoint takes the union of repository names from the claim groups and the graph map. If a name is present only in the claims, it still gets a response entry with graph set to null. The UI can show the claims without implying it indexed code. This matters for missing source or unsupported languages.
+
+3.1.1. What can you conclude from a visible quote and source link?
+A validated link can identify evidence in a pinned snapshot. It helps me review the claim, but I still need to check whether the quote supports the exact entity and outcome. A static call list is a guide to source locations. It is not a record of code execution and does not prove the author owned the work.
+
+OPTIONAL PRACTICE RESOURCES
+BERTScore and Model-Based Evaluation (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/bertscore-and-model-based-evaluation
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run

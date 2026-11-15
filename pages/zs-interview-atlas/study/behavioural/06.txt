@@ -1,0 +1,71 @@
+Behavioural & Experience | Card 06
+Difficulty: Intermediate
+
+QUESTION
+What did mentoring 99+ AI students involve, and how did you define data quality across modalities?
+
+WHY THIS QUESTION MATTERS
+Audit the TA resume bullet and test scalable technical communication without invented outcomes.
+
+CONTEXT
+Teaching-assistant questions test scope, communication, and evidence of impact. “99+” describes a resume number whose denominator should be verified; it does not prove each student received direct mentorship or improved. Multimodal quality also requires different checks for image, text, and spatial records. Use only actual rules, tools, and examples, and mark any scaling ideas as proposals.
+
+TERMS
+provenance: Where a record came from and how it was transformed.
+quality benchmark: An explicit reference or threshold used to assess data quality.
+
+MECHANISM
+1. Identify the count’s source and distinguish registered students, active participants, direct mentees, and reviewed artifacts.
+2. Choose one true quality rule and connect an invalid record to a concrete downstream problem.
+3. Explain how learners could verify compliance, while separating a tool actually used from a proposed validator.
+
+TECHNICAL EXPLANATION
+Demonstrate empathy and rigor together. Explain that a good quality rule is teachable, testable, and tied to downstream use, but do not invent a student interaction or outcome. For image data, dimensions or corruption checks may matter; text may need encoding and missing-field checks; spatial records may require units and coordinate reference. Those are examples of possible contracts, not claims about the actual work unless verified. Fill in the true cohort source, responsibilities, and one real rule. If an artifact or validator did not exist, say what you would build rather than suggesting it was delivered. Distinguish a rule actually taught from a possible rule, and name which evidence supports that distinction.
+
+WORKED EXAMPLE
+Hypothetical review rule: every spatial record must state its coordinate reference system. Without it, two valid-looking coordinates may refer to different locations. Replace this example with a true rule from the TA work if one exists.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Cohort size is not a count of individually reviewed submissions or a measure of teaching impact.
+
+TEST EVIDENCE
+Matched wording to inputs/resume.txt. Cohort evidence, personal responsibility and real outcomes are explicitly unverified until the user fills the markers.
+
+SPEAKABLE ANSWER
+My resume records a Teaching Assistant role supporting 99+ students on a multimodal agricultural knowledge-base effort. I would distinguish the cohort size from the number of artifacts I personally reviewed. The bullet names curation pipelines, quality benchmarks and feature-extraction standards across vision, text and spatial data. [FILL BEFORE INTERVIEW: state the actual cohort-count source, your exact review responsibilities, one real quality rule you introduced and a true example of feedback.] To explain a quality rule, I would connect the check to a downstream failure it prevents, such as inconsistent labels or mismatched location metadata, but I would label that as an example unless it really occurred. I would also describe how students could verify compliance themselves. I should not claim that every student improved, that a national system was deployed, or that the resume cohort count is a measured learning outcome.
+
+SELF-CHECK
+If you cannot find records showing how many students you directly reviewed, how should you state the 99+ figure?
+Describe it as the cohort or resume-listed scale only if that is what the source supports, and say that direct review count is not established. Do not imply one-to-one mentorship or measured learning gains from enrollment alone.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What denominator does “99+ students” describe?
+I would verify whether it means a registered cohort, active participants, students I directly mentored, or artifacts I reviewed. Those denominators describe different kinds of work. [FILL BEFORE INTERVIEW: identify the true record and the resume’s intended count.] I would then give a concrete responsibility without implying individual outcomes for every student.
+
+1.1. What evidence could support learning impact?
+A shared rubric or before-and-after exercise can show change, but only if participation and comparison are clear. If I did not collect such evidence, I would describe scope and examples of support rather than claim an improvement rate. Cohort size is context, not proof of teaching effectiveness.
+
+1.1.1. How would you report the number if the records are ambiguous?
+Use the narrowest count I can defend and explain its source, or avoid quantifying it until verified. Do not mix total enrollment with direct mentees. [FILL BEFORE INTERVIEW: state the corrected denominator if known.] The interviewer should be able to understand exactly what the number counts.
+
+2. How would you explain a quality rule with a true example?
+Choose one rule I actually introduced or applied, show an invalid record, the downstream problem it could cause, and the corrected record. [FILL BEFORE INTERVIEW: insert the real data example and rule.] If I cannot recall a true case, I can explain the method with a clearly labeled hypothetical, not present it as something that happened.
+
+2.1. How would the rule differ across image, text, and spatial data?
+Image checks may cover dimensions, corruption, or labels; text checks can cover encoding and missing fields; spatial records may need coordinate reference, units, and geometry validity. The exact checks depend on the dataset contract. I should name only validations I personally used and mark suggested ones as proposals.
+
+2.1.1. How would you know the validator catches useful errors?
+Create examples that violate each rule and examples that should pass, then ask a domain reviewer whether the rule protects the intended use. Track false rejection and missed invalid records. [FILL BEFORE INTERVIEW: say what validator or review process truly existed.] A checklist without a tested failure case may only create work.
+
+3. How would students verify data quality themselves?
+Give them a clear contract with examples and a repeatable check: accepted fields, units, missing-value rules, and how to interpret an error. If there was an actual tool, describe it; otherwise propose a small validator without implying it was built. The goal is consistent review, not a vague instruction to “clean the data.”
+
+3.1. What would you do when two modalities disagree about one example?
+Preserve the disagreement and provenance, then ask which source is authoritative for the task. Do not overwrite one modality to make the record appear consistent. [FILL BEFORE INTERVIEW: name an actual disagreement only if one occurred.] A clear exception path is better than forcing a guessed value.
+
+3.1.1. How would you keep the quality process from becoming a bottleneck?
+Automate deterministic checks, reserve human review for ambiguous or high-impact cases, and monitor the queue and rework rate. Tune rules with domain feedback. If the teaching work used no automated pipeline, say that this is a proposed way to scale it, not a delivered capability.

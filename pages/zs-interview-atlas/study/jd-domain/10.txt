@@ -1,0 +1,75 @@
+JD / Domain | Card 10
+Difficulty: Advanced
+
+QUESTION
+How would you deploy a prototype LLM feature and decide whether local open-source inference is justified?
+
+WHY THIS QUESTION MATTERS
+JD: open-source model exposure, deployment, cloud basics and quality standards.
+
+CONTEXT
+A successful single-user demonstration establishes a narrow behavior under one workload. Deployment adds concurrent demand, sensitive data, dependency failure and operational recovery, which need their own evidence.
+
+TERMS
+quantization: Representing model values at lower precision to reduce resource use.
+tail latency: The slow end of the request-time distribution.
+
+MECHANISM
+1. Define the expected request size, concurrency and response-time target. Record model and configuration identities so a test result describes a known serving setup.
+2. Add authenticated access, secret handling, bounded work, observability and a clear degraded response. Measure queues and tail latency under representative load rather than extrapolating from one request.
+3. Compare hosted and local inference using task quality and total workload costs. Include idle capacity and maintenance; a configured endpoint proves an integration path, not a measured quality or cost advantage.
+
+TECHNICAL EXPLANATION
+Model weights are only part of serving memory; runtime state, activations and attention caches also depend on input length and concurrency. Quantization can reduce some resource requirements but may change task behavior and therefore needs evaluation on the intended workload. Record request distribution and concurrency when reporting latency: a mean can conceal queues and slow-tail failures. A local endpoint may improve control over data routing while adding provisioning, updates and incident work. Cost comparisons must include utilization and maintenance rather than only a per-token price. Set a meaningful degraded contract when inference is unavailable; do not label a partial statistics-only result as a complete analysis. These are proposed deployment checks. A configured local endpoint in source is not evidence that the workload was benchmarked on a particular GPU.
+
+WORKED EXAMPLE
+If a demo handles one request but a stakeholder expects twenty concurrent users, measure queueing, memory pressure and tail latency before promising the same response time. Keep a deterministic error or degraded path if inference is unavailable.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Do not quote a cost crossover, model-quality advantage or production readiness without measured workload and operational assumptions.
+
+TEST EVIDENCE
+Proposed load and failure tests: concurrency ramp, inference timeout, process restart, invalid credentials, log redaction and rollback. No new serving benchmark or cloud deployment was performed.
+
+SPEAKABLE ANSWER
+I would first separate a working demonstration from a production service. The prototype needs a versioned model configuration, bounded requests, representative evaluation cases and a clear data path. For deployment I would add secret management, authenticated access, timeouts, concurrency limits, observability and rollback. A hosted API can reduce operational work; local or managed open-source inference can give more deployment control, but it still costs compute and engineering time. I would compare task quality, response time, throughput under load, data-residency requirements and total cost using the same test set. In VisionDev, the source shows a local Qwen-compatible endpoint and a stats-only fallback. That proves a configured integration path, not a benchmark showing local serving is cheaper or better for every client.
+
+SELF-CHECK
+Can a containerized model that answers one request establish a twenty-user response-time promise?
+No. Packaging does not measure throughput or queueing. Test the intended concurrency and request distribution, including failures and slow responses, before making that promise.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Which costs does a per-token comparison omit?
+Local serving includes provisioning or purchasing compute, idle capacity, storage, power where relevant, platform work, upgrades and incident handling. Hosted serving also has integration and operational costs beyond the visible token price. Compare the same request volume, quality requirement and utilization assumptions rather than using one attractive unit rate. Without a measured workload and an accounting boundary, a claim that local inference is cheaper is an unsupported generalization.
+
+1.1. Why does utilization change the economics of local serving?
+A provisioned accelerator can cost money or consume owned capacity while idle, so cost per useful request depends on how much of that capacity the workload uses. Bursty demand may require headroom that lowers average utilization. Increasing utilization can also increase queueing and latency. Compare cost and service targets together, and state whether the estimate includes idle time and operational staffing rather than dividing a full-load benchmark into a monthly bill.
+
+1.1.1. What evidence would support a limited cost claim?
+Define the model, hardware or hosted configuration, request-length distribution, concurrency, measured throughput and quality acceptance set. Record the time period and which cost categories are included. Then report the result for that workload, with sensitivity to utilization and demand. A configured local endpoint or one successful request cannot establish a cost crossover. Preserve the raw measurements so another engineer can inspect assumptions and repeat the comparison.
+
+2. What must a degraded response communicate?
+It must name the unavailable capability and distinguish the partial evidence from a complete analysis. If model reasoning failed but deterministic statistics remain, show those statistics with a clear limitation rather than presenting a plausible substitute as the full result. The fallback should have its own acceptance contract and user-visible status. A successful HTTP response does not mean the intended capability completed, so monitoring must distinguish degraded success from full success.
+
+2.1. Should a fallback quietly generate a generic explanation instead?
+Only if the product explicitly defines that behavior and can prevent it from being mistaken for evidence-based analysis. A generic narrative can conceal the outage and introduce unsupported statements. Prefer a transparent partial result or explicit failure when the missing capability affects the decision. Test the displayed status, available evidence and user action under simulated inference failure rather than verifying only that the page still renders.
+
+2.1.1. How would you monitor whether degradation is becoming the normal path?
+Record separate counts for full completion, degraded response and failure, along with reason categories and latency. Alert on meaningful changes against the intended service target and inspect whether users can still complete their task. Avoid logging sensitive prompt contents unnecessarily. A stable HTTP success rate can hide a rising fallback rate, so capability-level monitoring is needed to see whether the actual promised behavior remains available.
+
+3. Why is average response time insufficient for an interactive feature?
+A mean can hide a minority of very slow requests that cause users to abandon or retry. Inspect percentiles, timeouts and queueing under representative concurrency and request lengths. Include warm and cold behavior if both occur in deployment. Report the workload alongside latency, because a one-request demonstration and a sustained multi-user service measure different conditions. Averages remain useful, but they do not describe the complete user experience.
+
+3.1. How can concurrency change latency without changing model weights?
+Requests compete for compute, memory, connection pools or worker slots. Once arrival rate approaches capacity, queueing can dominate response time even if each isolated request is fast. Long inputs and retries can amplify contention. Bound concurrency or queue length and measure tail behavior under the intended load. A per-request output limit is not automatically a server-wide workload limit or a guarantee that concurrent users receive the same latency.
+
+3.1.1. What should happen when the queue is full?
+Choose an explicit overload policy: reject quickly with a retryable status, apply a bounded wait or offer a documented degraded path. Do not allow unlimited queued work to consume memory and hide timeouts. Tell the caller whether retrying is safe and avoid duplicate side effects. Test saturation and recovery, including whether canceled requests still consume expensive work, before claiming that a concurrency cap provides reliable overload behavior.
+
+OPTIONAL PRACTICE RESOURCES
+Hosting, Serving, and Scaling LLMs in Production (LLMOps: Building Production-Ready LLM Systems - AI-Powered Course): https://www.educative.io/courses/llmops/hosting-serving-and-scaling-llms-in-production
+Inference Infrastructure: Hardware, Economics, and Latency (LLMOps: Building Production-Ready LLM Systems - AI-Powered Course): https://www.educative.io/courses/llmops/inference-infrastructure-hardware-economics-and-latency

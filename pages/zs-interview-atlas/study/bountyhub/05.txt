@@ -1,0 +1,105 @@
+Multi University Bounty System | Card 05
+Difficulty: Advanced
+
+QUESTION
+How does the Redis Streams worker handle a Mongo update failure, and what does recovery really mean?
+
+WHY THIS QUESTION MATTERS
+Tests the implementation boundary, failure modes, and whether I can separate code evidence from assumptions.
+
+CONTEXT
+Redis Streams separates delivery from acknowledgment. A message that was delivered but not XACKed is pending; it is not automatically reclaimed merely because a process restarts and reads new entries.
+
+TERMS
+consumer group: Redis Stream consumers that share work and track acknowledgments.
+pending entry: Delivered message not yet acknowledged by its group.
+XACK: Redis command that marks a group message processed.
+
+MECHANISM
+1. Distinguish new-entry reads using `>` from old pending entries owned by a consumer.
+2. Inspect the error branch and prove whether XACK is skipped after a failed Mongo write.
+3. Add a bounded reclaim pass for idle pending entries and metrics for attempts and age.
+4. Make projection writes replay-safe, and separately handle primary-replica lag or poison messages.
+
+TECHNICAL EXPLANATION
+XREADGROUP with `>` reads entries never delivered to the group; failed work is pending under its consumer. Restart plus `>` does not itself prove old pending work is reclaimed. Recovery should inspect pending entries, claim sufficiently idle ones, and track poison-message attempts. Upsert keyed by bounty/university can make repeated projection writes converge, but event ordering and deletes still need analysis. API also imports syncWorker while Compose starts a worker, so ownership and rebuild behavior deserve review. A failed process may leave an entry pending under its old consumer. A reclaim loop should use an idle threshold above normal high-percentile processing time, then claim in bounded batches. Reclaim can duplicate work if the old worker resumes, so projection updates need idempotency and version ordering. Also note `fetchBounty` reads via the replica: a temporarily missing row can return normally and then be XACKed, losing the refresh unless a retry or reconciliation path exists.
+
+WORKED EXAMPLE
+If Mongo update throws after delivery, entry is unacknowledged. Whether another process retries it depends on a reclaim mechanism not shown here; no runtime test was done.
+
+SOURCE
+BountyHub-main/server/src/workers/syncWorker.js:62-89
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/workers/syncWorker.js#L62-L89
+
+async function processMessage(messageId, fields) {
+  const type = fields.type;
+  const data = JSON.parse(fields.data);
+
+  if (type === 'BOUNTY_DELETED') {
+    await BountyCatalog.deleteOne({ bounty_id: data.bountyId });
+    logger.info(`[sync] removed bounty ${data.bountyId} from catalog`);
+    return;
+  }
+
+  const bounty = await fetchBounty(data.bountyId);
+  if (!bounty) {
+    logger.warn(`[sync] bounty ${data.bountyId} not found in PG — skipping`);
+    return;
+  }
+
+  if (['COMPLETED', 'CANCELLED'].includes(bounty.status)) {
+    await BountyCatalog.deleteOne({ bounty_id: bounty.id });
+    logger.info(`[sync] removed closed bounty ${bounty.id} from catalog (status=${bounty.status})`);
+    return;
+  }
+
+  const doc = buildCatalogDoc(bounty);
+  await BountyCatalog.findOneAndUpdate(
+    { bounty_id: bounty.id, university_id: doc.university_id },
+    { $set: doc },
+    { upsert: true, new: true }
+  );
+
+The excerpt parses the event, fetches from PostgreSQL, removes closed entries, or upserts the catalog. The loop acknowledges only after success. The missing question is how old pending entries are reclaimed.
+
+LIMIT
+Pending is not the same as a verified retry. The restart comment does not establish cross-consumer recovery.
+
+TEST EVIDENCE
+No crash, recovery, or duplicate-event test was run. Kill a consumer after delivery before XACK, restart another, verify reclaim, and ensure repeated upsert converges to one document.
+
+SPEAKABLE ANSWER
+The active worker is `server/src/workers/syncWorker.js`. It reads new entries with XREADGROUP, calls `processMessage`, and XACKs only after it returns. If processing throws, it logs and leaves the entry unacknowledged. The message is pending in the group, but this loop does not show XAUTOCLAIM or XPENDING recovery for another consumer to take it over. A comment says Redis will redeliver on next startup; I would verify pending-entry handling before promising that. I would add explicit reclaim with idle time and attempt limits, plus idempotent Mongo upserts. This is static review; I did not crash or restart a worker. I would also inspect the consumer group state during the test: a pending entry belongs to a consumer until it is reclaimed or acknowledged. The test should distinguish a new message from an old pending one, and should verify both recovery ownership and the final Mongo document.
+
+SELF-CHECK
+A worker dies after XREADGROUP delivers an entry but before Mongo completes. What state should recovery inspect?
+The consumer group pending list, including consumer owner and idle time. The inspected loop lacks an explicit reclaim call, so pending state needs deliberate recovery rather than an assumed redelivery.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What does Redis track after worker exit?
+The group tracks the delivered item as pending under that consumer. A reclaim operation must make idle work available elsewhere; this loop reads new entries with `>`. Redis consumer groups keep failed delivered entries in a pending list; `>` asks only for new entries. So a restarted process reading `>` may process future work while the old item remains assigned to its former consumer. I would add an explicit claim pass using idle time and test the transition before describing retries.
+
+1.1. What idle threshold should the claim loop use?
+Set it above the normal high-percentile processing time plus expected pauses, so a slow but healthy consumer is not duplicated. Then reclaim in bounded batches and monitor ownership changes. A shorter threshold improves recovery time but increases duplicate execution risk. I would measure processing duration, inject a slow Mongo write, and verify a second worker does not claim prematurely. A production reclaim loop should expose claimed-message counts and processing age so operators can distinguish slow work from abandoned work. A production reclaim loop should expose claimed-message counts and processing age so operators can distinguish slow work from abandoned work.
+
+1.1.1. What if the original consumer resumes after its entry was claimed?
+Both workers might finish the same message. The projection update must therefore be idempotent, and any side effect beyond the Mongo upsert needs its own deduplication. A lease or ownership token can reduce duplicate work, but it cannot replace idempotency after pauses. I would test a deliberately paused first worker that resumes after reclaim and assert one logical document and no duplicate external effect.
+
+2. How handle poison messages?
+Use bounded attempts, metrics and logs, then quarantine persistent failures in a dead-letter stream with event context. That is a proposed design. The active worker reads from the PostgreSQL replica when it rebuilds or processes an event. A create event can arrive before the replica exposes the new bounty, causing `fetchBounty` to find nothing and the worker to return; that path then reaches XACK. This is a concrete freshness window worth testing.
+
+2.1. What happens if `fetchBounty` returns no row?
+The current code logs a warning and returns from processing, after which the loop acknowledges the message because no exception escaped. That means a temporary replica lag can turn into a skipped projection update rather than a pending retry. I would either fetch the primary, retry missing rows with bounded backoff, or schedule a durable reconciliation. A delayed-replica test should verify the event eventually appears in Mongo.
+
+2.1.1. Would you retry every missing record forever?
+No. A deleted or permanently invalid aggregate should not block the whole stream. I would distinguish expected deletion from replication delay, use a bounded retry window, and route exhausted events to quarantine with event ID and reason. A periodic full rebuild or targeted repair provides another recovery path. The decision needs metrics for not-found events and tests for both lag and true deletion.
+
+3. How avoid duplicate projection effects?
+The upsert key uses bounty and university IDs, which helps repeated writes converge. I would still test event ordering and deletes, and add stable event IDs for consumer deduplication. The process can also receive a duplicate after a retry or rebuild. The upsert filter includes bounty and university IDs, which gives a stable key, but that alone does not order old and new event payloads because the worker refetches the current aggregate. That current-state read helps, while replica lag remains a caveat.
+
+3.1. Why does refetching current state change duplicate handling?
+The event acts as a signal to refresh an aggregate rather than a complete state snapshot. Reprocessing can fetch the latest row and upsert the same document, which often converges. But if the replica is behind, an older view can overwrite newer catalog content. I would compare updatedAt or a monotonic version and refuse older projections, then test delayed events around rapid updates.
+
+3.1.1. Where should the monotonic version come from?
+Prefer a database-maintained revision or an update timestamp whose ordering semantics are explicit; wall-clock timestamps can tie or skew across writers. The projection can store the applied version and conditionally update only when the incoming version is newer. I would test equal, older, and newer versions and include deletes as tombstones so stale upserts cannot resurrect a removed bounty. I would keep the version comparison in the Mongo write condition so an old worker cannot overwrite a newer document after a pause. I would keep the version comparison in the Mongo write condition so an old worker cannot overwrite a newer document after a pause.

@@ -1,0 +1,98 @@
+Resume Builder Agent | Card 10
+Difficulty: Advanced
+
+QUESTION
+What concurrency guarantee does a V2 session revision provide?
+
+WHY THIS QUESTION MATTERS
+Tests server-side session ownership, revision tokens, per-session locking, stale-write rejection, and derived-result invalidation.
+
+CONTEXT
+Two tabs can display the same old resume. If each tab submits an edit, how does the server detect that the second tab used stale information? A revision number labels the version a tab saw. The request must send that number for the check to matter.
+
+TERMS
+optimistic concurrency: Detecting conflicts using an expected version at mutation time.
+if_match: The revision a caller expects before an edit is applied.
+derived artifact: A result such as attribution computed from document and target state.
+
+MECHANISM
+1. Read a snapshot with document and revision, then send that revision with the intended edit. The server must check and apply the change within the same protected mutation boundary.
+2. On success, advance revision and clear dependent attribution. On mismatch, return a conflict and authoritative state so the client can decide how to resynchronize.
+3. Test absent as well as stale tokens: the current check returns immediately for None. Requiring a token is a stronger policy than merely supporting one.
+4. Treat the asyncio lock as coroutine coordination inside one process. Multiple app processes need shared storage and a cross-process conflict mechanism.
+
+TECHNICAL EXPLANATION
+The revision contract separates a client’s editing interval from the short mutation critical section. It can prevent a supplied stale version from silently overwriting a newer edit, provided every relevant route performs the check under the same lock. The helper itself permits an absent revision, so the guarantee is conditional rather than universal. A successful mutation should invalidate derived artifacts, while a rejected mutation should leave document and revision unchanged. Target changes can invalidate scoring state even without changing document text, so document revision is not the only cache input. In-memory session identity and process-local locks do not create distributed coordination or durable persistence. If the deployment grows to several workers, use an authoritative compare-and-update mechanism and define session routing. The user-facing conflict flow matters too: simply retrying a stale edit with a new revision can still overwrite someone else’s intent without reconciliation.
+
+WORKED EXAMPLE
+Two tabs read rev7. Tab A submits if_match7 and commits rev8. Tab B’s if_match7 must conflict. If B omits the token, the current helper does not reject it for staleness, which is why the policy should not be described as unconditional lost-update prevention.
+
+SOURCE
+resume-builder-agent/v2/src/rba_api/sessions.py:95-112
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba_api/sessions.py#L95-L112
+
+        if baseline is not None:
+            self.baseline_doc = baseline
+        self.rev += 1
+        self._invalidate_derived()
+        return self.rev
+
+    def check_rev(self, got: int | None) -> None:
+        if got is None:
+            return
+        if got != self.rev:
+            raise RevisionMismatch(self.rev, got)
+
+    def bump(self) -> int:
+        self.rev += 1
+        self._invalidate_derived()
+        return self.rev
+
+    def set_target(self, *, jd_text: str, role_key: str,
+
+Trace the data entering this boundary, the state it returns, and the conditions that limit its guarantee.
+
+LIMIT
+An omitted revision bypasses the helper check; in-process locks do not create cross-process consistency.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+A V2 session revision detects stale edits when a client supplies if_match. Under the session lock, the route checks the expected revision, applies the mutation and increments revision while invalidating derived results. A stale token can return a conflict so the client reloads instead of overwriting newer work. However, check_rev accepts None, so omitted tokens bypass that guard. The lock and session store are also process-local. I would describe this as optional optimistic conflict detection within one process, not durable multi-user transaction isolation. Strengthening it means requiring revision tokens where needed and coordinating state before adding independent app workers.
+
+SELF-CHECK
+Does an asyncio lock prevent two independent server processes from overwriting each other’s session state?
+No. Each process has its own lock and in-memory store. A multi-process deployment needs shared authoritative state or an explicitly constrained routing model, plus a conflict check enforced at that shared boundary.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What happens when two clients submit edits from the same revision?
+The first participating mutation checks its revision under the lock, applies the change and advances the revision. The second then has a stale token and should receive a conflict rather than silently replacing newer state. The user-facing client must reconcile intent; simply retrying with the latest token can still overwrite work.
+
+1.1. What if a caller omits its revision?
+The current check_rev helper returns for None, so absence bypasses that stale-version check. The guarantee is conditional on callers supplying and routes enforcing the token. If lost updates are unacceptable, require a revision at the schema or mutation boundary and test absent, stale and current cases explicitly.
+
+1.1.1. Why align schema validation and mutation policy?
+A helper that supports version checking does not help if the request contract permits bypassing a required protection. Make the input requirement visible and enforce it before changing state. Preserve useful conflict responses and test the public endpoint. Internal method tests alone cannot prove every caller uses the intended policy.
+
+2. Why clear attribution when the document changes?
+Attribution describes each line’s effect under a specific document and target. An edit can alter interactions, ordering or truncation, so retaining the previous result can make the UI show a stale explanation next to current text. A successful mutation should invalidate or version that derived state; rejected mutations should not alter the authoritative document.
+
+2.1. Can changing only the target also invalidate results?
+Yes. Dense similarities, skill matches and leave-one-out effects depend on the target even with identical document text. Reset or key those results by target identity. A document-only revision or signature does not automatically capture that change, so the cache contract must name all inputs used by each artifact.
+
+2.1.1. How should the UI handle an older score response arriving after a newer edit?
+Associate the response with the input revision or signature and target it scored, then avoid displaying it as current if those no longer match. This is a proposed UI consistency rule to verify in the actual frontend. A correct scorer can still look wrong when asynchronous responses are applied out of order.
+
+3. Why does an asyncio lock not coordinate separate server workers?
+Each worker has its own Python memory and lock object. A lock acquired in one process says nothing about a mutation in another. With in-memory sessions, another worker may not even know the session ID. Explicitly constrain routing or introduce shared authoritative state and compare-and-update semantics before claiming multi-worker consistency.
+
+3.1. Would a shared database automatically preserve the current API semantics?
+No. You must define atomic mutation, conflict detection, transaction boundaries and what is returned after a mismatch. The database can enforce a revision predicate, but the application still needs to update derived-state identity and reconcile clients. Persistence is infrastructure for the contract, not a replacement for specifying it.
+
+3.1.1. What would you test during a move to shared state?
+Use two independent app instances editing the same session version, a process restart, a target change and a rejected stale edit. Assert the committed document, revision and derived-state validity. Include deletion and expiration behavior. These tests exercise the promised failure boundaries rather than assuming the in-process test suite proves a distributed deployment.
+
+OPTIONAL PRACTICE RESOURCES
+Structured Outputs and Validation (LangGraph: From LangChain User to Agent Builder - AI-Powered Course): https://www.educative.io/courses/langgraph-from-langchain-user-to-agent-builder/structured-outputs-and-validation

@@ -1,0 +1,101 @@
+Resume Builder Agent | Card 01
+Difficulty: Advanced
+
+QUESTION
+How would you explain the Resume Builder’s architecture, and what actually runs when I click Build?
+
+WHY THIS QUESTION MATTERS
+Tests whether I can distinguish the submitted CLI graph from later UI and API paths.
+
+CONTEXT
+Imagine two buttons. Import asks, “What projects can I add?” Score asks, “How well does this draft match this job?” They share the editable resume, called ResumeDoc. One path proposes bullets from GitHub. The other computes a number from the bullets you chose. Learn that difference before counting graph stages.
+
+TERMS
+AgentState: The accumulated data passed between workflow stages, such as facts, summaries and document.
+AST: A parsed representation of source syntax; it records structure without running the code.
+claim: A candidate factual sentence that needs support from the retained evidence.
+SSE: Server-sent events: progress messages sent from the server to the browser.
+full_run: The graph-state flag that enables the four extra CLI stages after document conversion.
+permalink: A source link tied to a commit and, when located, a line range.
+
+MECHANISM
+1. Start with a GitHub username. FastAPI starts a job. Server-sent events send progress to the browser. The browser checks credentials before entering the graph; in this revision its Groq check can block even when Ollama is selected.
+2. Choose the input. connect_github selects the GitHub backend and generation client. list_repos keeps public repositories. select_repos can use Jev and resume similarity to prioritize repositories.
+3. Read and organize the evidence. fetch_facts reads a bounded sample including source files. prepare_evidence builds an index of Python definitions, calls and routes. The prompt gets a smaller bundle than the parser sees.
+4. Draft and check. The model proposes a sentence with a supporting quote. Plain Python checks numbers, paths, quote presence and relevance. Some checks can miss incorrect meaning. The safety scan is a separate, limited check.
+5. Convert to an editable resume. The browser stops after build_document, stage nine. Full CLI mode runs four more stages. The browser saves results to the session and can show the claims in the Evidence tab.
+6. Score after editing. The local scorer reads the enabled bullets and the job description. It returns the matching score. It does not call the import model again.
+
+TECHNICAL EXPLANATION
+Read the implementation as a series of data boundaries. Before graph execution, credential preflight can reject the request. During execution, Runner holds clients while nodes return updates to AgentState: repos becomes selected, selected becomes facts, facts becomes repo_graph, summaries become checked claims, and document becomes the browser-facing result. The node names describe stages, not one HTTP request each. fetch_facts can make several GitHub reads per repository, and summarize_repo processes the selected repositories. Selection itself can use a separate Jev service; the generation request is deliberately postponed until after selection. The GitHub backend is configured, so MCP is the tool transport when that backend is used, rather than an unconditional property of every run.
+
+prepare_evidence and summarize_repo solve different problems. AST parsing extracts observed source structure without inventing prose. The model then turns retained evidence into a human-readable description and claims. The AST index only covers fetched Python text, cannot resolve imports or dynamic dispatch, and may be removed from the prompt under budget. The verifier adds rule-based support checks and a location trail. Neither AST extraction nor a valid permalink establishes performance, ownership or full semantic entailment. Also, safety_scan records findings on its implemented scope; it is not a complete sanitization gate over the newly fetched code.
+
+At build_document, rejected claims are omitted; unresolved claims retain an unverified status. In an empty session they can still be enabled, so an editable document is not automatically an approved final resume. The conditional edge then stops the browser or continues the CLI. The API merges the import under a session lock and increments revision. Later score requests compare the selected text with a target using the local scorer, while compare in the CLI produces separate role-fit advice. SSE makes progress observable; SQLite caches responses; neither makes the in-memory session/job or uncheckpointed graph durable. The practical improvement is one orchestration path and more inspectable evidence. A stronger claim about output accuracy or latency needs a fresh measured comparison. In this snapshot the import retains the AST index beside the claims in the session. The evidence route reads that saved state instead of fetching GitHub again. This separates editing a resume from inspecting how the import reached a decision. PDF upload follows another path: pypdf supplies prose and pdfplumber supplies detected tables. Both can produce a ResumeDoc, but neither runs a GitHub import.
+
+Provider choice is a separate decision from the browser/CLI split. Runner.connect picks Groq or Ollama from process configuration; the same downstream nodes call the same structured-output method. Browser preflight is still Groq-oriented. It can reject a missing or invalid Groq key before reaching that branch. This is not a browser-only, no-Groq-key deployment guarantee.
+
+WORKED EXAMPLE
+Use a project that defines a POST /score route. Import can suggest a bullet about the endpoint and locate a supporting quote. It cannot infer a 40% speed gain from that route. After toggling the bullet, Score compares the enabled text with the job description; it does not fetch the repo again.
+
+SOURCE
+resume-builder-agent/v2/src/rba/graph.py:203-212
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/graph.py#L203-L212
+
+    g.add_edge(START, "connect_github")
+    for a, b in [
+        ("connect_github", "list_repos"),
+        ("list_repos", "select_repos"),
+        ("select_repos", "fetch_facts"),
+        ("fetch_facts", "prepare_evidence"),
+        ("prepare_evidence", "safety_scan"),
+        ("safety_scan", "summarize_repo"),
+        ("summarize_repo", "verify_claims"),
+        ("verify_claims", "build_document"),
+
+Follow the left and right stage names in each pair. The work starts at connect_github and reaches build_document before the one conditional edge. Scoring is not a node in this import path.
+
+LIMIT
+A richer evidence trail does not establish measured output quality. AST coverage is partial; selection can use Jev; safety_scan omits source_files content; unresolved claims can remain enabled; no durable import resumption is configured.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+I separate two jobs. Import turns public GitHub projects into editable resume suggestions. FastAPI starts a job and streams progress. The graph selects repos, reads bounded source, prepares evidence, asks a model for drafts, checks the claims and builds the document. Groq is the default; Ollama is an optional generation client. There are thirteen registered nodes. The browser runs nine; full CLI mode runs four more. Both paths use the same graph. The Evidence tab shows the claims and their available source locations. Local scoring is a separate path: it compares the enabled resume text with a job target. It does not generate resume bullets or prove a claim is true. The shared document is editable, and the session is kept in memory.
+
+SELF-CHECK
+If a browser import completes, did it execute all thirteen registered graph nodes? Explain the stopping rule.
+No. The browser omits full_run and stops after build_document, its ninth node. A V2 CLI full run sets full_run and continues through build_resumes, compare, plan_improvements and report. The node registrations and actual traversed path are different counts.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Can you show exactly why browser Build runs nine stages rather than thirteen?
+Start at connect_github and follow the fixed edges through list_repos, select_repos, fetch_facts, prepare_evidence, safety_scan, summarize_repo, verify_claims and build_document. The next edge is conditional. _after_document returns END when full_run is absent or false. Only a true value enters build_resumes and the remaining three CLI stages. So thirteen counts available named stages, while nine counts the successful browser path. This distinction also prevents reporting four skipped stages as browser latency.
+
+1.1. How would you test that routing rule without calling GitHub or Groq?
+Use an instrumented Runner whose async methods record their names and return minimal state updates. Compile the actual graph and execute it once without full_run and once with it true. Assert the exact ordered visits: nine for browser input, thirteen for full input. Give build_document a recognizable output and assert the browser returns it. This checks the routing contract without provider access; it does not establish that the real node implementations generate correct claims.
+
+1.1.1. If that routing test passes, what still needs testing?
+Each node still needs tests for its own inputs, outputs and failures. For example, verify_claims needs invalid-path and unsupported-number cases, while the import driver needs tests that streamed values supply the final document and that clients close on failure. A path test can pass even if a fake node returns incorrect content. Keep workflow traversal, content correctness and observed performance as separate claims with separate evidence.
+
+2. Why does adding source structure improve the answer rather than merely adding more prompt text?
+A README can say what a project intends, while a source definition shows an implemented shape at a particular snapshot. For example, a route decorator and handler body can support a narrower statement about an API entry point. prepare_evidence extracts such structure deterministically before the model writes prose. The gain is inspectability and better possible grounding. It is not automatic correctness: only selected Python files are indexed, and the compact structure can be dropped under the prompt budget.
+
+2.1. What is the difference between that static call map and a runtime trace?
+The static map records syntax in the fetched text, including caller and callee names. It does not execute requests or resolve all imports, receiver types and dynamic dispatch. Two functions with the same name can therefore be confused. A runtime trace observes what actually happened for one execution, with its inputs and environment, but still does not cover every path. Use the static map to find source to inspect; use controlled execution evidence for a claim about an observed request.
+
+2.1.1. Where should uncertainty about missing source appear in the final explanation?
+Keep the source budget and partial_source gaps visible when describing coverage. If a long file was truncated and cannot parse, that is an inspection gap rather than evidence that the full repository lacks a function. If a claim requires code outside the retained bundle, ask for that code or narrow the statement. The current verifier's checks are heuristic, so the user must review meaning and ownership even when a path and quote pass.
+
+3. What runs when I edit a bullet and request a new score?
+The service scores the current selected document against the resolved job target. It uses local dense embeddings, BM25 lexical overlap and skill matching, rather than asking Groq to summarize the project again. With all channels available, their nominal weights are 0.5, 0.2 and 0.3. This is a document-target matching proxy. Import verification answers whether project claims have support; scoring answers how the document matches the target. Neither substitutes for the other.
+
+3.1. Why can the graph's compare node not be described as that same score?
+The CLI comparison uses a hand-written role-fit rubric on its generated role resumes. It does not receive the user's actual job description required by the matching service, so it is labeled role-fit advice. Similar display scales do not make the formulas equivalent. Also, selecting a preset role in the workbench resolves a synthetic target for the actual scorer; that is different from silently treating the CLI advice rubric as JD-based matching.
+
+3.1.1. If an unsupported bullet improves the matching score, should I keep it?
+No. Adding target keywords can increase overlap even when the statement is false or misattributes someone else's work. Check factual support, ownership and readability before accepting an edit. Compare any delta under the same target and active channels, and disclose missing dense scoring or truncation. A score improvement can help choose between truthful alternatives; it cannot supply missing benchmark evidence or turn an unverified claim into an accomplishment.
+
+OPTIONAL PRACTICE RESOURCES
+Structured Outputs and Validation (LangGraph: From LangChain User to Agent Builder - AI-Powered Course): https://www.educative.io/courses/langgraph-from-langchain-user-to-agent-builder/structured-outputs-and-validation

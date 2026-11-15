@@ -1,0 +1,71 @@
+Behavioural & Experience | Card 04
+Difficulty: Advanced
+
+QUESTION
+For the telemetry and workload-identification bullets, what did you design, and did you actually train a model?
+
+WHY THIS QUESTION MATTERS
+Preserve the boundary between analyzed signals, proposed actions and implemented machine learning.
+
+CONTEXT
+Workload identification sounds like machine learning, but a designed feature is not a trained classifier. The resume support says the approach was designed and no model was built. A technical discussion should distinguish target labels, traffic features, evaluation splits, and operational action. It should also separate recommending an action from controlling network hardware.
+
+TERMS
+label leakage: Information about the target leaking into evaluation inputs or splits.
+control loop: Repeatedly observing state, deciding an action and checking its effect.
+
+MECHANISM
+1. Define an independent workload label and record how it was obtained before fitting any model.
+2. Split by host, session, or time to prevent related traffic from leaking across train and test.
+3. Compare against a simple heuristic, inspect per-class errors and drift, and require policy and rollback before automation.
+
+TECHNICAL EXPLANATION
+Be explicit about the project’s actual stage. Explain the proposed signal-to-decision chain, then say which components were not implemented or measured. An interviewer may test whether you understand how to validate the idea; outline label provenance, leakage-aware splitting, baseline comparison, and a human review path for unseen patterns. For telemetry actions, identify authorization, rollback, and outcome monitoring as prerequisites rather than implied capabilities. Add the true artifact you personally produced and avoid claiming a trained model, automatic remediation, or an accuracy number. The distinction between thoughtful design and deployed behavior is a strength when stated clearly. Keep every proposed evaluation step visibly separate from an experiment that was actually run. That distinction protects both the interviewer and the user clearly.
+
+WORKED EXAMPLE
+Illustrative confounder: both an AI-training job and a conventional transfer can produce high traffic volume. Volume alone cannot establish the workload class; a proposed feature needs testing against such counterexamples.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Do not imply a trained model, automatic corrective-action execution or measured classification accuracy.
+
+TEST EVIDENCE
+Confirmed the designed/no-model-built boundary in the existing work map. No training, hardware execution or labeling experiment was performed for this atlas.
+
+SPEAKABLE ANSWER
+I designed the reasoning from health signals and traffic patterns to possible diagnoses and actions. I did not build a trained workload-identification model. The honest distinction is between a proposed feature or decision rule and a validated classifier. My resume's workload idea was to infer behavior from traffic rather than trust self-reported identity. To make that a measured model claim, I would need labeled examples, a split that avoids leakage, a baseline, and performance under changing workloads. Similarly, a table mapping telemetry to corrective actions is not evidence that those actions ran automatically on hardware. [FILL BEFORE INTERVIEW: state the exact analysis or artifact you personally produced, any true prototype you implemented, and which action paths were never executed.] I can explain the design choices and their risks without claiming an ML or hardware deployment that the accessible record does not establish.
+
+SELF-CHECK
+If labels come from the same threshold rules used as features, what can the evaluation establish?
+It can show that a model reproduces those rules, not that it identifies real workload behavior. I would seek an independent source of truth or describe the work as rule emulation, and avoid presenting test accuracy as external validity.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What labels would a workload classifier need before training?
+It needs an independent source of workload truth. If labels are generated from the same traffic thresholds used as features or rules, the model may only reproduce the labeling heuristic. I would define the target, label provenance, and uncertain cases before training. The accessible work map says no trained model was built.
+
+1.1. How would you split the labeled data?
+Group related flows by host, session, or time so near-identical observations do not appear in train and test. A temporal holdout can expose behavior changes. I would compare with a simple heuristic baseline and report per-class errors, not only one aggregate accuracy number.
+
+1.1.1. What if some workload labels are unreliable?
+Keep an uncertain category or review queue rather than forcing a class. Measure how performance changes when uncertain labels are excluded or adjudicated. If label quality is weak, I would improve the collection process before tuning model architecture; otherwise training can make the system confidently reproduce bad labels.
+
+2. How would you detect when a traffic signature changes?
+A behavior inferred from traffic can drift when software, routing, or usage patterns change. I would log feature distributions and prediction confidence by time and source, then compare them with verified outcomes. A change detector can prompt revalidation, but it does not identify the cause by itself. No such trained detector is established by this project record.
+
+2.1. Would a distribution shift automatically mean the model is wrong?
+Not necessarily. A shift is a signal to inspect, not proof of degraded decisions. Evaluate labeled recent cases and compare decision costs; a shift can be harmless or can expose a missing class. I would define the escalation threshold from validation performance and use review rather than automatic retraining.
+
+2.1.1. How would you handle a new, unseen workload?
+Allow abstention or a low-confidence review path, preserve the observed features, and collect a label from a trusted source. Do not force the nearest known class if that could trigger the wrong action. [FILL BEFORE INTERVIEW: add only an actual prototype behavior if one existed.]
+
+3. What separates an action recommendation from an executed control loop?
+An action path needs verified inputs, a policy that permits the action, an actuator, outcome observation, and a rollback or safe-stop plan. A table mapping telemetry to actions only expresses a design. I would identify what I personally implemented and tested, and avoid saying the system autonomously changed hardware.
+
+3.1. What checks should precede an automated network action?
+Validate the signal, target, permissions, blast radius, and expected effect; require approval for high-impact changes; then use a staged rollout with monitoring and rollback. These are design controls, not claims about the confidential project. The action should be idempotent or guarded against repeated execution.
+
+3.1.1. How would you prove the action helped?
+Compare observed outcomes with a baseline or controlled rollout, track unintended effects, and retain a trace from input signal to action and result. If the action was only proposed, say evaluation remains future work. Do not convert a plausible operational metric into a measured result.

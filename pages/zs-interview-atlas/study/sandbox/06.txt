@@ -1,0 +1,108 @@
+Sandboxed Code-Execution Agent | Card 06
+Difficulty: Advanced
+
+QUESTION
+What is actually portable between the `opus` and `ollama` providers?
+
+WHY THIS QUESTION MATTERS
+Tests provider abstraction boundaries, model capability assumptions, and observability claims.
+
+CONTEXT
+A factory switch can select different providers while their tool-call semantics still differ. The wrapper, SDK, retry behavior, schema support, and observability all affect portability.
+
+TERMS
+provider abstraction: A common interface used to select among model backends
+pseudo-tool parsing: Extracting tool calls from free-form model text
+logical invocation: One model call from the graph’s point of view
+
+MECHANISM
+1. Inspect how each provider is constructed and how tools are bound.
+2. Compare argument schemas, multi-tool responses, malformed calls, and timeout handling.
+3. Distinguish a logical graph invocation from transport attempts beneath it.
+4. Use a fixed evaluation set and trace one run end to end before claiming equivalence.
+5. For example, compare one valid tool call, one malformed argument object and one mixed-result batch through both adapters. The same schema signature does not establish identical provider behavior, and no live cross-provider experiment was run in this audit.
+
+TECHNICAL EXPLANATION
+The shared LangChain BaseChatModel interface hides some invocation differences, but schema conversion, native tool-call support, pseudo-tool parsing, proxy endpoints, and model output behavior remain provider-specific. Tests need a provider matrix that covers tool schemas, malformed outputs, errors, and retries. A logical graph call is also distinct from underlying transport retries, so one graph call does not imply one HTTP request. The `opus` branch uses a proxy wrapper and `ollama` uses ChatOllama, but both flow through a shared graph abstraction. Test provider differences in required and optional fields, nested arguments, parallel calls, malformed output, timeout and retries. A logical `invoke` may trigger multiple transport attempts, and a timeout can leave tool-call delivery ambiguous. Use stable call/business idempotency keys for side effects and inspect actual traces; factory selection alone proves neither request count nor observability.
+
+WORKED EXAMPLE
+Switching the environment value to ollama changes the model backend, but it does not prove an identical tool-call success rate or equal behavior across models.
+
+SOURCE
+sandbox-agent/llm/factory.py:10-36
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/llm/factory.py#L10-L36
+
+def get_chat_model() -> BaseChatModel:
+    provider = os.getenv("LLM_PROVIDER", "opus").lower()
+
+    if provider == "opus":
+        from llm.client import AnthropicProxyClient
+        from llm.langchain_wrapper import AnthropicProxyChatModel
+
+        client = AnthropicProxyClient(
+            base_url=os.getenv("OPUS_BASE_URL", "https://opus.abhibots.com"),
+            api_key=os.getenv("OPUS_API_KEY"),
+            model=os.getenv("OPUS_MODEL", "claude-sonnet-4-20250514")
+        )
+        return AnthropicProxyChatModel(client=client)
+
+    elif provider == "ollama":
+        from langchain_ollama import ChatOllama
+
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        model = os.getenv("OLLAMA_MODEL", "llama3.2")
+        return ChatOllama(
+            base_url=base_url,
+            model=model,
+            temperature=0.7,
+        )
+
+    else:
+        raise ValueError(f"Unsupported LLM_PROVIDER: {provider}. Use 'opus' or 'ollama'.")
+
+The factory selects two backend construction paths based on an environment variable. I would call out the shared interface and separately name the wrapper and tool-call behavior that need compatibility testing.
+
+LIMIT
+Provider selection exists, but seamless behavioral portability and tracing completeness are not established by this factory alone.
+
+TEST EVIDENCE
+I statically inspected the factory, wrapper, and tracing setup; no provider matrix or fresh trace capture was run.
+
+SPEAKABLE ANSWER
+In `llm/factory.py:get_chat_model`, the default `opus` path wraps an Anthropic-compatible proxy, while `ollama` returns ChatOllama. The model choice is configurable, but tool calling and response parsing still depend on provider capabilities and the custom wrapper in `llm/langchain_wrapper.py`. So I would say the factory offers a provider switch, not proven drop-in portability. The graph’s calls are model invocations, not a count of every HTTP attempt; retries can exist below that layer. Tracing configuration is present in the harness, but I would verify recorded traces before claiming full observability.
+
+SELF-CHECK
+Both providers accept the same tool schema but one emits malformed arguments. Are they drop-in compatible?
+No. Matching construction interfaces do not prove equal behavior. Compatibility also includes valid dispatch, recovery, latency, and task outcomes; no provider matrix was run here.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What compatibility tests would you run before switching providers?
+Test valid and invalid tool schemas, multi-tool responses, malformed text fallback, timeouts, retries, and representative prompts against both backends; compare task success and latency.  The provider switch does not normalize every capability. The graph binds tools through LangChain, while the proxy wrapper converts tool calls into provider-specific payloads; Ollama may differ in schema support or malformed-output handling. I would test equivalent tool tasks rather than infer portability from matching method names.
+
+1.1. Which compatibility cases would you include?
+Test required and optional arguments, arrays and nested objects, multiple tool calls, malformed arguments, text-only responses, timeout, and a tool result containing an error. Use identical prompts and schemas against both providers, then compare valid dispatch rate and task outcome. The factory provides a switch, but this audit did not run a provider matrix or establish equal behavior. Include a multi-tool response and malformed arguments.
+
+1.1.1. What metric would you use beyond successful parsing?
+Track task completion, invalid-call rate, unnecessary tool calls, latency, token or compute cost, and recovery after a failed tool. A provider can parse the schema but choose different tools or arguments. I would use a fixed evaluation set with expected state changes and human review for answer quality, not only a schema-validity count. A valid schema is only one dimension of provider compatibility.
+
+2. Can you claim one LLM call per agent step?
+I can call it one logical model invocation in the graph. I cannot equate that with one network request because wrapper or transport retries may issue additional requests.  The proxy’s transport retry behavior is separate from the graph’s logical model step. A timeout can leave ambiguity about whether the provider processed the request; retries may add cost or duplicate a non-idempotent external action if tool calls are replayed.
+
+2.1. How do you prevent a transport retry from duplicating a tool action?
+Separate model request retries from tool execution and give each tool call a stable call ID. Before executing a mutating tool again, consult an idempotency record or make the operation itself idempotent. The graph should not infer that a timeout means the model did nothing. I would test a provider timeout after it has returned a tool call but before the client receives the full response.
+
+2.1.1. Should the tool-call ID be enough for deduplication?
+Only if it remains stable across provider retries and is persisted with the execution result. If a retry generates a new ID, use a business idempotency key derived from the intended operation. I would store call status and output under that key, then return the existing result on duplicate delivery. This is a design recommendation; the inspected flow does not establish durable tool-call deduplication.
+
+3. What trace evidence would you inspect?
+I would follow a trace from user input through graph node, provider request, tool call, and result, then check failures and sensitive-data handling. Configuration flags alone do not prove complete or safe tracing.  Tracing config can capture model and tool spans, but a configured callback does not prove every transport retry or host-side browser action appears in the trace. I would follow one run end to end and inspect omissions and redaction.
+
+3.1. Which fields should be redacted from traces?
+Treat prompts, tool arguments, HTTP headers, workspace paths, and returned file contents as potentially sensitive. Prefer IDs, sizes, status classes, timing, and sanitized error categories; allow explicit secure capture only when required. I would verify redaction with a sentinel secret passed through a test tool and inspect the stored trace. The audit saw configuration, not a complete trace sample. Check the callback chain at the provider wrapper too.
+
+3.1.1. How would you know a trace is complete?
+Compare graph events with provider request logs, ToolMessage IDs, and external effect records for a controlled run. Gaps between these systems identify blind spots. I would also test failures and retries because happy-path traces often omit the hard cases. Completeness is relative to a defined event model; no single callback configuration proves every layer is captured. A missing span is a tracing gap, even if the run succeeded.
+
+OPTIONAL PRACTICE RESOURCES
+Sampling Strategies (Grokking the Generative AI System Design Interview - AI-Powered Course): https://www.educative.io/courses/generative-ai-system-design/sampling-strategies

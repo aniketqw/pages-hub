@@ -1,0 +1,76 @@
+JD / Domain | Card 16
+Difficulty: Intermediate
+
+QUESTION
+How would you use Git, tests and a reproducible environment to deliver an AI change another engineer can review?
+
+WHY THIS QUESTION MATTERS
+Supplied JD: version control, readable testable Python, delivery quality and collaboration.
+
+CONTEXT
+Reviewable delivery requires more than a code diff. Another engineer needs the changed behavior, reproducible inputs, meaningful checks and clear limits on what the evidence establishes.
+
+TERMS
+commit: An identified snapshot of tracked repository content and history.
+fixture: A controlled input used to check a behavior repeatedly.
+integration test: A test of components interacting across a real interface.
+
+MECHANISM
+1. Isolate a coherent change in a branch and focused commits. Define the public trigger and result so reviewers can judge behavior rather than reconstruct intent from helper functions.
+2. Pin or record dependencies, data and model identities. Separate deterministic offline tests from service integration and task evaluation, because each exercises a different boundary.
+3. Write a handover with exact commands, actual results and known limitations. Check untracked files and external state; source rollback alone cannot undo every database or publication side effect.
+
+TECHNICAL EXPLANATION
+A commit identifies tracked source; it does not capture untracked files, secrets, external services or an unpinned model endpoint. A dependency lock narrows package versions, but platform-specific binaries and environment variables may still affect execution. Separate a deterministic transformation test from an integration test that calls a provider. A fake verifies your request and response contract, while the integration test verifies compatibility with the actual service. Both can pass while the task metric regresses, so an AI-facing change also needs an evaluation appropriate to its behavior. Small commits improve review and rollback when they form coherent, runnable changes. Reverting source does not automatically undo a database migration or a published side effect; explain any operational rollback step. Evidence should name the command, revision, dataset and limits, so the reviewer can judge the strength of the result.
+
+WORKED EXAMPLE
+A parser change passes a fake-provider unit test but fails on a saved real response with an optional field. Preserve that sanitized response as a regression fixture, fix the parser contract and report both the offline result and whether a live compatibility check was run.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+This is conceptual preparation and a proposed method, not a claim that I trained or deployed this system.
+
+TEST EVIDENCE
+Reasoning and illustrative examples reviewed; no training, provider experiment or deployment was performed for this lesson.
+
+SPEAKABLE ANSWER
+I would make the behavior change small and state its trigger, expected result and failure cases. A branch and focused commits make the diff reviewable. I record the code revision, dependency environment, model or artifact identity, relevant settings and evaluation dataset version. Tests should exercise the changed contract, with offline fakes for paid or unreliable services and separate opt-in integration checks. I keep credentials and private inputs out of commits and logs. The review description explains the behavior, evidence and remaining limits. Reproducibility is stronger than saying it worked on my laptop: another engineer should know which command to run and what result to expect. For a nondeterministic model, I would preserve request and evaluation artifacts and compare behavior rather than promise byte-identical text.
+
+SELF-CHECK
+Why does a commit hash alone not reproduce an AI evaluation?
+It identifies tracked source, but not necessarily the dependency environment, untracked data, model revision, settings or external service behavior that produced the saved result.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Which identities matter besides the application commit?
+Record dependency versions or lockfiles, the Python or runtime version, model and tokenizer revisions, prompt and schema versions, evaluation inputs and relevant inference settings. Hardware and numerical libraries can matter for some workloads too. The commit identifies tracked source, not every component that produced an output. Include the exact command and distinguish required secrets from public configuration so another engineer can reproduce the test without copying credentials into a handover.
+
+1.1. How could untracked files make a supposedly reproducible test misleading?
+A local data file, adapter or configuration may influence execution while remaining outside the recorded commit. Another checkout then runs different inputs or fails entirely. Inspect working-tree status and name the artifacts the command actually consumes, including their identities when appropriate. Do not blindly commit private data to fix reproducibility; provide a sanitized fixture or controlled artifact reference with the required access process. Reproducibility and confidentiality need to be designed together.
+
+1.1.1. What is a useful reproducibility record when the original data is confidential?
+Record a versioned controlled dataset identity, access requirements, schema, evaluation command and scoring rules, plus a sanitized representative fixture where permitted. Authorized engineers can reproduce against the controlled data without exposing it in a public repository or generic log. State which results can be reproduced using the sanitized fixture and which require restricted inputs. A handover should not imply that a toy fixture establishes the full private-data result.
+
+2. What does a fake-provider test establish, and what does it miss?
+A controlled fake can verify request construction, timeout handling, schema interpretation and application reactions to chosen responses without network cost. It does not establish that the real provider accepts the request or still returns that response shape. Keep the fake aligned with the documented public interface and add a separate compatibility check when appropriate. Passing a fake test means the application handled the simulated contract, not that live integration or end-to-end task quality is proven.
+
+2.1. How should a saved real response be used without making the test brittle?
+Sanitize it, preserve the fields relevant to the public contract and label the provider or schema version. Assert the behavior the application promises rather than every incidental field or ordering detail. Include missing and optional field variants where the API allows them. A saved response is valuable regression evidence for a known shape, but it can become stale; maintain a separate opt-in live check instead of pretending the fixture tracks every provider change automatically.
+
+2.1.1. Why can unit and integration tests pass while user-visible AI quality regresses?
+Those tests may verify that requests and responses flow correctly without evaluating whether the answer solves the task. A prompt can remain valid and the API compatible while producing less supported summaries. Add an evaluation set with task-specific evidence and acceptance criteria, and inspect failure groups. Keep layer-specific results separate: application contract tests, live compatibility and task quality provide complementary evidence rather than interchangeable definitions of success.
+
+3. How can a reviewer compare a change when generated text is not byte-identical?
+Define behavior-level criteria such as required facts, unsupported claims, schema validity and acceptable abstention. Compare the same representative inputs under recorded configurations and inspect the outputs that change category. Where variability is material, use repeated trials and report the distribution or counts rather than choosing one attractive sample. Exact-string assertions remain useful for deterministic formatting contracts, but they can confuse harmless wording changes with meaningful quality regressions in open-ended generation.
+
+3.1. Does setting a seed or lowering temperature guarantee exact reproduction forever?
+No. Reproducibility depends on the serving implementation, model revision and numerical or concurrency behavior as well as sampling controls. A seed can help within a supported setup, but it is not a promise about a different backend or an updated model alias. Record those controls and preserve observed outputs. Evaluate the behavior that matters to the user instead of implying that a low-temperature request is automatically deterministic or factually correct.
+
+3.1.1. What evidence should a release decision include when results vary across trials?
+State the fixed evaluation set, configurations, number of trials and acceptance rule before selecting a winner. Report critical failures separately from average quality and include examples that explain the trade-off. A small improvement with high run-to-run variation may not justify release, especially if a critical error appears. Preserve enough sanitized artifacts to review the decision later, and state the workload or domains the test does not cover.
+
+OPTIONAL PRACTICE RESOURCES
+Encapsulation (Learn Object-Oriented Programming in Python - AI-Powered Course): https://www.educative.io/courses/learn-object-oriented-programming-in-python/encapsulation
+Using Pytest (Quick Start Full Stack Web Development - AI-Powered Course): https://www.educative.io/courses/quick-start-full-stack-web-development/using-pytest

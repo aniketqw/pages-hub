@@ -1,0 +1,93 @@
+Sandboxed Code-Execution Agent | Card 07
+Difficulty: Intermediate
+
+QUESTION
+What do the human approval tool and 14 integration cases establish about safety?
+
+WHY THIS QUESTION MATTERS
+Tests human-in-the-loop semantics, evidence quality, and honest reporting of saved test results.
+
+CONTEXT
+A callable approval tool is optional behavior. The graph routes tool calls through ToolNode, so mandatory approval must be enforced at the executor boundary for selected actions.
+
+TERMS
+policy gate: Code that enforces a rule before an operation executes
+approval binding: Connecting consent to the specific action and payload
+integration test: A check that exercises multiple real components together
+
+MECHANISM
+1. Distinguish Pydantic argument validation from authorization policy.
+2. Check whether approval is a graph interrupt or merely a callable tool.
+3. Bind consent to a canonical action payload and revalidate immediately before execution.
+4. Use tests for missing, denied, expired, reused, or changed-payload approvals.
+5. The approval operation is available as a tool, but availability alone does not force every risky tool path through it. A denied action must cause no side effect; saved 12/14 integration results leave two unresolved failures.
+
+TECHNICAL EXPLANATION
+The model can choose to call a request_approval tool, but that differs from a framework-enforced interrupt that pauses every sensitive action. A policy layer should classify actions independently of model choice, persist the approval decision, bind it to the exact operation, and reject stale approvals. The saved test script exercises tools and the saved result is 12/14; it does not prove policy coverage or current runtime health. The approval implementation prompts in the host CLI, but `get_agent_graph` routes model tool calls to ToolNode without a mandatory interrupt. A model can call another tool instead. Approval should be checked immediately before a sensitive executor and bind to the exact normalized action, actor, expiry, and single-use identity. The saved integration log contains 12 passes and 2 failures, reread rather than rerun; it does not validate this policy. Test absent, denied, expired, and modified-payload cases in an isolated environment.
+
+WORKED EXAMPLE
+If the model skips request_approval and directly emits another tool call, the graph’s current structure does not by itself impose an approval stop before that call.
+
+SOURCE
+sandbox-agent/test/test_all_tools.py:46-60
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/test/test_all_tools.py#L46-L60
+
+def run_test(name: str, func, *args, **kwargs):
+    log_separator(f"TEST: {name}")
+    log(f"Function: {func.__name__}")
+    args_str = str(args)[:500] + "..." if len(str(args)) > 500 else str(args)
+    kwargs_str = str(kwargs)[:500] + "..." if len(str(kwargs)) > 500 else str(kwargs)
+    log(f"Arguments: args={args_str}, kwargs={kwargs_str}")
+    try:
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start_time
+        log(f"Elapsed: {elapsed:.3f}s")
+        log("Result:")
+        result_str = json.dumps(result, indent=2, default=str)
+        if len(result_str) > 2000:
+            result_str = result_str[:2000] + "\n... [truncated for log]"
+
+This excerpt shows the test helper’s pass/fail accounting; the saved log is the source for the 12/14 result. I would distinguish those integration checks from graph-level approval enforcement.
+
+LIMIT
+The approval path is optional and tool-based, and the saved suite has two failures; no fresh Docker run was made for this audit.
+
+TEST EVIDENCE
+I reread the saved integration log; I did not run the Docker test script or verify an approval policy end to end.
+
+SPEAKABLE ANSWER
+In `tools/implementations.py:request_approval`, approval is a callable host-side tool; the graph does not force an approval interrupt before every risky action. The saved log at `test/test_results_20260418_005648.log` reports 14 counted cases: 12 passed and 2 failed. I reread that log but did not rerun the Docker suite. So I describe optional tool-based approval and partial integration evidence, not a mandatory safety gate or fourteen passing tests. I would route high-impact actions through an explicit policy gate and add tests proving execution is blocked when approval is absent or denied.
+
+SELF-CHECK
+A human approves one shell command, then the model changes the path before execution. Should it proceed?
+No. Approval should bind to the exact normalized arguments; a changed payload requires a new approval. The current graph does not enforce this gate universally.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you make approval mandatory for a destructive tool?
+Put a policy check on the execution route so the tool cannot run until an approval record is bound to that action. Do not rely on the model choosing to call the approval tool.  The approval function itself can ask for confirmation, but it is a tool the model may choose to call. A mandatory gate belongs on the route to a high-impact executor, where execution is impossible until an approval record matches the exact plan or code.
+
+1.1. What should an approval record bind to?
+Bind it to a stable action ID, a hash of the plan and code, the requester, approver, timestamp, and scope. If the payload changes after approval, the hash should no longer match and execution must stop for a new decision. I would test both approval and a one-character code change. The current callable tool asks in a prompt but the graph does not enforce this binding.
+
+1.1.1. Can an approval be reused for the next tool call?
+Only if the approved scope explicitly covers that action and the action identity remains unchanged. Otherwise, treat approval as single-use and expire it after a short period. Reuse creates a confused-deputy risk where an approved plan authorizes different code. I would model the approval state in the execution service rather than trust the model’s conversation text. Treat changed code as a new action requiring approval.
+
+2. Which two tests failed, and did you fix them?
+The saved integration log is the evidence; I did not rerun or fix this repository. I would inspect the two recorded failures and reproduce them in the project’s conda environment with Docker prerequisites before claiming a resolution.  The saved log is historical: 12 passed and 2 failed out of 14 counted cases. It is not a fresh execution and it does not establish the safety properties of approval or sandbox isolation. I would examine the two failure records and reproduce only in the configured environment.
+
+2.1. How would you interpret a passing tool test here?
+A pass shows that particular integration case produced its expected result under its environment, not that the tool is secure or the whole graph routes correctly. I would map each test to a claim: Python output, HTTP behavior, or browser action. Then add separate tests for authorization, resource limits, and failure recovery. The saved log’s two failed cases remain unresolved in this audit.
+
+2.1.1. What should a useful test report include?
+Record the exact commit, environment, prerequisites, test names, pass/fail counts, and failure output. Distinguish tests executed now from logs reread later. For safety claims, state the threat model and controls exercised. This avoids turning “14 cases” into “14 passes” or implying a historical log proves the current checkout behaves identically. The failures remain unresolved until reproduced.  The report should identify the exact commit and environment.
+
+3. Why not just run it now?
+The suite starts containers and can make HTTP and browser calls and install packages. The audit scope preserved that saved evidence; I would run it only in the configured project environment with its external prerequisites understood.  Because the test script can launch containers, HTTP requests, browser calls, and package installation, a rerun changes environment state and has external dependencies. The saved report is the existing evidence; a new run needs a prepared environment and explicit result capture.
+
+3.1. How would you make the suite more deterministic?
+Mock outbound HTTP and browser services for unit-level behavior, pin package versions, and run container integration tests in an isolated environment with known images. Separate optional package installation from assertions so tests do not mutate the environment unexpectedly. I would keep a smaller deterministic suite for each commit and schedule a slower end-to-end suite separately. These are recommendations, not changes made here.
+
+3.1.1. What would you keep in the slow integration suite?
+Retain tests that genuinely require Docker, networking, or browser behavior, but give each a named prerequisite and isolated resource namespace. Capture cleanup in `finally` paths and make failures preserve logs without leaving containers or files behind. I would not remove the risky cases; I would make their scope and environment explicit so their results can be interpreted accurately. Capture logs before cleanup, then remove temporary resources.

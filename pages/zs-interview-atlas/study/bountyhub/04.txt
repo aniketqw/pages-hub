@@ -1,0 +1,85 @@
+Multi University Bounty System | Card 04
+Difficulty: Advanced
+
+QUESTION
+A PostgreSQL write commits but Redis event publication fails. What state is left behind?
+
+WHY THIS QUESTION MATTERS
+Tests the implementation boundary, failure modes, and whether I can separate code evidence from assumptions.
+
+CONTEXT
+The write path persists PostgreSQL state, then performs Redis invalidation and stream publication. This crosses a database transaction boundary, so the useful mental model is durable source state followed by recoverable derived effects.
+
+TERMS
+transactional outbox: A durable event row written in the same DB transaction as the business change.
+at-least-once: Delivery can repeat, so consumers tolerate duplicates.
+projection: A derived view built from authoritative data or events.
+
+MECHANISM
+1. Locate the PostgreSQL commit and list side effects that occur only afterward.
+2. Identify which error is swallowed and whether the event intent is recorded durably elsewhere.
+3. Use an outbox row in the same database transaction, then publish by stable event ID with retry.
+4. Make the consumer idempotent because a publisher can crash after XADD and publish again.
+
+TECHNICAL EXPLANATION
+The caller commits business state before XADD. A crash or swallowed error means no stream record. Retrying publication without stable IDs can duplicate events, so consumers also need idempotency. An outbox row committed with the bounty, published with a stable event ID, and marked delivered after acknowledgment gives durable at-least-once publication; it still does not make the full PostgreSQL/Redis/Mongo chain exactly once. An outbox provides durable intent, not exactly-once transport. A publisher can crash after Redis accepted XADD but before marking its row delivered, so duplicate publication is expected. Include stable event identity and payload version, observe oldest undelivered age, and ensure the Mongo projection is idempotent. Cache invalidation is another effect with its own consistency contract; an outbox event does not automatically make all readers fresh.
+
+WORKED EXAMPLE
+A bounty may be in PostgreSQL but absent from Mongo search until rebuild or repair. This is a possible schedule, not a reproduced outcome.
+
+SOURCE
+BountyHub-main/server/src/config/redis.js:66-73
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/config/redis.js#L66-L73
+
+async function publishEvent(type, payload) {
+  if (!redis) return;
+  try {
+    await redis.xadd('events:bounty', '*', 'type', type, 'data', JSON.stringify(payload));
+  } catch {
+    // ignore publish errors — do not fail the calling transaction
+  }
+}
+
+XADD is separate from the business commit. The catch keeps the request alive but creates no durable retry record here. An outbox is the next step, with an idempotent projection.
+
+LIMIT
+No outbox is traced; retries can duplicate events, and exactly-once is unjustified.
+
+TEST EVIDENCE
+No Redis failure test was run. Commit a bounty while forcing XADD failure, then verify an outbox publisher later delivers a stable event and projection replay is safe.
+
+SPEAKABLE ANSWER
+In `create` in `server/src/services/bountyService.js`, the bounty is persisted, caches are invalidated, then `publishEvent` in `server/src/config/redis.js` runs. These steps do not share one transaction. The publisher catches Redis errors, so the API can succeed even if no stream event was recorded; PostgreSQL then has the bounty while the Mongo catalog can stay stale. I call this a commit/publish gap, not exactly-once delivery. A transactional outbox would write the event with the business transaction and let a publisher retry. No outbox is present on this active path. I did not induce Redis failure or run the stack, so this is a source-based failure window. If asked for a fix, I would first introduce the outbox row in the same PostgreSQL transaction as the bounty, then run a publisher that retries by event ID. The worker should apply updates idempotently, and an operator should be able to rebuild the catalog from PostgreSQL if the projection falls behind.
+
+SELF-CHECK
+PostgreSQL commits, XADD succeeds, but the publisher crashes before recording delivery. What should happen on restart?
+The publisher may send the event again. A stable ID and idempotent consumer make the duplicate harmless; the existing code has no outbox on this path and does not establish exactly-once delivery.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why not make PostgreSQL and Redis one transaction?
+They are independent systems here; no distributed transaction protocol exists. A common design is an outbox row committed with business data, then an idempotent publisher. The failure schedule is straightforward: PostgreSQL commits, then Redis XADD throws and the helper swallows it. Because no durable event row is coupled to the commit, the catalog has no guaranteed signal to catch up. I would make the outbox record part of the same transaction and publish it asynchronously with a stable event ID.
+
+1.1. What fields belong in an outbox row for this event?
+At minimum, a stable event ID, event type, aggregate ID, serialized payload or payload reference, creation time, and delivery state or attempt metadata. The business mutation and row must commit together. The publisher reads undelivered rows, sends the ID downstream, then records acknowledgment. I would version the payload and avoid storing secrets. This does not make Redis and Mongo one transaction; it makes the event intent durable.
+
+1.1.1. How does the consumer use that ID?
+The consumer can persist the last applied event ID or use an idempotent upsert keyed by the bounty and projection version. If it performs additional side effects, those need their own deduplication identity. A duplicate stream delivery should converge to the same catalog document. I would replay the same event several times and assert unchanged logical state, then test a newer update followed by an older event.
+
+2. What guarantee does outbox give?
+Durable at-least-once publication when retried to acknowledgment. Consumers must deduplicate or apply idempotently; not end-to-end exactly once. Cache invalidation and stream publication are both post-commit calls here, so the same gap can affect more than search. If invalidation fails silently, cached detail can remain stale until TTL. I would inventory each side effect and decide whether it is best-effort, retried, or represented in a durable event; fixing only the Mongo event leaves cache freshness separate.
+
+2.1. Would you put cache invalidation in the outbox too?
+I would consider an invalidation event in the outbox if stale cache has material consequences, but the consumer should be safe to repeat. For ordinary display data, bounded TTL may be enough; for status used in a decision, the write path should revalidate from primary. I would state that service-level cache invalidation is best effort today and evaluate the outbox based on the consistency contract, not apply it mechanically.
+
+2.1.1. Can the cache consumer race with a newer cache fill?
+Yes. A delayed invalidation can delete a newer value or, if invalidation ordering is weak, allow stale data to be repopulated. Versioned keys or a version check make ordering explicit. I would reproduce the sequence with delayed events: write v1, write v2, then deliver invalidation for v1. The expected behavior should preserve or reload v2, and the cache design should encode that invariant.
+
+3. How observe and repair in production?
+Track outbox age and attempts, alert on backlog, preserve event IDs, and provide replay or projection rebuild. These are recommendations, not all implemented here. At-least-once delivery is a realistic outbox goal because a publisher may crash after Redis accepted an event but before it marked the row delivered. On restart it publishes again. Exactly-once across PostgreSQL, Redis, and Mongo would require stronger coordination than this code contains, so I would define idempotent effects and observability instead.
+
+3.1. How can the publisher tell whether XADD happened before it crashed?
+Without a shared transaction, it may not know. It can use the outbox event ID as the Redis Stream entry identity or include it as a field and tolerate duplicate publication. The publisher should mark delivery only after a confirmed response, while accepting that a crash in the acknowledgment window can repeat. I would expose attempts and oldest undelivered age, then test crash points around XADD.
+
+3.1.1. What operational alert would you set?
+Alert when the oldest pending outbox event exceeds the freshness objective or when delivery attempts grow without success. Track event type and aggregate, but avoid logging sensitive payloads. A dashboard should distinguish publication backlog from consumer lag; a publisher can be healthy while Mongo processing is stuck. I would test each signal by pausing the publisher and then the worker separately.

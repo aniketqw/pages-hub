@@ -1,0 +1,87 @@
+Sandboxed Code-Execution Agent | Card 08
+Difficulty: Advanced
+
+QUESTION
+What happens if two `execute_python` tool calls run at once while writing the temporary script?
+
+WHY THIS QUESTION MATTERS
+Tests concurrency behavior at the shared execution boundary and whether I can reason from implementation to a safe redesign.
+
+CONTEXT
+Concurrent tool calls share both a fixed launcher path and a writable workspace. The race can cross executions even if each individual script is correct.
+
+TERMS
+race condition: A result that depends on the timing order of concurrent operations.
+
+MECHANISM
+1. Identify the write-to-temp and execute ordering around `TEMP_SCRIPT`.
+2. Use call-local unique paths, atomic creation, restrictive permissions, and `finally` cleanup.
+3. Separate generated launcher files from intentionally shared project outputs.
+4. Use barriers and distinct output tokens to reproduce and detect cross-call execution.
+5. Two concurrent calls can interleave write A, write B, execute A, causing A to run B’s source. A deterministic barrier test with distinct output tokens would expose that path before replacing the fixed script filename.
+
+TECHNICAL EXPLANATION
+The race is between the shell write and `exec_run` open: call A can write, call B can replace the path, then A launches and reads B’s contents. A unique name based on a secure random ID avoids same-path collision; atomic create and close-before-exec avoid partial reads. Each invocation should capture its own stdout/stderr and clean its own artifact. Also consider concurrent writes to shared user files, which a unique temp script does not solve. `TEMP_SCRIPT` is a module-level path under the shared workspace. The implementation writes the script through shell redirection, then launches Python by that path; concurrent invocations can overwrite it between those operations. A random per-call path and atomic create protect the launcher, but other workspace files remain shared. Return call IDs and artifact manifests, and use per-job directories or explicit locks for shared targets. No concurrency experiment was run; the barrier test in the learning check is proposed evidence.
+
+WORKED EXAMPLE
+Two callers submit scripts that print different unique tokens. If both output the same token, the shared path was crossed; this is a proposed test, not an observed result.
+
+SOURCE
+sandbox-agent/tools/implementations.py:224-234
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/tools/implementations.py#L224-L234
+
+def execute_python(code: str) -> dict:
+    container = get_container()
+    if _is_studio_dummy(container):
+        print(f"[Tool] Studio mode: would execute Python code")
+        return {"stdout": "[Studio mock output]", "stderr": "", "exit_code": 0}
+
+    print(f"\n[Tool] execute_python:\n{code}\n")
+    escaped = code.replace("'", "'\\''")
+    write_cmd = f"cat > {TEMP_SCRIPT} << 'PYEOF'\n{code}\nPYEOF"
+    container.exec_run(cmd=["sh", "-c", write_cmd])
+    result = container.exec_run(cmd=["python", TEMP_SCRIPT], workdir=WORKSPACE_CONTAINER, demux=True)
+
+
+
+LIMIT
+Unique temp scripts address filename collision, but not races over shared workspace outputs or shared container state.
+
+TEST EVIDENCE
+No concurrency test was run. Use a barrier to synchronize two calls with distinct script contents, verify outputs and file identities, then test cleanup after timeout and failure.
+
+SPEAKABLE ANSWER
+`execute_python` in `tools/implementations.py` writes every submitted program to the same `TEMP_SCRIPT`, then runs Python against that path. Two concurrent calls can overwrite the file between write and execution, so one call may run the other call’s code or a partial race-dependent version. The container workspace is also shared. I would use a unique per-call file, atomic creation, and cleanup, then test synchronized concurrent invocations. No concurrency test was run in this audit.
+
+SELF-CHECK
+Call A writes script A, call B overwrites the same path, then A launches. Which output is valid for A?
+Only A’s unique token. If it receives B’s token, execution crossed the shared temporary-file boundary; the repository has not been concurrency-tested.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you demonstrate the overwrite race without relying on timing luck?
+Add a test-only barrier after the shell write and before `exec_run`: pause call A, let B write its different script, then release A. Capture each output and compare it with the intended unique token. This makes the interleaving deterministic. The production function has no barrier; this would be a harness around the call, not a claimed repository test. The implementation currently reuses the module-level path.  This avoids misattributing an output to the wrong invocation.
+
+1.1. What should the expected assertion be?
+Each invocation must return only its own token, and each on-disk script path must be unique for the duration of execution. The test should also verify both processes exited and their temporary files were cleaned. If one call sees the other token, the test has exposed a real path collision. Repeat under a stress loop after the deterministic test to catch additional shared-state effects.
+
+1.1.1. Could unique filenames still leave a race in cleanup?
+Yes. If one call deletes a shared or incorrectly computed path, it can remove another call’s script. Store the exact generated path in a local variable, close the file before execution, and remove only that path in a `finally` block. A test should overlap execution and cleanup to verify one invocation cannot delete another’s artifact. Cleanup must be tied to the call-local filename.  The test should overlap cleanup with another active call.
+
+2. Would `uuid4` filenames be sufficient?
+They make accidental collision extremely unlikely, but correctness also depends on safe path construction, permissions, and cleanup. Create the file atomically in a job-specific directory with restrictive permissions, write and close it, then pass that exact path to execution. Avoid predictable names in a shared writable directory. I would keep the path in call-local state rather than mutate a global variable.
+
+2.1. How do you prevent one script from reading another job’s file?
+Use separate workspace directories or mount scopes per job, restrictive ownership, and clean up after completion. Unique script names alone do not isolate files if every process can list and read the same directory. The code currently shares `/workspace`, so I would document that boundary and test access across concurrent jobs before claiming per-job isolation. Do not let the container list expose unrelated job artifacts.  Apply this even when scripts are launched in separate containers.
+
+2.1.1. What if scripts intentionally share project files?
+Then isolate only the generated launcher script while defining explicit shared project artifacts. Use a per-job execution directory with a controlled input mount and output location, and serialize or version writes to shared outputs. That preserves collaboration while avoiding accidental execution crossover. I would specify the contract for shared files and test concurrent writes to the same target separately. Sharing should be an explicit workflow contract.  State the shared-file policy before merging artifacts.
+
+3. What does a unique launcher file fail to protect?
+It does not stop two scripts from mutating the same project file, environment variable, or database. If scripts target shared output names, results can still overwrite. I would introduce per-run working directories or explicit locks for declared shared resources, and return artifact paths tagged with run IDs. The patch scope should state whether code snippets may share files; the launcher race and workspace race are separate concerns.
+
+3.1. How would you merge outputs from isolated runs?
+Treat each run’s output as an artifact with an owner and manifest, then merge through an explicit step that checks conflicts and validates expected files. Avoid letting arbitrary executions publish directly into one shared destination. I would use content hashes and preserve source paths so a later reader can tell which run produced an artifact. That gives reproducibility without pretending all workspace sharing is safe.
+
+3.1.1. How would you verify output provenance later?
+Store a manifest with run ID, input and output hashes, tool version, and completion status. A later consumer can compare the claimed artifact to its digest and detect accidental replacement. Do not expose hashes of secrets in public logs; keep manifests access-controlled. The current implementation does not provide this provenance contract, so this is a proposed extension. This is a proposed provenance feature, not existing behavior.  The metadata itself should be access-controlled.

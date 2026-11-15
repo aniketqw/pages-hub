@@ -1,0 +1,105 @@
+Sandboxed Code-Execution Agent | Card 09
+Difficulty: Advanced
+
+QUESTION
+What state survives a process restart in this graph, and what does the fixed thread ID actually guarantee?
+
+WHY THIS QUESTION MATTERS
+Tests concurrency behavior at the shared execution boundary and whether I can reason from implementation to a safe redesign.
+
+CONTEXT
+Thread identity chooses a checkpoint namespace, while the saver determines how long state exists. MemorySaver is in-process; the harness uses one fixed ID and a max reducer for step_count.
+
+TERMS
+checkpoint: A saved graph state used to resume or continue a thread.
+
+MECHANISM
+1. Distinguish conversation history from turn budget and durable checkpoint storage.
+2. Use an opaque user/conversation ID rather than a global constant in multi-user use.
+3. Choose a persistent saver only with encryption, retention, migration, and deletion policy.
+4. Test same-process continuation, process restart, and simultaneous session isolation separately.
+5. A fixed thread key groups state only within the configured saver’s scope. MemorySaver can continue during one process lifetime, but restarting the process loses its in-memory checkpoints; a durable saver and per-user identities would be separate changes.
+
+TECHNICAL EXPLANATION
+MemorySaver provides checkpoint behavior only for the process lifetime; a stable thread key addresses lookup within that saver, not persistence to disk. After restart, the in-memory mapping is gone. With one constant ID, simultaneous sessions in one process may collide if the harness becomes multi-user. Durable checkpointing requires an external saver, lifecycle policy, and privacy/retention controls. Budget resets need their own reducer or turn field, independent of message history. `MemorySaver` holds checkpoint state in the Python process. A stable `thread_id` selects that state but does not persist it to disk; the harness also uses one global ID and may couple sessions if made multi-user. Durable storage adds security and retention responsibilities because messages and tool outputs may be sensitive. `merge_max` also means a zero does not reset `step_count`. Model budget state per turn separately from conversation history and test restart and two-session isolation; no restart test was run.
+
+WORKED EXAMPLE
+Keep a REPL open and the same thread can carry history; terminate the process and MemorySaver state disappears. The latter is an architectural expectation, not a measured restart test in this audit.
+
+SOURCE
+sandbox-agent/agent/graph.py:127-155
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/agent/graph.py#L127-L155
+
+    workflow = StateGraph(AgentState)
+    workflow.add_node("agent", agent_node)
+    workflow.add_node("tools", tool_node)
+    workflow.add_node("reflect", reflect_node)
+    workflow.set_entry_point("agent")
+
+    def after_agent(state: AgentState):
+        if state.get("step_count", 0) >= MAX_STEPS:
+            return END
+        last_msg = state["messages"][-1]
+        if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+            return "tools"
+        return END
+
+    def after_tools(state: AgentState):
+        last_msg = state["messages"][-1]
+        if isinstance(last_msg, ToolMessage) and _has_error(last_msg.content):
+            if state.get("retry_count", 0) < MAX_RETRIES:
+                return "reflect"
+            else:
+                return END
+        return "agent"
+
+    workflow.add_conditional_edges("agent", after_agent, {"tools": "tools", END: END})
+    workflow.add_conditional_edges("tools", after_tools, {"reflect": "reflect", "agent": "agent", END: END})
+    workflow.add_edge("reflect", "agent")
+
+    _checkpointer = MemorySaver()
+    _graph = workflow.compile(checkpointer=_checkpointer)
+
+
+
+LIMIT
+A fixed ID can couple sessions, and in-memory checkpointing does not survive process restart.
+
+TEST EVIDENCE
+No restart test was run. Invoke twice in one process, inspect retained messages, restart with the same ID, and verify whether state is absent; then test two independent conversation IDs.
+
+SPEAKABLE ANSWER
+`agent/graph.py` compiles with `MemorySaver`, which keeps checkpoints in process memory. The REPL uses one fixed `main-user-session` thread ID, so turns can share graph state while the process lives, but that ID does not make the checkpoint durable across restart or isolate multiple users. Also, `merge_max` prevents a zero step count from resetting the stored maximum. I would separate conversation, turn budget, and durable storage requirements. The audit did not test process restart recovery.
+
+SELF-CHECK
+If the process restarts with the same thread ID, does MemorySaver restore messages?
+No. The ID cannot recover data from an in-memory saver after the process exits. Durable persistence requires a durable checkpointer and lifecycle controls.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What changes if the process crashes between turns?
+In-memory checkpoint data is lost with the process, so the same thread ID after restart does not retrieve the old messages from durable storage. The application may still have local REPL variables only until that process exits. I would describe continuity as process-local unless a durable saver is configured. No restart recovery test was executed in this audit. The checkpoint exists only in the current Python process.  Do not imply the state survives a process restart.
+
+1.1. What would you verify before choosing a durable saver?
+Check support for atomic checkpoint writes, schema migration, concurrency control, encryption, retention, and deletion. A durable backend adds operational state that must be managed and may store sensitive prompts and tool results. I would test a crash after a checkpoint write, restore with the same thread, and verify both message ordering and privacy controls. Include access-control and retention requirements in the migration.  Include the privacy owner and deletion path in the design review.
+
+1.1.1. How do you delete one user’s checkpointed history?
+Use an opaque user/conversation key and a backend operation that deletes all associated checkpoints, not just the latest state. Then verify no child records or logs retain content beyond policy. If the saver lacks deletion semantics, add a retention layer or choose another backend. This repository uses memory and does not establish any durable deletion workflow. The current implementation has no durable checkpoint deletion API.  The current in-memory saver has no persistent records to query.
+
+2. What goes wrong if two REPL clients share this process?
+Both can address the same checkpoint key and combine message histories or step state. That risks cross-session context leakage and confusing budget behavior. I would scope the thread ID to an authenticated user and conversation, and verify that the checkpointer receives that config for every invoke. The current harness looks single-user; scaling it requires explicit identity boundaries. An opaque conversation ID avoids embedding personal data.  The identifier should not contain a raw email address.
+
+2.1. Could a random thread ID make conversations unrecoverable?
+Yes, if it is not stored with the user’s conversation metadata. Generate an opaque ID once per conversation, persist the association in the application layer, and pass it on each invoke. Do not derive it from a raw email or other PII. Then test that two IDs produce separate message histories and that the intended user can reopen the right one.
+
+2.1.1. What should happen when a user starts a new conversation?
+Create a new thread ID and initialize clean state while preserving any durable conversation index only if product policy allows. The old conversation should remain isolated and deletable under retention rules. I would make turn budget state start fresh without copying old reducer values. This is different from a new REPL turn, which may share messages but should reset its own budget by policy.
+
+3. How would you model a per-turn step counter without losing conversation history?
+Keep messages in the thread state but store a turn ID and step counter with overwrite semantics or a turn-scoped substate. On each new user input, increment the turn ID and explicitly initialize its budget. The current `merge_max` reducer preserves the maximum, so sending zero is not a reset. I would test two turns in the same thread and inspect both message continuity and counter values.
+
+3.1. Would a separate counter store create consistency problems?
+It can if the counter and graph checkpoint update independently. Prefer keeping the turn ID and counter in the same checkpoint transaction, or use an idempotent update keyed by turn. Then retries of the same invoke do not reset or double-increment unexpectedly. I would decide whether the budget is per model call, tool call, or wall-clock and assert that unit explicitly.
+
+3.1.1. How should a new turn initialize its budget?
+Increment a turn identifier and initialize a declared counter in the same graph state update. Preserve message history separately. This prevents a retry of the same turn from receiving a fresh allowance while allowing the next user turn to start at zero. The existing max reducer does not implement that policy; it needs a state/schema change and focused reducer tests.

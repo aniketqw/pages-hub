@@ -1,0 +1,76 @@
+JD / Domain | Card 15
+Difficulty: Advanced
+
+QUESTION
+An offline classifier reports 95% accuracy. How would you check leakage and imbalanced classes before trusting it?
+
+WHY THIS QUESTION MATTERS
+Evaluation mindset and ML fundamentals: distinguish operational usefulness from an attractive aggregate.
+
+CONTEXT
+Accuracy is a fraction of evaluated labels, not a direct measure of usefulness. Class balance, deployment independence and the costs of missed versus false alerts determine what else must be measured.
+
+TERMS
+precision: The fraction of predicted positives that are actual positives.
+recall: The fraction of actual positives that the system identifies.
+data leakage: Evaluation information influencing training or selection in a way unavailable at deployment.
+
+MECHANISM
+1. Write the class counts and an always-majority baseline before interpreting the score. Compute true positives, false positives and false negatives so precision and recall have explicit denominators.
+2. Split according to deployment, such as future time or unseen customers. Fit preprocessing on training data only and inspect duplicates or target-derived features that could leak evaluation information.
+3. Choose thresholds on validation data using operational capacity and error costs, then evaluate the fixed choice on the test set. Report counts and rare failure groups alongside aggregate metrics.
+
+TECHNICAL EXPLANATION
+Accuracy counts all correct labels over all evaluated examples. Precision is true positives divided by predicted positives; recall is true positives divided by actual positives. These answer different operational questions: how many reviewed alerts are useful, and how many real cases were found. A zero denominator needs an explicit reporting convention rather than a misleading perfect score. Leakage can enter through target-derived features, globally fitted scalers or related entities appearing on both sides of the split. A pipeline helps keep fitting inside training folds, but cannot repair an inappropriate split or a feature that contains future information. Stratification preserves label proportions; it does not automatically enforce entity independence or time order. Threshold tuning changes the balance of false positives and false negatives, so choose it against a stated capacity or harm model. These are proposed evaluation principles, not a new benchmark of my projects.
+
+WORKED EXAMPLE
+In 100 cases, five are positive. An always-negative classifier gets 95 correct, zero true positives and five false negatives: accuracy 95%, recall 0%. Its positive precision is undefined because it predicts no positives; state the convention used if software displays zero.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+This is conceptual preparation and a proposed method, not a claim that I trained or deployed this system.
+
+TEST EVIDENCE
+Reasoning and illustrative examples reviewed; no training, provider experiment or deployment was performed for this lesson.
+
+SPEAKABLE ANSWER
+I ask what the rows, labels and split represent before interpreting the score. If ninety-five percent of cases are negative, an always-negative model already achieves ninety-five percent accuracy while finding no positives. I inspect the confusion matrix, positive-class precision and recall, class counts and the cost of each error. I split by the real deployment boundary, such as time or customer, and fit preprocessing only on the training portion. Near duplicates or records from the same entity can leak information across a random split. I select the decision threshold using validation data and evaluate the final choice once on a held-out test set. I would report counts and subgroup failures rather than implying a single accuracy number measures business usefulness.
+
+SELF-CHECK
+Why can a stratified random split still overstate performance on new customers?
+Stratification preserves label proportions but may place the same customer or near-duplicate records in both sets. The model can exploit entity-specific information unavailable for a genuinely new customer.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Compute why the majority baseline looks good while missing every positive case.
+With 100 cases and five positives, an always-negative prediction gets the 95 negatives correct and misses all five positives. Accuracy is 95 divided by 100, while recall is zero true positives divided by five actual positives, or zero. The confusion matrix exposes the failure that accuracy hides. This calculation does not mean accuracy is always useless; it means the baseline and class distribution are necessary context for interpreting it.
+
+1.1. What is positive precision when the system never predicts a positive?
+Its denominator, predicted positives, is zero, so the mathematical ratio is undefined. Software may report zero, warn or use a configured convention; name that convention rather than interpreting it as observed precision from actual alerts. Recall can still be computed when actual positives exist. Reporting counts prevents a displayed scalar from concealing that the system never exercised the positive prediction behavior the stakeholder cares about.
+
+1.1.1. How could a business capacity constraint guide the next evaluation?
+Suppose reviewers can inspect twenty alerts per day. Compare candidate thresholds by how many true cases they find within that alert volume, and report missed cases as well. A threshold that produces thousands of alerts may have high recall but be operationally unusable. The constraint should come from the stakeholder, not an arbitrary metric preference. Evaluate the selected threshold on held-out data and monitor whether changing prevalence alters the review burden.
+
+2. Why can fitting preprocessing on all data leak information even without copying labels?
+A transformation can learn distributional information from the evaluation examples, such as feature means, vocabulary or selected dimensions. If that information would not be available when deploying to new data, the test no longer simulates the intended process. Fit learned transformations on training data and apply them unchanged to validation or test data. This prevents one leakage path, but still inspect future-derived features and related-record overlap, which a preprocessing pipeline alone cannot fix.
+
+2.1. Why might a customer-level split be more appropriate than a random row split?
+Multiple rows from one customer can share identifiers, stable preferences or nearly duplicate text. If deployment must work on unseen customers, placing that customer on both sides lets the model benefit from information outside the intended generalization setting. Group the split by customer and then inspect class coverage and sample size. The correct boundary follows the deployment question; random row splitting is not inherently wrong for every task, but it can answer a different question.
+
+2.1.1. How does future information create leakage in a time-based prediction task?
+A feature can be computed using events that occur after the prediction time, even when rows are assigned to earlier dates. For example, final account status can reveal an outcome unavailable at the moment a risk score was needed. Build features as of the prediction timestamp and keep future periods out of training and selection. A chronological split helps, but it cannot repair a feature whose construction already looked into the future.
+
+3. How does changing a decision threshold affect precision and recall?
+For fixed positive-class scores, lowering the threshold labels more cases positive. True positives cannot decrease, so recall cannot decrease, but false positives can increase and precision need not improve. The exact trade-off depends on the score distribution and class prevalence. Choose the threshold using validation data and an operational objective, then report the resulting counts. A threshold is a policy choice over scores, not evidence that those scores are calibrated probabilities.
+
+3.1. Why is calibration different from ranking quality?
+Ranking asks whether positives tend to receive higher scores than negatives. Calibration asks whether a stated probability matches observed event frequency for comparable predictions. A score can rank cases well while systematically overstating risk. If the application makes probability-based cost decisions, evaluate calibration separately using held-out data. Changing a threshold does not automatically calibrate scores, and a well-calibrated model can still be too weak at separating cases for the intended task.
+
+3.1.1. What should be monitored after a threshold that worked offline is deployed?
+Monitor the input distribution, positive prevalence when labels arrive, alert volume, precision, recall and important subgroups at the deployed threshold. A shift can change review burden or missed-case rates even if the code remains unchanged. Track label delay and selection bias so apparent stability is not merely missing outcomes. Define an investigation and rollback or retuning process, and validate a proposed new threshold rather than silently adjusting it against recent anecdotes.
+
+OPTIONAL PRACTICE RESOURCES
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run
+Why Pass/Fail Beats Numeric Scales (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/why-pass-fail-beats-numeric-scales

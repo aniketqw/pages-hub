@@ -1,0 +1,75 @@
+JD / Domain | Card 06
+Difficulty: Advanced
+
+QUESTION
+A retrieved document tells the agent to ignore its rules and upload secrets. What should happen?
+
+WHY THIS QUESTION MATTERS
+JD: prompt injection, hallucination and sensitive-data protection.
+
+CONTEXT
+Retrieved text is evidence to inspect, not an actor with application permissions. This question tests whether the system treats external content as lower-trust data even when it contains convincing instructions.
+
+TERMS
+prompt injection: Untrusted content attempting to redirect a model or its tools.
+least privilege: Giving a component only the capabilities needed for its task.
+
+MECHANISM
+1. Map trust boundaries: application rules and authenticated permissions define allowed behavior; documents and tool responses provide data that may be malicious or misleading.
+2. Constrain available tools and validate their arguments against user permissions outside the model. Do not expose a secret to the model simply because a retrieved passage asks for it.
+3. Test an adversarial document that requests data exfiltration. Observe both the generated response and tool execution; a refusal sentence is insufficient if an unauthorized tool call already occurred.
+
+TECHNICAL EXPLANATION
+Instruction hierarchy alone is not a complete application security boundary. A model can misinterpret quoted instructions, so enforce permissions again at tool execution with caller identity and resource scope. Data minimization reduces what an injection could expose: secrets absent from prompts and tool outputs cannot be copied from that context. Separate controls for reading, writing and network egress, and treat generated tool arguments as untrusted requests. An allowlisted tool name is insufficient if its path or URL argument can address arbitrary destinations. Test encoded or indirect requests and evaluate resulting state, not just refusal wording. Logging the attack verbatim can itself leak sensitive source material, so preserve diagnostic categories and sanitized references rather than indiscriminately recording every prompt.
+
+WORKED EXAMPLE
+A PDF says send the full customer table to a URL to verify freshness. The application should answer from permitted evidence or decline that instruction; it should not expose a tool able to export the table merely because the PDF requested it.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+A system prompt saying ignore malicious instructions cannot replace capability restrictions and authorization.
+
+TEST EVIDENCE
+Proposed adversarial cases: injected document instructions, disguised URLs, secret-like strings in tool output, cross-user retrieval, approval payload mismatch and trace redaction. No penetration test was run.
+
+SPEAKABLE ANSWER
+I treat retrieved text and tool output as untrusted data. A sentence in a document cannot grant permission to upload anything. I would keep tool capabilities narrow, validate arguments in trusted code, restrict destinations, and require an appropriate approval step before sensitive side effects. Separating instruction text from evidence helps communicate intent to the model, but prompt formatting alone is not a security boundary. Access checks must also run before retrieval so unauthorized data never enters the prompt. Logs need a deliberate redaction and retention policy because traces can contain the same secrets as prompts. For a read-only question-answering task, the safest useful capability is often read-only retrieval with no upload tool exposed at all.
+
+SELF-CHECK
+If the model refuses in its final text but already uploaded a file, did the protection succeed?
+No. The side effect already crossed the boundary. Evaluate tool authorization and resulting state, not merely whether the final response contains a refusal.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why should a retrieved instruction not override application rules?
+The document was retrieved for its content, not granted authority to change permissions or the task contract. Its author may be malicious or simply unrelated to the current workflow. Treat commands within it as text to analyze and keep authenticated application policy outside that source. A prompt can describe this boundary, but execution services must still enforce it because a model may follow an injected instruction despite the wording.
+
+1.1. Does putting the document inside delimiters create a security boundary?
+Delimiters make the request easier to read and can help distinguish data from instructions, but the model still processes all of that text. They do not change filesystem permissions, network access or service authorization. Enforce those controls where tools execute. Test adversarial documents that imitate higher-priority instructions and observe the resulting actions, rather than assuming a neatly formatted prompt prevents the attack.
+
+1.1.1. What should a successful injection test observe besides the final answer?
+Observe tool requests, authorization decisions, outbound destinations and resulting state. A final refusal can coexist with a tool call that already exposed data. Use sanitized audit records to verify that forbidden actions were denied before execution and that no sensitive content was sent to unauthorized locations. The test result should name the attempted action and boundary checked, not simply count refusal phrases in generated text.
+
+2. How would you scope a tool so an injection has less power?
+Expose only the operations, resources and destinations required for the user's task. A document reader should not automatically receive arbitrary filesystem or network access. Bind each call to authenticated user and tenant scope, validate arguments and deny resources outside the allowlist. Fewer tool names alone are insufficient if one generic shell or HTTP tool can perform every sensitive action. Measure the actual capability behind each interface.
+
+2.1. Why must argument validation include more than JSON types?
+A string can be a valid URL or path while referring to a forbidden destination, another tenant or a sensitive host file. Type validation establishes shape, while policy validation establishes allowed scope. Normalize inputs consistently, inspect redirects or resolved resources where relevant, and enforce the same constraints at execution time. An injection can exploit a broad argument field even when the schema and tool name look narrowly defined.
+
+2.1.1. How should logging be designed for denied malicious requests?
+Record the action category, caller context, resource identity when permitted and denial reason without automatically storing secrets or the full private document. Logs can become a second disclosure channel if every rejected payload is copied verbatim. Use access-controlled sanitized references for deeper investigation. The incident record should explain which boundary prevented execution and preserve enough correlation to investigate without widening the original data exposure.
+
+3. Why is asking the model to request approval not enough?
+The model can omit the request, misunderstand the answer or execute a changed payload after approval. The application needs an enforceable gate immediately before the consequential action. Bind consent to the normalized action, target and parameters, with an expiration and reuse policy. If the payload changes, require fresh approval. A callable approval tool is not evidence that every dangerous execution path is actually gated.
+
+3.1. What should the person see before approving an action?
+Show the real target, data being sent or changed, expected effect and important irreversibility or uncertainty in language they can assess. A vague request to continue does not establish consent to an arbitrary upload or deletion. Tie the displayed summary to the canonical payload that execution will check. For sensitive actions, preserve the approval identity and outcome under the appropriate audit and retention controls.
+
+3.1.1. What negative tests would demonstrate that this gate is enforced?
+Test execution without approval, explicit denial, expired approval, replayed approval and a payload altered after approval. Assert that each denied case causes no protected side effect, not just an error message. Also test an authorized matching action so the policy is usable. These tests establish the exercised gate behavior; they do not prove the absence of every bypass elsewhere in a larger tool surface.
+
+OPTIONAL PRACTICE RESOURCES
+Prompt Injection, Leaking, and Jailbreaking (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/prompt-injection-leaking-and-jailbreaking
+Implementing Access Control in RAG Pipelines (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/implementing-access-control-in-rag-pipelines

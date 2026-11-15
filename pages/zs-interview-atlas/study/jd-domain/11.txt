@@ -1,0 +1,75 @@
+JD / Domain | Card 11
+Difficulty: Intermediate
+
+QUESTION
+A client changes the requirement halfway through delivery. How do you turn that into a testable change rather than an argument?
+
+WHY THIS QUESTION MATTERS
+JD: requirements, Agile/Waterfall, collaboration, audit, risk escalation and delivery.
+
+CONTEXT
+A changed requirement is a negotiation about observable behavior and delivery constraints. The useful technical skill is exposing the impact with examples rather than arguing about an ambiguous sentence.
+
+TERMS
+acceptance criteria: Observable conditions that define an acceptable result.
+change control: An agreed method for assessing and approving changes.
+
+MECHANISM
+1. Restate the changed business outcome with a small before-and-after example. Confirm units, time rules and permissions so the team is estimating the same behavior.
+2. Trace effects through data, interfaces, implementation and tests. Identify a thin demonstrable slice and show options for scope, date and resources with stated uncertainty.
+3. Record the chosen acceptance criteria, owner and next checkpoint. Demonstrate failures as well as the happy path, and update regression cases when the accepted behavior changes.
+
+TECHNICAL EXPLANATION
+Acceptance examples make a change discussable because they reveal differences in time, units, access and missing-data assumptions. Impact analysis should trace the new behavior through source availability, data model, interfaces, tests, rollout and operational ownership. A thin slice is useful only if the stakeholder understands its limitations; show an unsupported or failure case alongside the happy path for an AI feature. If a new requirement threatens the date, present the changed scope, evidence and concrete options with a recommendation. The agreed record needs an owner and next decision checkpoint so uncertainty is not mistaken for a promise. Follow the delivery process agreed for the engagement, whether iterative or stage-gated. This is a proposed working method, not an invented client-management anecdote.
+
+WORKED EXAMPLE
+The old report showed total sales; the new request asks for sales by region and month. Clarify the time zone, late-arriving records, access rules and whether historical totals must reconcile before estimating the extra work.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Agreeing to an ambiguous change without impact analysis can create an untestable promise; excessive process can also delay useful feedback.
+
+TEST EVIDENCE
+Proposed acceptance review: compare old/new examples, list affected interfaces and confirm a stakeholder-visible demonstration plus regression tests. No real client incident is invented.
+
+SPEAKABLE ANSWER
+I would restate the changed business outcome and identify the smallest concrete example that distinguishes the new behavior from the old one. Then I would check its effect on data sources, permissions, interfaces, tests and timeline. I would document acceptance criteria and options, explain the trade-off in plain language, and ask the responsible stakeholder to prioritize scope, time or quality. Under an iterative process I would propose a thin demonstrable slice and collect feedback; in a stage-gated process I would also follow the agreed change-control and sign-off steps. I would flag a risk early with evidence and an owner rather than waiting for a missed deadline. This is my proposed working method, not a claim that I managed a commercial client engagement.
+
+SELF-CHECK
+Why is sales by region and month not a complete acceptance criterion by itself?
+It omits period boundaries, time zone, late data, access and reconciliation rules. Two implementations can both satisfy the phrase while returning different totals.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why start with an example instead of another paragraph of requirements?
+An example makes competing interpretations visible. Showing the old output and the desired new output exposes missing assumptions about units, time periods and inclusion rules. It also becomes a candidate acceptance test once the stakeholder confirms it. One example is not a complete specification, so follow with boundary and failure cases. The point is to give the discussion a concrete object rather than accumulate agreeable but ambiguous wording.
+
+1.1. Which boundary cases should follow a region-by-month sales example?
+Ask about missing region, refunds, late-arriving records, currency, time zone and users allowed to see each region. Verify whether monthly totals must reconcile with an existing report and how corrections affect past periods. These choices change the data logic and delivery effort. Select the cases relevant to the actual client rather than presenting a generic checklist as evidence that every domain rule has been discovered.
+
+1.1.1. How does an accepted example become a useful regression test?
+Record the input fixture, expected result and business meaning, then test through the public boundary that implements the behavior. Preserve the old behavior where it should remain valid and add a case that distinguishes the requested change. Avoid a test that merely repeats the implementation formula without an independent expected result. The fixture should explain why the output is correct so a future reviewer can recognize an accidental semantic change.
+
+2. How would you communicate that the change threatens a deadline?
+State the changed behavior, the affected work and the evidence behind the estimate. Present comparable options such as a smaller initial scope, a later date or a validated resource addition, with a recommendation. Make uncertainty visible and name the decision needed from the accountable stakeholder. Avoid promising unchanged scope and timing without evidence, and do not frame quality as a vague luxury when it includes required correctness or data protection.
+
+2.1. What makes options comparable rather than merely a list of ideas?
+Use the same dimensions for each: deliverable behavior, time, resources, risks reduced and uncertainty remaining. Explain dependencies and the cheapest next check that could change the estimate. A smaller slice should have its own acceptance criteria rather than being described as nearly complete. This lets the stakeholder choose knowingly and prevents a recommendation from hiding the cost or residual risk of the option the engineer prefers.
+
+2.1.1. What should be recorded after the stakeholder chooses?
+Record the accepted scope, owner, date or checkpoint, acceptance examples and residual risks. Update tests and plans to match the decision so the old interpretation does not survive elsewhere. If an assumption remains unresolved, attach a revisit trigger and responsible person. This is a proposed working method, not evidence of a past client engagement. The record should help delivery rather than substitute for implementing and demonstrating the chosen behavior.
+
+3. How would you avoid a misleading AI demonstration?
+Demonstrate an unsupported question or dependency failure alongside the happy path. State which data, workload and permissions were exercised, and show the user-visible response when evidence is insufficient. A thin slice is useful when its boundary is clear; it becomes misleading if viewers infer full coverage or production readiness. Tie the demonstration to acceptance criteria and list the next uncertainty to resolve before broader use.
+
+3.1. What if stakeholders like the demo but disagree about what it proves?
+Restate the observed behavior and the untested assumptions with a concrete example. Ask them to distinguish a prototype capability from a delivery commitment and capture the agreed next check. Do not treat enthusiasm as acceptance of hidden limits. A source-grounded answer on three documents establishes that path under those conditions, not broad correctness, operational scale or authorization across an entire organization.
+
+3.1.1. How would you choose the next milestone after that clarification?
+Select the smallest check that addresses the highest-impact uncertainty, such as permission enforcement, source freshness or concurrency under the expected workload. Define an observable pass condition and owner before expanding features. The next milestone should improve the strength of evidence for the intended use, not merely make the demonstration more impressive. Report the actual result and adjust scope if the uncertainty remains unresolved.
+
+OPTIONAL PRACTICE RESOURCES
+Pros and Cons of the Scrum Framework (AI Project Management: Deploying and Maintaining AI for Business - AI-Powered Course): https://www.educative.io/courses/ai-project-management-deploying-maintaining-business/pros-and-cons-of-the-scrum-framework
+The Waterfall Model (Web Development: A Primer - AI-Powered Course): https://www.educative.io/courses/web-development-a-primer/the-waterfall-model

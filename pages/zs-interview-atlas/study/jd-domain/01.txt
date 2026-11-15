@@ -1,0 +1,75 @@
+JD / Domain | Card 01
+Difficulty: Intermediate
+
+QUESTION
+A user says the model forgot the beginning of a long conversation. Explain tokens, context and sampling without blaming temperature.
+
+WHY THIS QUESTION MATTERS
+JD: tokens, embeddings, context windows, temperature and top-p; distinguish capacity limits from generation choices.
+
+CONTEXT
+The model appears to forget a fact. Before adjusting generation settings, distinguish information that never reached inference from information that reached it but was not used well. Tokenization and request assembly are the prerequisites; sampling parameters operate later.
+
+TERMS
+token: A tokenizer-specific unit represented by an integer ID.
+context window: The bounded sequence available to the model for a request.
+
+MECHANISM
+1. Trace the request assembly: instructions, conversation, evidence and tool messages become one serialized input. Count that actual representation with the matching tokenizer rather than treating every displayed word as one token.
+2. Compare the input plus the reserved output allowance with the serving context limit. If a truncation policy removed the early fact, no sampling choice can recover it from the missing text.
+3. If the fact remains present, test whether distracting material, ambiguous references or the task wording prevents its use. Change one variable and retain source pointers when summarizing history.
+
+TECHNICAL EXPLANATION
+Think of sampling after request assembly: the model cannot attend to a message the client never sent. A context budget should reserve space for the maximum allowed continuation, not assume an output cap makes the input small. Summaries introduce their own compression errors, so preserve explicit decisions and source pointers. If a sentinel fact remains in context but recall fails, vary its position and distractors without changing the expected answer to isolate use-of-context behavior from truncation. These are proposed controlled experiments, not evidence that any particular model always forgets early text. Temperature and top-p transform the token-choice distribution; neither is a calibrated truth score. A low-temperature unsupported statement is still unsupported. Report actual tokenization and truncation decisions rather than inferring the budget from characters or visible chat bubbles.
+
+WORKED EXAMPLE
+Illustrative budget: a 16,000-token window with a 2,000-token output allowance leaves at most 14,000 tokens for the serialized input. If instructions use 2,000 and evidence 10,000, only 2,000 remain for other messages; these numbers describe an example configuration.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Lower temperature is not evidence of accuracy or recovery of truncated context.
+
+TEST EVIDENCE
+Proposed check: log token counts and truncation decisions on synthetic conversations with an early sentinel fact; compare recall before and after it is excluded. No provider experiment was run here.
+
+SPEAKABLE ANSWER
+I first separate the input budget from generation randomness. A tokenizer maps text to token IDs; tokens are not always words. The context window limits the sequence the model can process, including the prompt, retrieved material, tool messages and generated continuation under the serving configuration. If the beginning was omitted or truncated before inference, lowering temperature cannot restore it. I would inspect the actual serialized request, token counts and truncation policy. Temperature changes how sharply probability mass is distributed; top-p selects a probability-mass shortlist for sampling. Neither parameter is a factuality check. I would keep essential instructions and evidence within budget, summarize older state with provenance, and retrieve relevant details when needed. A large context window also does not guarantee that every included fact will be used correctly.
+
+SELF-CHECK
+If the early fact is absent from the serialized request, would temperature zero recover it? Why?
+No. Temperature changes next-token sampling from the available context; it does not reinsert omitted information. Repair request assembly or retrieve the fact first.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why count the final request rather than just the user message?
+The final request contains more than the latest user text: instructions, tool schemas, retrieved passages, prior messages and formatting all consume tokens. Count the representation sent to the provider using its matching tokenizer and leave room for the allowed continuation. Otherwise a client can appear below budget while its actual request is too large. Inspect what the client omitted or compressed before attributing a missing fact to the model.
+
+1.1. What should a truncation policy preserve when everything cannot fit?
+Preserve the rules and state needed to interpret the current task, including unresolved constraints and the evidence supporting active claims. Remove redundant material before deleting dependencies that make later tool results meaningful. Define the policy explicitly so an old decision is not silently replaced by a misleading fragment. For example, a later approval message is unsafe to interpret if the payload it approved was truncated. Test with sentinel constraints placed at different positions.
+
+1.1.1. How could a summary fit the budget and still change the task incorrectly?
+Compression can turn a tentative suggestion into an agreed decision or lose an exception that changes the allowed action. Preserve explicit status such as proposed, accepted and unresolved, together with source pointers. Compare summary-based behavior against the full-history reference on controlled cases. A shorter request is not automatically an equivalent request; the evaluation should check important decisions and constraints, not merely whether a summary reads smoothly.
+
+2. Does top-p equal to 0.9 mean the answer is ninety percent correct?
+No. It restricts next-token sampling to a set with sufficient cumulative model probability under the sampling procedure. That distribution concerns likely token continuations, not a calibrated probability that a complete factual answer is true. A wrong but common statement can receive high probability. Keep the sampling setting separate from the factuality evaluation, and compare generated claims with evidence rather than translating a sampling parameter into an accuracy promise.
+
+2.1. What does temperature change if it does not measure truth?
+Temperature changes how concentrated or spread out the next-token distribution is before sampling. Lower values typically favor higher-scored options more strongly, while higher values permit more varied choices. The correct setting depends on the task and serving implementation; it cannot repair absent evidence or an incorrect premise. Compare settings on the same acceptance cases and report observed behavior rather than claiming that a low setting makes the output deterministic or factual.
+
+2.1.1. How would you test factual quality without confusing it with sampling variability?
+Fix the evidence and evaluation questions, define which claims must be supported, and run the configurations being compared with their settings recorded. If variability matters, use repeated trials and report counts of unsupported claims, omissions and abstentions rather than selecting the best sample. A sampling change may affect diversity or failure frequency under that setup. It does not establish universal correctness or a replacement for evidence validation.
+
+3. Which information should a state summary retain beyond a narrative of the conversation?
+Retain current decisions, their status and supporting source, unresolved questions, active constraints and any action approvals tied to exact payloads. A narrative alone may sound coherent while losing the distinction between an option discussed and an action authorized. Use a structured state when those distinctions matter. For example, keep the selected document version separately from a general description of the document so retrieval cannot silently substitute an outdated copy.
+
+3.1. What should happen when the summary conflicts with the original evidence?
+Treat the summary as a derived artifact and inspect the original source before making a consequential decision. Correct the summary, record the discrepancy and rerun affected checks rather than treating fluent compression as authoritative. A source pointer makes this feasible without keeping every token in the active request. The precedence rule should be explicit: a compressed recollection does not override an authenticated decision or a versioned source document.
+
+3.1.1. Can retrieval replace keeping all old messages in the context?
+It can supply relevant old evidence when the task identifies what to retrieve, but it introduces a selection failure mode: the necessary decision may never be returned. Preserve essential active constraints in current state and use retrieval for supporting detail with source identity. Test questions whose answers depend on older decisions, including ambiguous references. Retrieval reduces the active token load; it does not guarantee complete memory or remove the need for a state policy.
+
+OPTIONAL PRACTICE RESOURCES
+Understanding Context Windows and Token Limits (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/understanding-context-windows-and-token-limits
+Sampling Strategies (Grokking the Generative AI System Design Interview - AI-Powered Course): https://www.educative.io/courses/generative-ai-system-design/sampling-strategies

@@ -1,0 +1,87 @@
+JD / Domain | Card 12
+Difficulty: Intermediate
+
+QUESTION
+Given a string, return the length of its longest substring without repeating characters. Explain the invariant and test it.
+
+WHY THIS QUESTION MATTERS
+Python fundamentals, dictionary state, algorithmic reasoning and evaluation mindset; plausible coding practice, not a verified BITS PS interview question.
+
+CONTEXT
+The algorithm is about a contiguous substring, not a subsequence. Learn the invariant first: every current window has unique code points, and its left boundary only advances.
+
+TERMS
+sliding window: A contiguous range whose boundaries move while preserving a rule.
+invariant: A property that remains true after every loop iteration.
+substring: A contiguous slice of the original string.
+
+MECHANISM
+1. For each right index, inspect the character's previous position. If it lies inside the current window, move left just after it; an older occurrence outside the window is harmless.
+2. Update the last-seen index and compute the inclusive length right minus left plus one. The longest valid suffix at each right boundary covers the candidate needed for the global maximum.
+3. Trace abba by hand, then compare short generated inputs against an independent brute-force oracle. The finite check catches bugs, while the invariant supplies reasoning for arbitrary lengths and the API defines Unicode units.
+
+TECHNICAL EXPLANATION
+The proof separates validity from optimality. Advancing left past an in-window duplicate removes the only new uniqueness violation, so the suffix is valid. Any substring ending at right that starts earlier would contain that duplicate, so the retained window is the longest valid suffix for that boundary. Taking the maximum across boundaries therefore covers the global optimum. The guard prevents an old character outside the window from moving left backward, which is the abba failure. A dictionary stores last positions and jumps directly; a set-based approach instead removes elements until the violation disappears. Both have expected linear total work under ordinary hash-table assumptions. The current function returns a length over Python code points, so visible grapheme clusters, substring boundaries and stream offsets are separate API requirements. Finite exhaustive checks complement rather than replace the invariant.
+
+WORKED EXAMPLE
+abba: right=0, a -> left=0, best=1; right=1, b -> best=2; right=2, b was at 1 -> left=2, best=2; right=3, a was at 0 < left -> left stays 2, current substring ba, best=2. Moving left back to 1 would incorrectly count bba.
+
+SOURCE
+Teaching code (tested, not repo)
+
+def longest_unique_length(text: str) -> int:
+    last_seen = {}
+    left = best = 0
+    for right, char in enumerate(text):
+        if char in last_seen and last_seen[char] >= left:
+            left = last_seen[char] + 1
+        last_seen[char] = right
+        best = max(best, right - left + 1)
+    return best
+
+Point to the in-window duplicate check first. Explain why left only advances, then show how last_seen and the inclusive window length are updated.
+
+LIMIT
+Do not confuse substring with subsequence or count UTF-8 bytes as characters. A duplicate outside the current window must not move left backwards. Unicode code points are not always visible characters.
+
+TEST EVIDENCE
+Executed codex_support/live_coding.py: 8 named examples, including empty, abba, dvdf and emoji; all 1093 strings over abc of lengths zero through six matched an independent brute-force substring oracle. See reports/live_coding_tests.log.
+
+SPEAKABLE ANSWER
+I maintain a sliding window with no repeated characters. The left pointer marks its start, and a dictionary stores the last index of each character. When the next character already appears inside the current window, I move left to one position after that occurrence. I never move left backwards. Then I update the character index and the best window length. For abba, the second b moves left to index two; the final a was seen outside the current window, so it does not move left. The answer stays two. This is expected O(n) time with dictionary lookups and O(min(n, alphabet size)) auxiliary space. I test the empty string, repeated characters and abba, then compare small generated inputs against a brute-force oracle. Python iterates Unicode code points here; user-visible grapheme clusters would need separate segmentation.
+
+SELF-CHECK
+After the second b in abba, why must the last a not move left back to one?
+The old a lies outside the current window. Moving left backward would reintroduce the repeated b and invalidate the uniqueness invariant.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What goes wrong on abba if you always assign left to last_seen plus one?
+After the second b, left is two and the current valid window starts at the second b. The last a was seen at zero, outside that window. Assigning left to one on the final a moves it backward and incorrectly admits bba, which repeats b. Check whether the previous occurrence is at least left before advancing. The guard preserves validity while allowing an old out-of-window occurrence to remain harmless.
+
+1.1. Why is the retained window the longest valid suffix ending at the current index?
+When the new character repeats inside the window, every start at or before its previous occurrence includes both copies and is invalid. Moving left just after that occurrence removes the violation while retaining every possible remaining position. If there is no in-window duplicate, the existing start stays valid. This proves optimality for each right boundary, not merely validity, which is why maximizing those lengths yields the global optimum.
+
+1.1.1. How would the API change if the caller wanted the substring rather than its length?
+Track the best window start and length when the maximum improves, then slice the original input at the end. Define a tie rule, such as returning the earliest maximum, so equal-length candidates have predictable behavior. The current function returns only a length, so that richer output needs a contract and tests. The uniqueness invariant remains the same; changing the return type does not require recomputing every candidate substring.
+
+2. Could a set replace the last-index dictionary?
+Yes. Store the characters currently in the window; while the next character is already present, remove the leftmost character and advance left, then insert the new character. Each position enters and leaves at most once, giving expected linear total work with ordinary set operations. The last-index dictionary instead jumps directly beyond the duplicate. Both maintain uniqueness, but the stored state and trace differ, so explain the chosen invariant clearly.
+
+2.1. Why is the set version not quadratic just because it has a while loop inside a for loop?
+The relevant count is total boundary movement. Across the complete run, left advances at most the input length and each position is removed at most once. The nested loop does not restart from the beginning for every right index. This is amortized reasoning about total operations. Contrast it with independently scanning every substring, where repeated work really does multiply across start and end positions.
+
+2.1.1. What state is needed if characters arrive as a stream?
+A last-position approach can retain the current left boundary, global index, best length and last position for each observed symbol without storing all prior text when only the length is needed. Space depends on the distinct symbol set, not necessarily the current window alone. Returning the actual best substring requires retaining its content or access to the original stream. Define index and character units explicitly before promising the same API for arbitrary streamed text.
+
+3. What does exhaustive checking on short inputs establish?
+It checks every input in the chosen finite alphabet and length range against a separately written reference. That catches many boundary and repeated-character errors without relying on the optimized algorithm to generate expected outputs. It does not prove behavior for all strings or establish large-input performance. Pair it with the invariant proof and named examples, and report the exact finite set rather than calling the result universally verified.
+
+3.1. How could an oracle share the same bug as the optimized solution?
+If it uses the same moving-window logic or repeats the same incorrect boundary formula, agreement can reflect a shared mistake. Use an independent brute-force method that enumerates candidate substrings and checks uniqueness directly. Inspect a few expected results by hand, especially abba and empty input. Independence of approach strengthens the finite comparison, while the mathematical invariant supplies a separate line of reasoning about arbitrary lengths.
+
+3.1.1. Why does a successful finite alphabet check not settle Unicode behavior?
+The test alphabet may contain simple code points, while a visible character can contain several code points such as a base letter and combining mark. The current Python function counts code points, not grapheme clusters. If the requirement means visible characters, specify normalization and segmentation first, then apply the window algorithm to those units. The finite oracle validates the chosen representation; it does not define the product's meaning of character.
+
+OPTIONAL PRACTICE RESOURCES
+DIY: Longest Substring without Repeating Characters (Decode the Coding Interview in Python: Real-World Examples - AI-Powered Course): https://www.educative.io/courses/decode-coding-interview-python/diy-longest-substring-without-repeating-characters

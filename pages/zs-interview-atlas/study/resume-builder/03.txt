@@ -1,0 +1,94 @@
+Resume Builder Agent | Card 03
+Difficulty: Advanced
+
+QUESTION
+You describe one model call per repository. Does that mean one HTTP request or a fixed token cost?
+
+WHY THIS QUESTION MATTERS
+Tests precise description of logical model work, retries, rate limiting, and cost claims.
+
+CONTEXT
+Your resume describes one model call per repository. An interviewer might hear one network request, one charge, or a fixed speed. Here one call means one request from the summarization node to a client method. Once you define that unit, retries, cache hits and selecting a different provider make sense.
+
+TERMS
+logical operation: The application-level request whose implementation may make several attempts.
+cache hit: Reuse of stored content under a matching request identity.
+rate limit: A bound on permitted work within a time window, distinct from total run cost.
+
+MECHANISM
+1. Pick a provider when the graph connects. Groq is the default. The server can opt into Ollama. The following nodes are not rewritten because the two clients expose structured(messages, schema, ...).
+2. Give the method evidence and a schema. A schema lists the fields and types the result should contain. Ollama sends the full schema in the request format field and checks the result locally.
+3. Handle the failure you actually saw. A Groq token-limit failure may need more room. A wrong-shaped answer needs a correction; Groq and Ollama can repair a shape failure once at the structured layer.
+4. Distinguish one logical summary from the actual requests. A warm cache may mean zero generation requests; a repair can mean two. Transport and other stages can add calls.
+5. State the scope. Ollama avoids the Groq generation limiter but shares the host's compute and may still use network. Browser credential preflight has not been switched to Ollama.
+
+TECHNICAL EXPLANATION
+The implementation deliberately separates tool-backed evidence gathering from structured model output. That is an interface constraint and a useful test boundary, not proof of one remote request. GroqClient.complete constructs a provider request, consults its cache, reserves rate budget and handles transient failures; structured can make another validation attempt. A timeout may hide remote completion, so retrying can consume additional quota. Usage has request and token fields, but their scope and completeness matter when interpreting totals. The shared limiter coordinates a process-local rate window for a key bucket; it is not a durable run-wide financial ledger. Cache identity includes repository, head, prompt identity/version and model, while changes to omitted evidence-building settings can require invalidation. The strongest interview answer names the counted operation and then describes the budget boundary honestly. Do not divide one reported run total by repository count and present that as a fixed per-repository charge. In the supplied flow, 'one model step' is a useful shorthand only for project summarization within the browser prefix. select_repos can ask Jev for claimability and tier judgments and can use a local embedding for resume relevance. Likewise, one summarize_repo graph-stage visit can process several repositories. Count selected repositories, logical summaries, selection-service operations and remote attempts separately when explaining architecture or cost. The Groq client distinguishes two provider errors with different fixes. An explicit completion-token limit can increase max_tokens up to the configured cap in the lower-level retry loop. For a strict-schema rejection without that truncation signal, complete() raises SchemaRejectedError and passes along failed_generation when available. structured() appends the prior output and a correction, then asks once more. A successful HTTP response that fails local Pydantic validation also gets a repair attempt. Neither makes the result accurate by itself; schema validation checks the shape. The separate claim verifier checks support.
+
+Ollama uses a full JSON Schema under format and validates content locally. Its correction retries parsed but invalid content; a transport or HTTP error is not automatically repaired by that loop. Provider substitution changes deployment and resource limits. The source trace reports a clean smoke result on one configured host, not a head-to-head quality or latency benchmark. Browser credential preflight still checks Groq and can block before Runner runs.
+
+WORKED EXAMPLE
+Imagine two selected repos. One has a cached summary. The other returns JSON without the required claim text, so the client asks once more. That is two logical summaries, zero generation requests for the first and two for the second. It is not a promise of two requests in another run.
+
+SOURCE
+resume-builder-agent/v2/src/rba/ollama_client.py:123-132
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/ollama_client.py#L123-L132
+
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "format": schema.model_json_schema(),
+            "stream": False,
+        }
+        body.update(self.config.get("ollama.defaults", {}))
+        body.update(overrides)
+
+        resp = await self._client.post(f"{self.base_url}/api/chat", json=body)
+
+The schema becomes the format field. This request asks for one non-streamed reply. Later, structured validates the returned content. The source-check gate is still in nodes/verify.py, outside this client.
+
+LIMIT
+No hard token, exactly-one-request, or model quality guarantee. Provider selection does not yet switch the browser credential preflight, and no Groq generation limiter on Ollama means host capacity matters.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+I count one logical structured summarization operation per selected repo. That means asking the client for one typed summary, not guaranteeing one HTTP request. A cache hit can avoid a model request; repairing an invalid response can add one. The summarizer can call the same structured method on Groq or on an opt-in Ollama client. That changes where generation runs, not how code verifies a claim. Selection and credential checks are separate work, and the full_run continuation can generate role resumes and plans. I report attempts, actual usage and cache hits separately. A hosted quota or an output setting is not a fixed total cost.
+
+SELF-CHECK
+Can a timeout after a provider completed establish that no billable work occurred?
+No. The caller may not have received the completion or its usage record. Retrying can create another attempt. Record that uncertainty and distinguish observed request accounting from a hard provider billing guarantee.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why could the generation provider change without rewriting verification?
+Both clients expose a method called structured that takes messages and a schema and returns a typed result plus usage. Runner selects the client at graph setup. The summarization node still asks the same question in code. The plain Python checks then examine its claims rather than trusting the provider label.
+
+1.1. Does choosing Ollama make browser import independent of a Groq key?
+The generation node selects Ollama, but the browser first calls credential preflight. That preflight still checks Groq and treats a failed Groq check as blocking. A test of the Ollama client by itself cannot prove the full browser route works with no Groq credential. Match the claim to the path tested.
+
+1.1.1. How would you test the remaining browser boundary?
+Use a fake transport and exercise the entire browser import driver with Ollama selected and no Groq key. Assert whether preflight stops the import before the graph. Then implement provider-aware checks if required and test that Groq selection still blocks on a rejected key. Do not present that proposed fix as existing behavior.
+
+2. What identifies a reusable summary in the current code?
+summarize_one builds a key from repository, head SHA, prompt identifier and rendered prompt version, while Cache also keys by model. That addresses several staleness dimensions. Inspect omitted behavior-changing inputs such as evidence-budget or adapter changes before assuming the key captures the entire generation request. Cache identity is a contract to audit, not a generic guarantee.
+
+2.1. Why can the same repository commit still produce a different request?
+Application code or configuration can change what evidence is selected and how much is retained while the repository head remains unchanged. Decoder settings or schema behavior can also change. If those changes do not affect the cache key or versioning policy, reuse may return an older behavior. Version the relevant inputs or invalidate deliberately.
+
+2.1.1. How would you test that without a live provider?
+Use a fake transport that records calls. Hold repository and model fixed while changing one behavior-relevant input, then assert the intended hit or miss under the documented key policy. Also test repeated identical requests. This isolates cache correctness from provider variability and makes any omitted identity dimension explicit rather than hidden behind a low token total.
+
+3. Why does the full CLI branch have a different cost profile?
+After building the document it can generate per-role resumes and improvement plans in addition to summaries. The browser stops earlier. Those are extra logical generation operations even though both paths share one graph. Report the actual branch, selected repositories and retries before comparing latency or token usage between runs.
+
+3.1. Can one repository count explain two runs with different latency?
+Not by itself. Cache state, evidence size, provider backoff, chosen model tier and whether full_run is enabled all matter. A single observed run provides evidence for its configuration, not a general service target. Compare controlled runs with those dimensions recorded and inspect where time was spent.
+
+3.1.1. How would you describe the repository’s reported sixty-eight-second import?
+Attribute it to the documented live example with two selected repositories and its recorded settings. Do not turn it into a latency promise for every username, cold cache or load level. This review does not rerun that paid provider experiment; offline tests establish control flow and contracts under their own conditions.
+
+OPTIONAL PRACTICE RESOURCES
+Sampling Strategies (Grokking the Generative AI System Design Interview - AI-Powered Course): https://www.educative.io/courses/generative-ai-system-design/sampling-strategies
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run

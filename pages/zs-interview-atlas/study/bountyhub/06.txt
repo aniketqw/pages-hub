@@ -1,0 +1,98 @@
+Multi University Bounty System | Card 06
+Difficulty: Advanced
+
+QUESTION
+Why use MongoDB for cross-university search while PostgreSQL stays authoritative, and what can you say about a Redis prefix index?
+
+WHY THIS QUESTION MATTERS
+Tests the implementation boundary, failure modes, and whether I can separate code evidence from assumptions.
+
+CONTEXT
+Search here has two derived/data paths: Mongo text search and a PostgreSQL substring fallback. Learn the differences in word matching, ranking, freshness, and failure semantics before comparing performance.
+
+TERMS
+authoritative store: System of record whose state other views reflect.
+denormalized read model: Derived copy shaped for queries rather than writes.
+eventual consistency: Updates may take time to appear in dependent views.
+
+MECHANISM
+1. Trace the controller into the service and discovery method; note Mongo’s text-score ordering.
+2. Distinguish an empty result from an unavailable catalog; both currently can lead to fallback.
+3. Read the PostgreSQL predicate: case-insensitive contains is not a tsvector full-text query.
+4. Validate any claimed Redis prefix index by tracing its writer, key format, reader, and tests.
+
+TECHNICAL EXPLANATION
+The active path builds a Mongo `$text` query and runs count/page retrieval; null or empty results lead to a PostgreSQL case-insensitive search. Matching and performance can differ. `searchDocuments` includes university ID and a shard-key comment, but the audit does not establish a deployed sharded cluster. No Redis prefix-index path is traced. Define semantics and freshness, then compare Mongo text search, PostgreSQL indexes, or a dedicated engine under measured load. The repository fallback uses `contains` across title and description, so calling it PostgreSQL full-text is inaccurate. Arbitrary substring matching may benefit from pg_trgm; tokenized search may fit tsvector, but semantics change. Use the generated SQL and EXPLAIN ANALYZE with representative volume. Count and page queries are separate costs, and an empty Mongo result can invoke fallback even when the stores disagree on matching rules.
+
+WORKED EXAMPLE
+For a two-word query, the Mongo path makes both terms required; the PostgreSQL fallback may have different matching behavior.
+
+SOURCE
+BountyHub-main/server/src/services/discoveryService.js:7-27
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/services/discoveryService.js#L7-L27
+
+  async search(query, skip = 0, limit = 10) {
+    if (!BountyCatalog) return null;
+
+    try {
+      const criteria = { status: { $ne: 'CANCELLED' } };
+      if (query && query.trim()) {
+        // By default MongoDB $text treats multi-word queries as OR ("machine learning"
+        // returns docs with either word).  Wrapping each word in double-quotes makes
+        // every word required (AND semantics) without disabling stemming entirely.
+        const mandatoryQuery = query.trim().split(/\s+/).map(w => `"${w}"`).join(' ');
+        criteria.$text = { $search: mandatoryQuery };
+      }
+
+      const [docs, total] = await Promise.all([
+        BountyCatalog.find(criteria)
+          .read('secondaryPreferred')
+          .skip(skip)
+          .limit(limit)
+          .sort(query ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
+          .exec(),
+        BountyCatalog.countDocuments(criteria).read('secondaryPreferred'),
+
+Mongo is a derived search catalog; Redis detail cache is a different optimization. I traced Mongo text search and PostgreSQL fallback, while the Redis prefix-index path remains unverified.
+
+LIMIT
+Fallback matching may differ. Shard-key comments do not prove deployment, and a Redis prefix index is not established by this code map.
+
+TEST EVIDENCE
+No search benchmark ran. Compare the same query set, relevance, p50/p95, freshness after writes, and fallback behavior; trace any claimed prefix-index producer and consumer.
+
+SPEAKABLE ANSWER
+PostgreSQL is the system of record; `search` in `server/src/services/discoveryService.js` queries a Mongo catalog for cross-university text search. If Mongo is unavailable or returns no matches, `search` in `server/src/services/bountyService.js` falls back to PostgreSQL. Detail/list reads separately use Redis caching. I can trace those paths. I cannot trace a Redis prefix-index update path from this code map, so I would not claim it is implemented. Mongo uses `$text` with secondaryPreferred, a derived read model with eventual consistency. I did not benchmark latency or search quality. I would be careful about the word “global”: the service comment describes cross-university search, while another method carries a university ID for a targeted query. I would confirm which route calls each method before making a product-level claim. Search correctness also needs a judged query set; successful database responses alone do not establish relevance.
+
+SELF-CHECK
+Mongo returns zero matches for a phrase while PostgreSQL contains finds one bounty. Is fallback automatically more correct?
+No. The stores may implement different matching semantics, so fallback can add a result that violates Mongo’s stricter text behavior. Product intent and a judged query set must decide; this audit also cannot trace the resume’s Redis prefix-index update path.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why maintain a denormalized Mongo catalog?
+It supports a dedicated text-search path while PostgreSQL handles relational writes and constraints. The tradeoff is sync lag and complexity, so justify it with measured query needs. “No matches” and “Mongo is unavailable” both trigger the PostgreSQL fallback in this service, but they mean different things operationally. Empty results may be a valid answer; a thrown Mongo error indicates dependency failure. I would preserve that distinction in metrics and response behavior so a slow fallback does not hide a broken catalog.
+
+1.1. How would you distinguish empty search from Mongo failure?
+Return an explicit result state from discovery, such as success-with-zero, success-with-results, or unavailable, rather than overloading null and empty. The caller can choose fallback for unavailable and perhaps for empty only if fallback semantics are intended. I would add counters for each outcome and compare sampled result IDs between stores. This makes a fallback measurable instead of an invisible branch.
+
+1.1.1. Would fallback on every empty Mongo result be correct?
+Not necessarily. Mongo may have stricter matching or lagging data, while PostgreSQL contains substring matching; a fallback can introduce results that contradict the primary search semantics. Product expectations should define whether this is acceptable. I would test query cases with zero, one, and multiple terms and label fallback-origin results in telemetry before changing behavior. The response should preserve which backend answered so a fallback does not silently alter relevance expectations. The response should preserve which backend answered so a fallback does not silently alter relevance expectations.
+
+2. How verify that claim?
+Search producers, consumers, key schema, invalidation, and tests, then trace one write end to end. If absent, label it unverified rather than infer from Redis use. The repository comment says “full-text,” but the fallback uses case-insensitive `contains` over title and description; that is not PostgreSQL full-text search. A leading wildcard can also limit ordinary B-tree index use. I would inspect schema indexes and query plans before making a performance claim.
+
+2.1. What index might help substring search?
+A trigram GIN or GiST index can support many substring and similarity operators, but the exact Prisma-generated SQL and PostgreSQL operator class matter. A normal B-tree index generally will not accelerate arbitrary contains patterns. I would reproduce the generated query, add the candidate index in a disposable database, run EXPLAIN ANALYZE at realistic cardinality, and compare write cost as well as read latency.
+
+2.1.1. How would you prevent an index from becoming a guess?
+Start with observed query plans, representative data volume, and a target latency objective. Measure p50 and p95 before and after the index, plus insert/update overhead and index size. Keep the index only if it improves the workload that matters. I would also test cancellation and status filters, because a search index that speeds text matching may not eliminate sorting or count costs.
+
+3. What is a fair comparison?
+Use the same corpus and queries, judge recall/ranking, record p50/p95 and freshness, and include Mongo outage fallback. `skip` and `take` implement offset pagination, and the query performs a separate count. Deep pages can scan or discard many rows, while the total count can cost more than the page fetch. I would set maximum page size and consider cursor pagination if clients routinely go deep.
+
+3.1. What consistency issue can cursor pagination improve?
+A cursor based on a stable ordered key such as `(createdAt,id)` avoids many rows shifting between page requests when new records arrive at the front. It does not automatically give a frozen snapshot, and the cursor must include filters and sort direction. I would test inserts between pages and ensure no duplicates or omissions under the chosen contract. That test should use a fixed dataset and record both identifiers and rank, not only whether each query returns HTTP 200. That test should use a fixed dataset and record both identifiers and rank, not only whether each query returns HTTP 200.
+
+3.1.1. Would you remove the total count from the response?
+Only if the client experience can use next-page availability or an approximate total. Exact count across a large changing dataset can be expensive and may be inconsistent with the page query unless both share a snapshot. I would inspect product requirements, measure count latency independently, and consider a capped or asynchronously computed total rather than silently returning a misleading number.

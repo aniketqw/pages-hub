@@ -1,0 +1,75 @@
+Behavioural & Experience | Card 08
+Difficulty: Intermediate
+
+QUESTION
+How do you learn an unfamiliar tool quickly while staying accountable for quality and deadlines?
+
+WHY THIS QUESTION MATTERS
+JD: learning velocity, AI productivity tools, delivery and proactive risk communication.
+
+CONTEXT
+Learning a tool quickly is a workflow for reducing uncertainty, not a claim that a tutorial equals production expertise. A small reproducible task can expose interface, permissions, and error handling before a deadline is committed. AI-generated code and SQL still need review, representative checks, and access controls. Certifications show completed study, not production operation.
+
+TERMS
+timebox: A fixed period for exploring or completing a bounded task.
+reviewable change: A change small and clear enough for another person to assess.
+
+MECHANISM
+1. Choose one task that uses the tool’s actual input and output, and consult the primary documentation for that path.
+2. Build a minimal example, write a focused check, inspect failure and permission behavior, and ask for review when blocked.
+3. Report verified scope and remaining uncertainty early; reduce scope explicitly if the deadline cannot support validation.
+
+TECHNICAL EXPLANATION
+Explain the method as a sequence: define the task, learn the narrow interface, test a representative case, review risk, and communicate what remains unverified. Add one real example with tool, time window, and result; without that, keep the answer as a proposed process rather than a past accomplishment. When discussing AI assistance, explain how you checked the output and protected data. Under deadline pressure, offer comparable scope and timing options, not a vague promise to “work harder.” Do not imply cloud operations from certifications alone. The best evidence is a small change you can explain and verify, with clear limits.
+
+WORKED EXAMPLE
+Proposed first-hour plan for an unfamiliar API: one authenticated read against test data, one validation failure, one timeout path and a short note on limits. This is a plan, not an invented prior accomplishment.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Do not confuse certifications, tutorials or AI-generated output with demonstrated production ownership.
+
+TEST EVIDENCE
+Certification names and technical proficiency matched to the resume. Personal learning story and deadline outcome must be supplied; no cloud account was accessed.
+
+SPEAKABLE ANSWER
+I would begin with the smallest task that exercises the real interface, then read the official documentation for that path and write a check for the expected behavior. [FILL BEFORE INTERVIEW: add one true example of learning a tool, the time available and the result.] AI assistance can suggest an approach or code, but I remain responsible for reviewing it, running checks and understanding failure modes. I would keep credentials and client data out of prompts and commit a small reviewable change rather than a large unexplained generated patch. If the deadline becomes unrealistic, I would report what works, what is unverified and the smallest scope that can still deliver value. My AWS certifications are evidence of completed learning listed on the resume, not proof that I operated a production cloud system.
+
+SELF-CHECK
+If an AI-generated query returns plausible totals but one join key is not unique, what should you do?
+Stop before using the result. Inspect table grain and row multiplication, verify the key and filters with the data owner, and compare against a small independent sample. Plausible output does not establish correct aggregation or appropriate access.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you learn the smallest useful interface first?
+Pick one real task that exercises the tool’s core input and output, then read the official docs for that path and make a tiny reproducible example. [FILL BEFORE INTERVIEW: give the actual tool, time available, and outcome.] I would time-box exploration and record what I have not yet verified.
+
+1.1. What check keeps a quick prototype from becoming a fragile deliverable?
+Add a focused test for the expected behavior, inspect error handling and permissions, and ask a teammate to review the smallest diff. Keep the prototype isolated until it meets the agreed acceptance criteria. A successful tutorial example is not enough to establish production readiness.
+
+1.1.1. How do you decide whether to keep learning or ask for help?
+Ask when a blocked assumption affects the task, security, or deadline. Bring a minimal reproduction and the sources already checked so the expert can respond efficiently. [FILL BEFORE INTERVIEW: say how you actually sought help in a real learning example.]
+
+2. What would you check in an AI-generated SQL query?
+Check table grain, join cardinality, filters, null behavior, permissions, and whether the output answers the business question. Run it on safe representative data and compare a small sample with an independently computed result. Generated syntax that runs is not evidence that the query is correct.
+
+2.1. How might a join silently inflate an aggregate?
+If one side has multiple rows per key, joining can duplicate facts before aggregation. I would inspect uniqueness assumptions, count rows before and after the join, and validate against a known case. Also verify the query does not expose fields the user is not authorized to see.
+
+2.1.1. What would you do if the result differs from the expected sample?
+Stop and reduce the query to the smallest join or filter that changes the result. Trace row counts and nulls, confirm source definitions with the data owner, and record the fix in a regression case. [FILL BEFORE INTERVIEW: use a real example only if one happened.]
+
+3. What information belongs in a deadline-risk update?
+State the verified result, remaining uncertainty, likely impact, and options with time or scope cost. Name the decision needed and its owner before the deadline is missed. Avoid vague status such as “almost done.” [FILL BEFORE INTERVIEW: describe a true update you delivered and what decision followed.]
+
+3.1. How do you offer options without shifting responsibility?
+Give a recommendation and explain why, but make the decision owner explicit. For example, preserve the date with reduced scope or retain scope with a later validation gate. Record accepted risk and the next checkpoint. Do not quietly choose a risky path on behalf of a stakeholder.
+
+3.1.1. What if the stakeholder chooses the riskier option?
+Confirm the choice, document the accepted risk and guardrails, and monitor the agreed signal. If facts change, raise it promptly. [FILL BEFORE INTERVIEW: state only a real outcome.] Accountability includes supporting an informed decision and being candid if the original estimate changes.
+
+OPTIONAL PRACTICE RESOURCES
+Introduction to GitHub Copilot Ecosystem (GitHub Copilot for Professionals - AI-Powered Course): https://www.educative.io/courses/advanced-github-copilot/introduction-to-github-copilot-ecosystem
+Responsible AI and the Ethical Use of Copilot (GitHub Copilot for Professionals - AI-Powered Course): https://www.educative.io/courses/advanced-github-copilot/responsible-ai-and-the-ethical-use-of-copilot

@@ -1,0 +1,104 @@
+VisionDev | Card 02
+Difficulty: Intermediate
+
+QUESTION
+Walk me through the misclassification callback: how do you capture failures without derailing training?
+
+WHY THIS QUESTION MATTERS
+This tests whether the candidate understands framework hook design, the cost of instrumentation, and data-capture hygiene - the engineering judgment behind the headline feature, not just the feature.
+
+CONTEXT
+A training callback runs inside a hot path, so every extra operation trades convenience for runtime and memory. This implementation recomputes validation logits, retains image payloads, and delays hash aggregation until training ends. Those choices are tolerable for a small CIFAR-10 prototype but would need measurement and a different artifact strategy at larger scale. Exact hashes identify byte-level repeats only.
+
+TERMS
+Lightning callback: a class whose hooks (on_validation_batch_end, on_train_end) the Trainer invokes at lifecycle points, letting you add instrumentation without touching the model
+content addressing: identifying data by a hash of its bytes - here sha1 of raw pixels - so identity is deterministic across epochs and runs
+dedup-with-count: collapsing repeated observations to unique records while preserving frequency as a count field - keeping both the unique and exposure views
+
+MECHANISM
+1. Trace when Lightning invokes `on_validation_batch_end` and which outputs are already available from the validation step.
+2. Measure callback time, peak memory, and log size on a fixed run; compare with a version that reuses returned logits.
+3. Keep exact IDs and observation counts, but stream payloads or shard artifacts before scaling beyond the prototype.
+
+TECHNICAL EXPLANATION
+Design choices worth defending: (1) Hook placement - validation batches, not training batches, so capture reflects held-out behavior and does not interact with gradient computation. (2) Recomputing logits inside the hook (pipe/debug_logger.py L191) instead of reusing Lightning's outputs - simpler and framework-version-proof, but it is a second forward pass; the cheaper design threads outputs through validation_step returns. (3) sha1 of raw tensor bytes as identity (L222-223) - deterministic and cheap, enabling the on_train_end unique-by-hash pass (L404-413) that sorts by repeat count so the most persistently-failing images top the list. (4) Storing base64 inline makes the log self-contained - any machine can reconstruct the image - at the price of multi-MB JSONs; a content-addressed image directory plus hash references would scale better. (5) The epoch field per entry preserves when a failure first appeared. What I would change for production: sample or cap capture per epoch, write images to object storage keyed by hash, stream entries instead of holding them in memory, and emit metrics to a proper store instead of one monolithic JSON.
+
+WORKED EXAMPLE
+Concretely: after a 3-epoch run, pipe/logs/training_log_20260317_012558.json contains 4,935 unique misclassified samples distilled from 10,012 observations, each with hash, base64 image, true/predicted labels, distortion_predicted, confidence, epoch, and count - enough that the downstream archetype and VLM stages run without touching the training environment at all.
+
+SOURCE
+vision_dev_project/pipe/debug_logger.py:177-204
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L177-L204
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        """Called at the end of each validation batch to collect predictions"""
+        x, y = batch
+        
+        # Collect input statistics
+        self.input_stats.append({
+            'batch_idx': batch_idx,
+            'epoch': trainer.current_epoch,
+            'input_mean': float(x.mean().item()),
+            'input_std': float(x.std().item()),
+            'input_min': float(x.min().item()),
+            'input_max': float(x.max().item()),
+        })
+        
+        logits = pl_module(x)
+        preds = torch.argmax(logits, dim=1)
+        
+        # Store all predictions and labels
+        self.all_predictions.extend(preds.cpu().numpy().tolist())
+        self.all_labels.extend(y.cpu().numpy().tolist())
+        
+        # Batch-wise metrics
+        batch_accuracy = (preds == y).float().mean()
+        batch_loss = torch.nn.functional.cross_entropy(logits, y)
+        self.batch_metrics.append({
+            'epoch': trainer.current_epoch,
+            'batch_idx': batch_idx,
+            'batch_accuracy': float(batch_accuracy.item()),
+
+This is the top of on_validation_batch_end. First it appends input statistics - mean, std, min, max per batch - which later helps distinguish data drift from model failure. Then the line I flag honestly: logits = pl_module(x) is a fresh forward pass, the second one for this batch. It collects all predictions and labels for epoch-level confusion analysis, then computes per-batch accuracy and cross-entropy. The misclassification capture, hashing, and YOLO tagging follow just below this slice.
+
+LIMIT
+The honest weaknesses: doubled validation compute from the recomputed forward pass; memory growth because every misclassified sample is held in RAM until on_train_end; and exact-hash dedup that misses near-duplicates - one different pixel means two entries. On a dataset larger than CIFAR-10 this design would need the production changes I listed or it would fall over.
+
+TEST EVIDENCE
+Verify from artifacts: training_log_20260317_012558.json has summary.total_misclassified 10012 while len(misclassified_samples) is 4,935 - proof the dedup-with-count path executed; every entry carries a 40-hex-char sha1 and a count >= 1, and counts sum back to the observation total.
+
+SPEAKABLE ANSWER
+The capture lives in a PyTorch Lightning callback, DebugLogger in pipe/debug_logger.py, so failure analysis is a by-product of training rather than a separate job. Its on_validation_batch_end hook runs after every validation batch: it recomputes logits, records batch accuracy, loss, and input statistics, and for each misclassified image it converts the tensor to PIL, takes a sha1 hash of the raw pixel bytes, base64-encodes the image, and appends an entry with true label, predicted label, and the YOLO distortion tag. Then on_train_end deduplicates by exact hash, keeping the first entry plus a repeat count, and writes one consolidated training_log JSON along with distribution plots. I will name the costs before you do: the hook does a second forward pass on every validation batch, roughly doubling validation compute - fine for a 3-epoch CIFAR-10 research run on run 012558's scale of about 10,012 misclassification observations, not something I would ship unchanged; base64 images make the JSON large; and dedup is exact byte match, so two near-identical images count as distinct. The payoff is zero extra pipeline stages: train once, and the failure dataset exists.
+
+SELF-CHECK
+If validation time doubles after enabling the callback, which design assumption would you test first?
+I would measure the callback path against the base validation step and confirm whether logits are recomputed. Returning detached logits from validation_step and reusing them should remove that second forward pass, subject to a parity check on captured examples.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you eliminate it?
+Return logits from validation_step and read them from the outputs argument that on_validation_batch_end already receives, or register the capture inside validation_step itself. I recomputed for decoupling - the callback works with any LightningModule without contract changes - and accepted the cost knowingly at CIFAR-10 scale.
+
+1.1. Why recompute logits in a callback at all?
+The callback was written to work independently of a project-specific validation-step output contract, which made it convenient for a research prototype. The cost is a second forward pass for each validation batch. A stronger design returns detached logits from validation_step and consumes them in the callback, then checks that the metrics and captured mistakes remain equivalent on a fixed batch.
+
+1.1.1. Would using stored logits change callback compatibility?
+Yes, it creates a clearer contract between the LightningModule and callback. I would define the expected output shape and test it on a single batch, then measure validation time before and after. If compatibility with arbitrary modules is important, make the output path configurable and keep a slower fallback explicit rather than silently recomputing.
+
+2. Why dedup at save time instead of capture time?
+Capture time only sees one batch; the same image reappears across epochs, and I wanted the repeat count as a signal - an image failing in all 3 epochs is more interesting than a one-off. Deduping once in on_train_end keeps the hot path cheap and makes count computation trivial. The trade-off is peak memory holds all observations.
+
+2.1. When is save-time dedup preferable to dedup during capture?
+Capture-time code sees only the current batch, while an image can recur in later epochs. Delaying aggregation lets the callback preserve how often a specific exact hash failed. The trade-off is that all sample payloads remain in memory until training ends. I would keep this only for small runs and stream compact records or shard artifacts for larger workloads.
+
+2.1.1. How would you preserve repeat counts while streaming?
+I would use a disk-backed keyed table or append-only events keyed by exact image hash, incrementing an observation count as batches arrive. The image payload could be written once to a content-addressed store. A restart-safe transaction or idempotent event key would be needed so a retried batch does not inflate counts.
+
+3. Is embedding images in JSON sane?
+At CIFAR-10 size - 32x32 PNGs - yes: the log stays a single portable artifact and downstream scripts need no filesystem contract. At realistic image sizes it is not; I would write images to a content-addressed directory (hash.png, which the pipeline's extraction step already produces) and keep only hashes and paths in the log.
+
+3.1. What can go wrong when the report depends on filesystem paths?
+Paths can become stale when artifacts move, and absolute paths from one machine may not resolve elsewhere. I would make the content hash the stable key, store a relative artifact path and checksum in the manifest, and verify the file before analysis. This keeps JSON compact while making missing or altered image files a visible error.
+
+3.1.1. How would you make the artifact portable between machines?
+Package the manifest and image directory together or upload them under a versioned artifact URI, preserving checksums. On load, resolve relative paths from the package root and fail with a useful missing-artifact report. I would test a copied artifact bundle in a clean temporary directory instead of relying on the original workspace layout.

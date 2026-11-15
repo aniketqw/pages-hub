@@ -1,0 +1,75 @@
+JD / Domain | Card 14
+Difficulty: Advanced
+
+QUESTION
+How would you improve a failing extraction prompt without turning examples into a source of fabricated facts?
+
+WHY THIS QUESTION MATTERS
+Supplied JD: few-shot prompting, structured outputs, hallucination awareness and simple test cases.
+
+CONTEXT
+An extraction prompt defines behavior under evidence constraints. Improving its clarity should not let examples or plausible language become substitutes for facts in the current document.
+
+TERMS
+few-shot prompting: Providing a small number of demonstrations of the desired behavior in the request.
+abstention: Explicitly declining to supply an answer or field when support is insufficient.
+
+MECHANISM
+1. Classify the observed error before rewriting instructions: was the source absent, the field ambiguous, the output malformed or the extracted value unsupported?
+2. Specify allowed fields and missing-value behavior, then use varied demonstrations of behavior. Delimit the real document and keep examples distinct from the evidence for this request.
+3. Validate output shape and source support separately, and compare revisions on missing, contradictory and ordinary cases. A concise evidence reference is reviewable; a persuasive explanation alone is not validation.
+
+TECHNICAL EXPLANATION
+Prompting is an interface design problem: the caller must define what the model should do when the input is partial, contradictory or irrelevant. Few-shot demonstrations reduce ambiguity about behavior, but can also create anchoring and accidental value copying. Choose examples that vary names, amounts and missing fields, then test an input with no amount to see whether a demonstration amount leaks into the output. Delimiters improve readability; they do not grant the enclosed text authority or create an authorization boundary. Structured output narrows output shape, while a separate evidence check establishes whether each field was supported. When a prompt revision helps common examples but harms missing-data cases, inspect failures rather than announcing improvement from an aggregate alone. An explanation should identify the source used or the reason for abstention; do not treat an unverifiable narrative about internal reasoning as evidence.
+
+WORKED EXAMPLE
+Example demonstration uses invoice amount 100, while the real invoice only contains a date. The expected amount is null under the stated contract. Producing 100 is example contamination even though the JSON parses perfectly.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+This is conceptual preparation and a proposed method, not a claim that I trained or deployed this system.
+
+TEST EVIDENCE
+Reasoning and illustrative examples reviewed; no training, provider experiment or deployment was performed for this lesson.
+
+SPEAKABLE ANSWER
+I first label the failure: missing evidence, an ambiguous instruction, an invalid output shape, or an unsupported value. I then make the task contract explicit: permitted fields, evidence boundaries, a missing-value rule and a small output example. Few-shot examples demonstrate behavior; their names and numbers must not become facts about the current input. I separate instructions from the document, ask for source references where useful, and validate both schema and factual support. I change one important part at a time against a fixed development set, then compare on held-out cases. I can request a brief explanation with evidence for review, but a convincing explanation is not proof of correctness. If the evidence is missing, the correct behavior may be null or abstention rather than a more elaborate prompt.
+
+SELF-CHECK
+An example contains amount 100 but the actual document has no amount. What should the extraction return?
+Under a contract that uses null for missing fields, it should return null. Copying 100 would import a demonstration fact into a different input.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How can a demonstration improve format while making factual extraction worse?
+The demonstration makes a response pattern easier to imitate, including any concrete names or numbers it contains. If the real document lacks an amount, the model may copy the demonstration amount instead of applying the missing-value rule. That is useful behavioral conditioning becoming factual contamination. Vary demonstration values, include missing-field examples and test a document with no amount. Check each generated value against the current source rather than rewarding only a well-formed object.
+
+1.1. What contrastive examples would expose copying rather than real extraction?
+Use the same document shape with different amounts, a document with the amount omitted, and a document containing an unrelated number such as a reference ID. Keep the expected field rule explicit. If predictions track demonstration values instead of source changes, the prompt is anchoring on examples. If the reference ID becomes the amount, field interpretation is wrong. These paired cases make the failure observable without requiring a large dataset or a more elaborate explanation prompt.
+
+1.1.1. Would repeatedly fixing the prompt on those few examples establish broad quality?
+It would establish that the prompt can be adjusted to those examples. Reusing them for every decision can hide overfitting to their wording and layout. Keep separate development and held-out cases with different templates, missingness patterns and conflicting fields. After a change, inspect both improvements and regressions by category. A tiny diagnostic set is excellent for identifying a mechanism; it is limited evidence for performance across unfamiliar documents.
+
+2. How should the contract handle a field the source does not provide?
+Choose an explicit representation such as null or an omitted optional field, and document that choice in the schema and caller behavior. An empty string, zero and null can mean different things; silently exchanging them loses information. The evaluator should accept the prescribed missingness representation and reject an invented value. Downstream code must handle it deliberately, for example requesting more evidence rather than treating zero as an observed invoice amount.
+
+2.1. What happens if a field has the right type and a plausible value but no source support?
+It fails the factual contract even though parsing and schema validation succeeded. Keep those gate results separate so a structural success does not mask invented content. A source reference can help locate support, but verify that the referenced span actually establishes the field, unit and entity. If support is absent, return the missing-value representation or fail the extraction according to the contract; do not repair the problem by making the answer sound more confident.
+
+2.1.1. How would you preserve provenance without logging the entire sensitive document?
+Store a permitted source identifier, version and field-level location or sanitized evidence reference under appropriate access controls. Avoid copying every prompt and document into general application logs. A reviewer with authorization can inspect the original source through the controlled system, while operational logs retain enough metadata to diagnose which version and field failed. Provenance should improve auditability without creating a second uncontrolled repository of sensitive inputs.
+
+3. Why change one important prompt variable at a time?
+A controlled comparison makes it easier to attribute an observed difference to the change. If demonstrations, schema, model and evidence selection all change together, a better score does not reveal which change helped or which introduced a hidden regression. Use the same evaluation inputs and rubric, preserve both outputs and inspect disagreements. This is an experimental aid rather than a requirement to ignore interacting changes; later combinations still need their own evaluation.
+
+3.1. What if the revised prompt improves common invoices but harms missing-field cases?
+Report both groups rather than relying on the average. The new examples may encourage filling every field, which helps complete documents while causing invention on partial ones. Inspect paired outputs to identify that mechanism, revise the missing-value rule or demonstrations, and retest both categories. Acceptance depends on the operational cost of unsupported fields, so a small overall gain may be unacceptable if it increases a critical failure type.
+
+3.1.1. What should be versioned so a prompt regression can be diagnosed or rolled back?
+Version the prompt template, demonstrations, schema, model configuration and evaluation dataset alongside application code. Preserve sanitized request and output artifacts for the comparison when policy permits. A source-code revert alone may not restore behavior if the serving model alias or retrieval index also changed. The rollback record should identify the actual behavior-producing configuration and distinguish components that can be restored from external state that needs separate handling.
+
+OPTIONAL PRACTICE RESOURCES
+Structured Outputs and Validation (LangGraph: From LangChain User to Agent Builder - AI-Powered Course): https://www.educative.io/courses/langgraph-from-langchain-user-to-agent-builder/structured-outputs-and-validation
+Zero-Shot vs. Few-Shot Prompting (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/zero-shot-vs-few-shot-prompting

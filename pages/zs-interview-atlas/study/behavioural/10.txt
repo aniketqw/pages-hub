@@ -1,0 +1,72 @@
+Behavioural & Experience | Card 10
+Difficulty: Intermediate
+
+QUESTION
+Explain a technical issue to a stakeholder who does not work in machine learning.
+
+WHY THIS QUESTION MATTERS
+Tests audience awareness, precise uncertainty, and ability to translate a technical limitation into a decision.
+
+CONTEXT
+Explaining a technical issue requires translating without deleting important boundaries. Separate observation, interpretation, and recommendation; then choose an example that matches the stakeholder’s decision. The VisionDev tagger illustrates the distinction: its label is an observed prediction, while the claim that blur caused an error needs intervention evidence. A past communication story still requires true audience and response details.
+
+TERMS
+observation: What the system directly measured
+interpretation: What the measurement may mean, given assumptions
+false positive: A signal that indicates an issue when the issue is absent
+
+MECHANISM
+1. Lead with the consequence or decision, then state what was directly observed in plain language.
+2. Use one example or visual aid to explain the mechanism, and preserve uncertainty, run identity, and denominator.
+3. Check understanding through a restatement or decision; correct an inference that exceeds the evidence.
+
+TECHNICAL EXPLANATION
+An accessible explanation can still be technically precise. Start with the decision, give the measurement and its source, describe the uncertainty, then offer a next check. An analogy is useful only if it preserves the distinction between reading and cause. Ask the stakeholder to restate the claim; if they overgeneralize, adjust the explanation or show a small example. Fill in a true past conversation if one exists, including how the audience reacted. If not, describe this as the method you would use, not a story. Do not claim that a visual aid or stakeholder outcome occurred unless it did. The goal is shared understanding sufficient for a sound decision, not proof that the explanation was clever.
+
+WORKED EXAMPLE
+A stakeholder may hear “40% blur” as “blur caused 40% of errors.” I would say the system tagged that share of a specific run’s failures, then explain what experiment would establish a causal effect.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+If I simplify by dropping the denominator, run identity, or uncertainty, the explanation becomes misleading even if it sounds accessible.
+
+TEST EVIDENCE
+Prepare one true explanation story and identify the original technical phrasing, the plain-language version, the stakeholder question, and the resulting decision. [FILL BEFORE INTERVIEW: add those real details.] Practice with someone unfamiliar with the work and check whether they can accurately repeat the claim and its limitation.
+
+SPEAKABLE ANSWER
+I would start with the consequence the stakeholder cares about, then explain the mechanism with one concrete example and end with what decision or check is needed. [FILL BEFORE INTERVIEW: name a real time you explained a technical issue, who the audience was, what changed in your explanation, and how you knew they understood.] For instance, I can explain that a blur tag on a failed image is like a label from a measuring instrument: it tells us what the tool detected, but it does not prove the tag caused the failure. I would avoid jargon, invite the person to restate the decision, and correct my explanation if it did not land.
+
+SELF-CHECK
+If a stakeholder repeats “blur caused 40% of errors” after your explanation, what do you say?
+Correct the wording: the tagger labeled 1,949 of 4,816 unique failures in run 005331 as blur, about 40.47%; that is not a causal estimate. Then explain the paired experiment that could test causality and ask whether that answers the decision they need to make.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How do you separate observation from interpretation?
+Use a sentence for each layer: what was directly measured, what it may mean, and what action follows. For the VisionDev example, a tagger’s blur label is an observation about its output; the claim that blur caused a classification error is an interpretation requiring intervention evidence. This structure lets a stakeholder challenge the assumption without losing the raw result.
+
+1.1. What wording prevents an association from sounding causal?
+Say “the tagger labeled this share of the observed failures” and name the run and denominator. Avoid “blur caused this share.” Then state the experiment that could test causation. Precise verbs do more than a disclaimer at the end because they preserve the evidence boundary throughout the explanation.
+
+1.1.1. How would you handle disagreement about the interpretation?
+Return to the original record, clarify what each person means by the term, and identify evidence that would distinguish interpretations. Do not change the observation to win the argument. [FILL BEFORE INTERVIEW: describe a true disagreement only if one occurred.]
+
+2. What plain-language example would you use without hiding the caveat?
+Use a familiar instrument analogy: a thermometer reading reports a measurement, but it does not explain why the room is warm. Likewise, the tagger reports a predicted distortion, while the cause of the model error remains a separate question. Keep the run, count, and uncertainty beside the example so simplification does not remove critical context.
+
+2.1. How would you check whether the analogy misleads?
+Ask the stakeholder to restate what is measured and what remains unknown. If they infer causation, replace the analogy with a paired before-and-after example or a small diagram. Analogies are tools to test, not proof that communication succeeded. [FILL BEFORE INTERVIEW: use the true audience and reaction if describing a past conversation.]
+
+2.1.1. When should you stop simplifying and show technical detail?
+When the decision depends on a boundary condition, denominator, or failure mode that the analogy cannot preserve. Offer a short explanation first, then an optional technical detail or artifact link. The stakeholder should be able to choose depth without being forced to accept an oversimplified claim.
+
+3. What observable signal shows the audience understood the limitation?
+Ask them to make or explain the decision using the evidence boundary, such as distinguishing a tag from a cause. A correct restatement is stronger evidence than nodding. If they repeat an unsupported claim, correct it immediately and ask what information would help. [FILL BEFORE INTERVIEW: state how you checked understanding in the true story.]
+
+3.1. How do you respond if they still want a yes-or-no answer?
+Give the closest honest answer: what is known, what is not known, and what check can resolve it. If a decision must be made before that check, explain the risk of each option and who can accept it. Do not turn uncertainty into false certainty to sound decisive.
+
+3.1.1. How can a visual aid improve the explanation?
+Use a compact flow showing input, measurement, interpretation, and action, with unknowns marked visibly. A paired image or count table can help, provided it names the run and denominator. [FILL BEFORE INTERVIEW: include a visual aid only if you actually used one.]

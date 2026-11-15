@@ -1,0 +1,87 @@
+Resume Builder Agent | Card 08
+Difficulty: Advanced
+
+QUESTION
+How does V2 use one graph for both browser import and CLI, and what does full_run change?
+
+WHY THIS QUESTION MATTERS
+Tests whether I distinguish two versioned interfaces from the copied engine and avoid attributing the CLI graph to the FastAPI workbench.
+
+CONTEXT
+The browser wants an editable resume. The command-line full run also wants a report. Both need the same evidence and verification work up front. This question tests whether you can identify what is shared and the exact point where they split.
+
+TERMS
+registered node: A processing stage available in the compiled graph.
+full_run: The state flag selecting four additional report-generation stages.
+state update: A node’s contribution to the accumulated graph state.
+
+MECHANISM
+1. Read add_node as registration: it binds a stable stage name to a Runner method. Thirteen registrations make thirteen stages available, not thirteen calls to GitHub or thirteen LLM requests.
+2. Read the add_edge pairs as fixed control flow: START reaches connect_github, then a single prefix reaches build_document. Runner methods return state updates, allowing later stages to consume facts and summaries rather than refetch them.
+3. Read add_conditional_edges separately. _after_document returns build_resumes only when state.get('full_run') is truthy; otherwise it returns END. Browser build_from_github omits the flag, while the full CLI supplies it. This is the one branch within current V2.
+4. After a true branch, follow build_resumes → compare → plan_improvements → report → END. These produce role-specific artifacts and advice that the browser's editable-document import does not wait for. Generation and rate-limit waits are possible here, but a speedup requires measured inputs and configurations.
+5. Trace astream in the browser driver. updates identify node completions for NODE_PROGRESS; values give accumulated state for the final result. A node rename needs a matching progress entry. The finally block closes Runner clients on success or failure.
+6. Inspect compile() at the end: no saver is supplied and no human-review interrupt is configured. A persistent response cache may reduce repeated work, but restarting the process does not restore the lost graph position, job or editable session.
+
+TECHNICAL EXPLANATION
+The branch is encoded in AgentState rather than hidden in a Runner attribute, so a reader can understand the decision from the graph itself. build_document is deterministic and creates the document before the optional full_run continuation. The browser driver streams both updates and values: updates feed named progress messages, while values supply the final accumulated state. Its finally block closes Runner clients. Local import of graph symbols inside the driver avoids a cycle through the resume package initialization path. Tests should assert not just a final object but which nodes were visited and whether progress covers the shared path. The design removes duplicate orchestration without turning the system into a dynamic planner: these are explicit mostly sequential edges. It also does not provide durability merely because it uses LangGraph. A graph compiled without a saver has no persistent node checkpoint to resume after a crash. Sharing the builder is better because changing an evidence or verifier stage affects both entry points through one definition. Stopping the browser at the document is also a product boundary: a user can start editing without waiting for role-specific report artifacts. This is a design reason for lower unnecessary work, not a reproduced latency benchmark. The supplied ANALYSIS.md omits report in its 12-stage table. Count the actual add_node registrations and follow the routing function; there are thirteen. The document's historical timing is context for the split, not a current measured latency estimate.
+
+WORKED EXAMPLE
+Both paths get their first nine steps. Once the document is ready, the browser ends. The full CLI runs build_resumes, compare, plan_improvements and report. Count 9 + 4 = 13 stages. That is a stage count, not a count of model requests.
+
+SOURCE
+resume-builder-agent/v2/src/rba/graph.py:180-184
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/graph.py#L180-L184
+
+def _after_document(state: AgentState) -> str:
+    """The one branch in the graph: the CLI asks for `full_run` and gets the
+    role resumes, the comparison, the plan and a report. The browser import
+    omits it and stops at the document it just built."""
+    return "build_resumes" if state.get("full_run") else END
+
+Read this small if/else as a switch. At build_document, full_run routes the full CLI to build_resumes. Without it, the browser reaches END. The registered report stage is the fourth extra stage.
+
+LIMIT
+One shared graph is not dynamic autonomy or durable resumption; stale comments disagree with executable node counts.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+Both V2 entry points call build_graph. The graph registers thirteen nodes and has one branch after build_document. Browser import omits full_run, so it traverses nine nodes and returns the editable document. The CLI sets full_run=True and continues through build_resumes, compare, plan_improvements and report. This removes a second hand-sequenced workflow and gives shared evidence and verification changes one place to live. The graph has no checkpointer or interrupt. I would test the actual visited nodes and progress mapping rather than infer execution from registrations or comments. The shared graph improves consistency, while the shorter browser path limits unnecessary generation work.
+
+SELF-CHECK
+If a node is registered but never visited by the chosen branch, should it count as executed work?
+No. Registration describes an available processing stage. Execution counts need the path selected by input state and, for runtime evidence, the observed node visits. Browser and full CLI paths have different counts within one V2 graph.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What evidence establishes that the two entry points share orchestration?
+Trace the CLI and import driver to the same graph builder and test the visited nodes under their input states. Merely finding a graph module proves it exists, not that the browser invokes it. The current driver uses graph.astream, while the CLI requests the full_run continuation through that same builder.
+
+1.1. Why is the full_run flag part of state rather than an implicit UI rule?
+It makes the routing condition visible in the graph definition and testable from its inputs. A reader can inspect _after_document without reconstructing hidden caller-side sequencing. The flag still needs a clear API contract; explicit state improves readability but does not automatically authorize arbitrary extra work or enforce a run-wide budget.
+
+1.1.1. Which branch assertion protects the browser from unnecessary extra generation?
+Assert that browser import visits build_document and then ends without build_resumes, compare, plan_improvements or report. Also assert that a full run reaches those stages. Keep shared evidence/verification assertions in both paths. A final-document-only assertion can miss added calls or omitted checks that happen to leave a tiny fixture unchanged.
+
+2. Why should NODE_PROGRESS be checked against graph structure?
+A renamed node can still execute correctly while losing its displayed progress message if the mapping uses the old name. Compare mapping keys with the browser-stage set and test streamed updates. This is a UI-observability contract, separate from whether document generation succeeds or provider requests are traced.
+
+2.1. Why does the driver consume both updates and values?
+Updates identify which stages produced changes and can trigger user-facing progress. Values provide accumulated state from which the final document and evidence are extracted. Confusing the two can produce incomplete results or misread progress as final state. The stream mode is an execution API detail that deserves a focused integration test.
+
+2.1.1. Does seeing the final progress fraction prove every output is valid?
+No. It reports stage progress, not a semantic quality judgment or a durable commit. Inspect the returned document, claim statuses, errors and session revision. A pipeline can finish its permitted work while some repositories fail or claims remain unresolved. The UI should preserve those distinctions rather than equating a full progress bar with complete factual success.
+
+3. Why can removing those components improve the current prototype?
+It reduces state-persistence and human-review orchestration complexity for an import whose current goal is an editable document. Plain dataclass state can pass through one short-lived execution without a serialization migration contract. That is simpler, but the prototype gives up persistent graph continuation and a built-in pause boundary.
+
+3.1. When would that simplification become a product limitation?
+If users require long-running imports to survive process restarts, return to an approval stage later or inspect durable stage history. Those requirements need persisted identity and replay behavior, not just a nicer progress display. Reintroduce persistence only with clear failure, migration and duplicate-effect semantics rather than treating a saver as a universal reliability switch.
+
+3.1.1. How would you explain the design choice in an interview?
+Say the current product favors one shared, inspectable execution path and editable output over durable graph resumption. Name the resulting restart limit and the conditions that would justify changing it. That shows a deliberate scope choice rather than claiming the removal made the system strictly better on every reliability dimension.
+
+OPTIONAL PRACTICE RESOURCES
+Structured Outputs and Validation (LangGraph: From LangChain User to Agent Builder - AI-Powered Course): https://www.educative.io/courses/langgraph-from-langchain-user-to-agent-builder/structured-outputs-and-validation

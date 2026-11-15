@@ -1,0 +1,104 @@
+Resume Builder Agent | Card 04
+Difficulty: Advanced
+
+QUESTION
+The generated resume is checked a second time. How strong is that numeric provenance check?
+
+WHY THIS QUESTION MATTERS
+Tests post-generation validation and whether I can identify a concrete safety gap.
+
+CONTEXT
+Consider a user who wants a source link for each resume bullet. A citation answers where the text came from. It does not tell you whether the text supports the bullet. This question asks how far the later numeric check goes when the full CLI drafts a role-specific resume.
+
+TERMS
+provenance: The source identity and transformation trail attached to a statement.
+needs_measure: A claim status indicating missing support for a measurement or asserted effect.
+allowlist: An explicitly permitted set; here it is too broad to prove claim-specific number attribution.
+
+MECHANISM
+1. First tell the interviewer which path you mean. Browser Build uses the existing summary claims. The full CLI also drafts role-specific resumes.
+2. At the browser document boundary, retain trusted coordinates only for verified evidence. A pretty link with no validated location would be misleading.
+3. In the full CLI path, enforce_provenance checks numbers. Even though the output names claim IDs, the allowed pool also gets numbers from all supplied claims.
+4. Check the meaning yourself. Ask what the number counts, what time period it covers, and whether the source establishes the relationship.
+
+TECHNICAL EXPLANATION
+The document conversion fix closes a concrete trust escalation: a model can write an evidence path such as files, and a needs_measure claim can return before path validation. Building a GitHub link from that path plus a genuine commit would make an unvalidated citation look legitimate. from_summaries now only trusts those fields for verified claims. That does not make every visible unresolved bullet safe to publish; the UI and user still need to respect its status. Separately, enforce_provenance belongs to the full_run build_resumes stage. Its union of numbers can authorize a value from an unrelated claim, and even a narrower numeric pool would not prove tense, ownership or causality. Treat derived metrics as explicit calculations with input evidence, and keep per-bullet source associations. The improvement is a stronger provenance boundary, with semantic and cross-claim attribution work still open.
+
+WORKED EXAMPLE
+Project A has 20 tests. Project B has 4 APIs. A role bullet that says Project B has 20 APIs can still find its number somewhere in the allowed pool. The number check could pass; that does not establish those APIs or the claimed ownership.
+
+SOURCE
+resume-builder-agent/v2/src/rba/resume/document.py:437-460
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/resume/document.py#L437-L460
+
+                continue          # refused claims never enter the document
+            first = claim.evidence[0] if claim.evidence else None
+            evidence = first.quote if first else ""
+            # `verify_claim` only resolves path/line/sha for claims that
+            # reach VERIFIED -- a `needs_measure` claim returns early with
+            # its evidence untouched, so `first.path` there is still
+            # whatever the model wrote, unvalidated (it can be a key from
+            # the evidence bundle's own JSON, like "files", not a real
+            # path). Building a permalink from that plus the real head_sha
+            # produced a link that *looked* legitimate and pointed nowhere
+            # real -- caught by running a live import, not by a unit test.
+            # Only a verified claim's evidence is trustworthy enough to cite.
+            if status == "verified" and first is not None:
+                evidence_path = first.path
+                sha = getattr(first, "sha", "") or head_sha
+                line_start = getattr(first, "line_start", 0)
+                line_end = getattr(first, "line_end", 0)
+            else:
+                evidence_path = sha = ""
+                line_start = line_end = 0
+            bullets.append(Bullet(
+                text=claim.text, source_repo=repo, evidence=evidence,
+                evidence_path=evidence_path, evidence_sha=sha,
+                evidence_line_start=line_start, evidence_line_end=line_end,
+
+Trace the data entering this boundary, the state it returns, and the conditions that limit its guarantee.
+
+LIMIT
+Numeric allowlists and verified citation locations are narrower than complete semantic support.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+I first identify the V2 path. Browser import converts checked summaries directly into ResumeDoc bullets; it does not run the later role-resume generator. Verified claims can carry trusted paths, commits and line ranges. Rejected claims are omitted, while needs_measure claims remain marked unverified and get no trusted permalink. The full CLI continuation also generates role resumes and applies enforce_provenance. That second check is a numeric allowlist, and its implementation broadens the pool to all supplied claims rather than only cited claims. It can catch a wholly new number while missing wrong attribution, units or meaning. I would defend the source trail and explain this remaining gap rather than call it end-to-end factual verification.
+
+SELF-CHECK
+Does a valid GitHub permalink prove that the bullet’s impact claim is true?
+No. It makes a source independently inspectable. The linked code may prove an implementation detail while providing no benchmark or authorship evidence. Check the relationship, units, period and measured outcome separately.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why does browser import not perform a second free-form role-resume generation?
+Its stopping point is build_document, which converts summaries into ResumeDoc deterministically. The additional role-resume generator belongs to the full_run continuation. This keeps the browser from doing unnecessary generation work, but makes status preservation at document conversion important: deterministic conversion is not another independent semantic review.
+
+1.1. Can an unresolved claim still appear as an enabled browser bullet?
+Yes. from_summaries keeps non-rejected claims and marks verified according to status; Bullet defaults enabled to true. Merging into an existing resume normally adds candidates disabled, but an empty session adopts the generated document. Distinguish visibility, enabled state and verification. The user interface should not imply that every displayed or active bullet is verified.
+
+1.1.1. What acceptance test would make that boundary explicit?
+Create verified, rejected and needs_measure claims, convert them, then exercise both empty-session import and existing-resume merge. Assert which bullets exist, their verified flags, enabled states and permalink fields. Decide the desired final-publication policy separately. A test of the flag alone does not prove an unresolved bullet cannot reach export.
+
+2. What attribution error can a global number pool miss?
+A role-resume bullet can borrow a value from an unrelated supplied claim. Twenty tests in Project A does not establish twenty APIs in Project B, even if both values are allowed somewhere. The check catches entirely absent numeric tokens but not the intended mapping between a bullet, its source and the number’s unit.
+
+2.1. Would restricting the pool to used_claim_ids completely solve it?
+It would narrow one hole, but several cited claims can still refer to different entities or periods. A merged bullet can misuse an allowed number or turn a planned effect into a completed one. Retain per-bullet evidence associations and validate units, entities and derivations. Numeric membership remains one layer of provenance rather than semantic proof.
+
+2.1.1. How should a legitimately derived metric be represented?
+Record its source claims, formula, units and relevant period, then compute it deterministically. A model should not silently invent an aggregate because its inputs are individually present. Review whether the formula answers the intended question and whether denominators are compatible. The generated sentence should preserve those assumptions rather than presenting a derived value as a direct measurement.
+
+3. Why can a supported quote still have no line anchor?
+Quote acceptance can use normalized token overlap, while _locate requires an exact source substring and source-file availability. A README or reformatted quote may not produce a located range. That is a limitation to report, not a reason to ask the model to guess coordinates. A valid file-level link is different from a verified line location.
+
+3.1. How should source changes affect a saved citation?
+A permalink should keep the commit that supplied the evidence. New code can make the old claim stale, but changing the link to the latest branch would detach it from the inspected text. Preserve the old citation for audit, refresh evidence deliberately and update the claim only after checking the new snapshot.
+
+3.1.1. Does a source link establish personal contribution?
+No. It establishes where code or text exists at a repository revision. Personal contribution requires an actual work record, explanation of the owned part and appropriate team credit. A candidate can understand a repository deeply without being its sole author, and source-grounded resume wording should preserve that distinction.
+
+OPTIONAL PRACTICE RESOURCES
+Encapsulation (Learn Object-Oriented Programming in Python - AI-Powered Course): https://www.educative.io/courses/learn-object-oriented-programming-in-python/encapsulation

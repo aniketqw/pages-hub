@@ -1,0 +1,106 @@
+VisionDev | Card 09
+Difficulty: Advanced
+
+QUESTION
+How would you separate a distortion tag from evidence that the distortion caused a model error?
+
+WHY THIS QUESTION MATTERS
+Tests causal reasoning, measurement design, and whether observed labels support intervention claims.
+
+CONTEXT
+The blur percentage is an association measured among selected model failures and depends on a tagger that can force low-confidence labels. Causal attribution requires a counterfactual comparison, while tag quality needs an independent labeled check. Even an intervention such as deblurring can introduce artifacts, so experimental design must distinguish the effect of blur from the effect of the transformation.
+
+TERMS
+confounder: A factor associated with both the apparent cause and outcome
+counterfactual: The outcome for the same case under a different intervention
+selection bias: Distortion introduced by how cases enter the analyzed set
+
+MECHANISM
+1. Validate tagger precision and coverage on an independently labeled sample, reporting confidence-zero retries separately.
+2. Apply synthetic blur at controlled strengths to correctly classified held-out images and compare paired predictions.
+3. Test deblur recovery on tagged failures, inspect transformed image quality, and stratify by class and acquisition source.
+
+TECHNICAL EXPLANATION
+Causal attribution needs a counterfactual: what would the same example’s prediction have been if blur were changed while other properties remained as stable as possible? First validate the tagger on independently reviewed samples, since the confidence-zero retry can force labels and bias the observed category share. Then generate controlled blur strengths for correctly classified held-out images and measure paired error changes by class. Separately apply documented deblur transforms to tagged failures and measure recovery, while reviewing whether the transformation introduces ringing or removes information. Include unmodified controls and multiple severity levels. A positive synthetic-blur effect supports a controlled causal claim for that setting, not a blanket claim about naturally blurred deployment images. The current pipeline ran neither intervention. This remains proposed work.
+
+WORKED EXAMPLE
+If blur is more common among failures, blur may still be correlated with class, lighting, or image source. Only a controlled perturbation and recovery experiment can estimate whether blur changes the model outcome.
+
+SOURCE
+vision_dev_project/pipe/debug_logger.py:236-265
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L236-L265
+
+                if self.distortion_model is not None:
+                    try:
+                        # models expect HWC uint8 images
+                        img_for_model = img_np
+                        res = self.distortion_model(img_for_model, conf=self.distortion_conf_threshold, verbose=False)
+
+                        def _extract_best_prediction(result):
+                            if not (len(result) > 0 and hasattr(result[0], 'boxes') and len(result[0].boxes) > 0):
+                                return None, None
+                            confs = result[0].boxes.conf.cpu()
+                            best_idx = int(confs.argmax())
+                            cls_idx = int(result[0].boxes.cls[best_idx].cpu())
+                            label = (
+                                self.distortion_classes.get(cls_idx, str(cls_idx))
+                                if isinstance(self.distortion_classes, dict)
+                                else self.distortion_classes[cls_idx]
+                            )
+                            return label, float(confs[best_idx].item())
+
+                        distortion_pred, distortion_conf = _extract_best_prediction(res)
+
+                        # If no detection, try lowering the threshold to force a prediction
+                        if distortion_pred is None:
+                            res_low = self.distortion_model(img_for_model, conf=0.0, verbose=False)
+                            distortion_pred, distortion_conf = _extract_best_prediction(res_low)
+
+                        # If still None, explicitly mark as unknown
+                        if distortion_pred is None:
+                            distortion_pred = "unknown"
+                            distortion_conf = None
+
+Read the file operation first, then explain what identity it preserves and what it does not.
+
+LIMIT
+A classifier prediction is not ground truth, and an intervention such as deblurring can itself alter the image in ways that affect prediction.
+
+TEST EVIDENCE
+On a held-out set, compare clean and synthetically blurred versions of the same correctly classified inputs, stratify by class and blur strength, and separately review tagger precision. For repair, measure paired recovery with a transformation artifact check; do not treat either observational share as causal impact.
+
+SPEAKABLE ANSWER
+The 40.47% figure in `misclassified_20260317_005331.json` describes blur tags among 4,816 unique failures; it does not show that blur caused those failures. `DebugLogger.on_validation_batch_end` obtains a YOLO label with a 0.01 threshold and retries at 0.0, so label uncertainty matters too. I would report the tagger confidence and unknown rate, then test causality with paired interventions: synthetically blur correct images and see whether errors rise, and apply a controlled deblur to blur-tagged failures and see whether predictions recover. The current pipeline performed neither intervention.
+
+SELF-CHECK
+If blur tags are common among failures but synthetic blur does not increase errors, what should you conclude?
+The observational association is not enough to claim blur is a cause. I would check tagger accuracy and the intervention’s validity, then narrow or revise the causal explanation based on the paired results.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What would a causal experiment compare?
+I would start from held-out images with verified labels and compare each clean image with controlled synthetic blur at several strengths, holding class and other content fixed. Separately, I would apply a documented deblur transform to tagged failures and measure paired prediction recovery. Both arms need image-quality review because preprocessing can change content as well as blur.
+
+1.1. How would you distinguish a blur intervention from an intervention that changed the object itself?
+Inspect transformed images and preserve paired unmodified controls. A deblur operation can introduce ringing, remove texture or invent detail, so prediction recovery may reflect those changes rather than removal of blur alone. Compare multiple documented strengths and review whether the class-defining content remains stable. Report the effect for this controlled transformation and dataset, rather than treating it as proof about every naturally blurred image.
+
+1.1.1. What result would limit the causal interpretation?
+If the transformation changes labels, object content or several distortions at once, it does not isolate blur. A recovery result is then evidence about that compound preprocessing operation. Preserve the altered examples and report this limitation. Even a clean synthetic perturbation supports a claim for the tested setting; real deployment blur can have other causes and correlations that require separate validation.
+
+2. How would tagger uncertainty affect the causal analysis?
+First I would manually label a stratified sample of blur, other, and unknown outputs to estimate tag precision and recall. I would report the forced confidence-zero labels separately, then repeat the association analysis above a calibrated confidence floor. If the apparent blur share changes sharply, that tells me label uncertainty is material before I interpret any intervention.
+
+2.1. How should uncertain tagger labels affect the selection of intervention cases?
+Review a stratified subset independently and report tag precision and unknown coverage before selecting cases for intervention. Otherwise a forced low-confidence blur label can put a nonblurred example in the treatment group and distort interpretation. Keep reviewed labels and model labels separate, and analyze sensitivity to the confidence policy. This is a proposed evaluation; the existing saved percentage is descriptive and has not established a causal effect.
+
+2.1.1. Why not drop every unknown record and report only confident cases?
+That changes the population and can make the resulting estimate look more certain than the deployment setting warrants. Show how many records were excluded and compare class and source composition. A confident subset may be useful for a controlled test, but its result should be labeled as applying to that subset. Unknown cases remain important evidence about tagger coverage and should not silently disappear from the overall failure distribution.
+
+3. What confounders would you control?
+Class, image source, lighting, and acquisition conditions can affect both blur prevalence and classifier errors. I would stratify or match on those factors, use the same held-out examples for paired perturbations, and report class-specific effects. This reduces obvious confounding, though it still would not justify a causal claim about every real-world blur process.
+
+3.1. How would you measure whether blur itself changes predictions?
+Use paired examples: retain each original image and create controlled versions at documented blur strengths, then compare model outputs with all other input conditions held fixed. For tagged failures, separately measure recovery after deblurring. Keep original predictions and transformations so every apparent correction can be audited. That is an experiment proposal; the current project did not run it.
+
+3.1.1. What would count as a failure of the causal hypothesis?
+If increasing synthetic blur does not raise error on the held-out set, or deblurring does not improve predictions beyond a reasonable comparison, the causal story weakens. I would also test whether apparent effects come from a single class or source. The result should update the diagnosis rather than be forced to match the observed blur-tag share.

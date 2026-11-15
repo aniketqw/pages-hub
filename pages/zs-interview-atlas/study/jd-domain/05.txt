@@ -1,0 +1,75 @@
+JD / Domain | Card 05
+Difficulty: Advanced
+
+QUESTION
+How would you evaluate an LLM feature when the stakeholder only says the answers should be good?
+
+WHY THIS QUESTION MATTERS
+JD: simple test cases, evaluation prompts and hallucination awareness.
+
+CONTEXT
+Good is not yet an acceptance criterion. The task is to translate subjective approval into distinct observable properties, so a polished answer cannot hide unsupported facts or a critical operational failure.
+
+TERMS
+rubric: Explicit criteria used to judge an output.
+held-out set: Examples reserved for evaluation rather than development decisions.
+
+MECHANISM
+1. Write examples of correct, wrong and unanswerable cases with the stakeholder. Separate factual support, required field correctness, disclosure boundaries and useful task completion.
+2. Apply deterministic checks where the contract is exact and calibrated human or model review where interpretation is required. Keep a held-out comparison set and inspect judge disagreements.
+3. Report numerator, denominator and failure groups. Compare a simple baseline and treat critical errors separately from an average; an attractive quality score must not conceal another user's data appearing in an answer.
+
+TECHNICAL EXPLANATION
+An acceptance rubric should distinguish whether evidence was retrieved, whether claims are supported and whether the business task was completed. These can fail independently. A model judge can cheaply prioritize review, but it may prefer verbosity or share a generator's blind spots; compare judgments against human-labeled examples and inspect systematic disagreement. Freeze cases and scoring rules for comparisons, and avoid choosing a release by repeatedly tuning on its final test set. A small sample with no observed failures is limited evidence, not a zero-risk guarantee. For numeric checks, define exactly which values and formats count as matches. The saved Resume Builder metrics have implementation-specific definitions and averaging; they should not be silently substituted for general accuracy or treated as calibrated probabilities.
+
+WORKED EXAMPLE
+If 18 of 20 answers are useful but two disclose another client's content, a 90% helpfulness score is not an acceptable release summary. Report the two disclosure failures as a separate release-blocking category.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+A judge score, a deterministic token check and real task accuracy measure different properties.
+
+TEST EVIDENCE
+Proposed evaluation design, not a new executed model benchmark. Existing saved Resume Builder evaluation is audited separately in 05_resume-builder-agent_decisions.md.
+
+SPEAKABLE ANSWER
+I translate good into observable outcomes with the stakeholder: correct required facts, supported claims, acceptable abstention, no unauthorized disclosure, and a response-time budget. I create a small representative test set with expected evidence or acceptance rules, then keep a held-out slice for comparison. Deterministic checks handle exact fields and numbers; human review handles ambiguous usefulness. A model judge can help triage, but I would calibrate it on human-labeled cases and inspect disagreements. I report the denominator and failure groups instead of one flattering average. My Resume Builder saved result is an example of the distinction: 0.9184 faithfulness and 1.00 number precision over one six-repository run do not establish universal correctness. I would also compare a simple baseline so the team knows whether the new feature earns its complexity.
+
+SELF-CHECK
+If helpfulness improves but two cases expose unauthorized content, is the aggregate improvement enough to release?
+No. Helpfulness and disclosure are different acceptance properties. Report the disclosure failures directly, repair the boundary and verify those cases before relying on the improved average.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you detect a judge that favors longer answers?
+Construct concise and verbose responses with the same factual content and have humans label them under the intended rubric. Compare the judge's decisions on those pairs and inspect disagreements. If added wording improves the score without improving the task outcome, verbosity is a confounder. Revise the rubric or decision format and recheck on held-out pairs instead of assuming the judge is unbiased because it produces detailed explanations.
+
+1.1. Why should judge disagreements be inspected rather than averaged away?
+Averages can hide a systematic category such as accepting unsupported numbers or penalizing valid abstentions. Group disagreements by failure mechanism and review representative cases with the rubric owner. Some disputes reveal unclear criteria rather than a weak judge. Fix the acceptance definition when needed, preserve the change record and compare again. Judge-human agreement is evidence about this rubric and sample, not proof of universal objectivity.
+
+1.1.1. Can using a different model as judge eliminate shared blind spots?
+It may reduce some shared errors, but a different model can still reflect similar training patterns, positional preferences or factual gaps. Independence of model identity is not the same as validated judgment. Retain deterministic checks for exact requirements and human-labeled calibration cases. Measure disagreement categories and inspect critical claims directly, rather than treating a second model's approval as independent factual ground truth.
+
+2. Why is a perfect result on ten cases limited evidence?
+It says that no failure was observed in those ten selected cases under the recorded setup. They may omit rare inputs, important subgroups or adversarial conditions. Show how the cases were chosen and which acceptance properties they cover. A perfect small sample is useful evidence of those behaviors, but it does not imply zero future risk or justify reporting excessive decimal precision as if the population performance were known exactly.
+
+2.1. How would you grow the set without turning the test into a tuning worksheet?
+Collect representative real failures and novel categories into development cases, while reserving an appropriately separated set for final comparisons. Track when a case influenced prompt or model decisions. Repeatedly tuning against every test failure can make the apparent final result optimistic. A stable regression suite is valuable, but distinguish it from an independent estimate of performance on new inputs and state the coverage of both.
+
+2.1.1. How should the saved six-repository evaluation be described in that light?
+Describe it as one saved run over six repositories with the evaluator definitions and configuration attached. Its whole-summary faithfulness and numeric-token precision measure different properties, and claim-verification counts are a separate result. Do not derive a universal reliability rate or assume the aggregate is simply verified claims divided by all claims. To strengthen evidence, add independent repositories and inspect failure categories rather than merely quoting more decimal places.
+
+3. What baseline would you use for a document-answering feature?
+A retrieval-only display or deterministic source lookup can show whether finding the right evidence already solves much of the need. Compare it with generated answers on supported task completion, omitted facts, user effort and latency. The baseline helps isolate what generation adds and what new failures it introduces. It should be useful enough to be a fair alternative, rather than deliberately weak so that the more complex system looks better.
+
+3.1. What if generation feels smoother but introduces unsupported claims?
+Separate presentation preference from factual support. A fluent answer may reduce reading effort while adding an error that changes the user's decision. Report both outcomes and inspect whether stricter evidence handling, shorter responses or a retrieval-first interface addresses the problem. The right choice depends on the acceptance criteria and error cost; a polished demonstration alone does not justify accepting unsupported information.
+
+3.1.1. How would you communicate that trade-off to a nontechnical stakeholder?
+Show the same question, source and two outputs, highlight the extra unsupported statement, and explain its decision consequence. Present options such as source-only display, constrained summaries or a review step with their measured limits. Ask the accountable stakeholder to choose using agreed quality and workflow requirements. Keep the discussion concrete instead of hiding it behind a single aggregate metric or an unexplained model-quality score.
+
+OPTIONAL PRACTICE RESOURCES
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run
+Why Pass/Fail Beats Numeric Scales (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/why-pass-fail-beats-numeric-scales

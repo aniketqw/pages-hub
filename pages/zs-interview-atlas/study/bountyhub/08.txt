@@ -1,0 +1,89 @@
+Multi University Bounty System | Card 08
+Difficulty: Advanced
+
+QUESTION
+Which reads must use the PostgreSQL primary, and what freshness contract does the separate Prisma read client actually provide?
+
+WHY THIS QUESTION MATTERS
+Tests read/write routing and freshness guarantees using the actual repository boundary.
+
+CONTEXT
+The two Prisma clients are separate routing choices. A read replica lowers pressure on the primary but may lag; a cache can extend the freshness window if it refills from that replica.
+
+TERMS
+read replica: A database copy used to serve reads separately from the write primary.
+
+MECHANISM
+1. Trace each call site to `prisma` or `prismaRead`; names alone do not show workflow guarantees.
+2. Classify reads as display, authorization, or mutation precondition; the latter must use authoritative state.
+3. For immediate read-your-write, return committed data, use primary briefly, or wait for a version marker.
+4. Measure replica lag and primary capacity before setting a sticky-read window.
+
+TECHNICAL EXPLANATION
+The client variable selected by each repository call determines its source; Prisma itself does not turn a replica URL into synchronous replication. A lagging replica can return old status immediately after a write. Primary-only reads improve read-your-write at the cost of load. A version token or bounded sticky-primary period can limit that cost. The existing preflight is particularly sensitive because stale ownership/status checks should not authorize mutation; the authoritative checks belong inside the transaction. A stale read can originate in the replica or in a cache populated from that replica; the two layers need separate diagnosis. After a primary commit, a response can return the committed object directly while subsequent reads wait for a replica version. A bounded sticky-primary window is a fallback if no replay marker exists, but its duration must come from observed lag and primary headroom. No such measurement exists in this audit.
+
+WORKED EXAMPLE
+After changing bounty status to IN_PROGRESS, an immediate list request can still observe OPEN if it lands on the replica. That is a possible lag schedule, not a measured result.
+
+SOURCE
+BountyHub-main/server/src/config/database.js:8-18
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/config/database.js#L8-L18
+
+// Master client – for all write operations
+const prisma = new PrismaClient({
+  datasources: { db: { url: config.db.url } },
+  log: config.nodeEnv === 'development' ? ['query', 'error'] : ['error'],
+});
+
+// Read replica client – for read-heavy operations
+const prismaRead = new PrismaClient({
+  datasources: { db: { url: config.db.readUrl } },
+  log: config.nodeEnv === 'development' ? ['error'] : ['error'],
+});
+
+The module constructs two Prisma clients with different configured URLs. Call sites choose which client they use; no freshness behavior is implemented here.
+
+LIMIT
+Replica routing may reduce primary load but offers no read-after-write guarantee; stale reads must not authorize writes.
+
+TEST EVIDENCE
+No lag test was run. In a disposable primary/replica setup, write a versioned row, poll the replica until visible, and record the distribution; separately assert mutations recheck invariants on primary.
+
+SPEAKABLE ANSWER
+I would point to `server/src/config/database.js`, which creates distinct `prisma` and `prismaRead` clients from `config.db.url` and `config.db.readUrl`. That is explicit routing, not a freshness guarantee: a successful primary commit may not yet be visible to a replica read. In `bidService.js`, preflight reads use `prismaRead`, while the acceptance transaction uses `prisma`. I would route authorization and state-transition checks to primary and make cache/search freshness separate contracts. The code map did not measure replica lag or run a consistency test.
+
+SELF-CHECK
+A user changes bounty status and immediately opens its detail page. What could the read path return?
+A stale replica or cached prior status, depending on routing and invalidation timing. The code does not promise read-your-write consistency; status used to authorize a new mutation must be checked again on primary.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you provide read-your-write without sending every read to primary?
+I would return the committed representation from the mutation and use a short, explicit primary-read window only for follow-up reads that require it. If the database exposes a replay position, the client can wait until the replica reaches that version. The current clients expose no such token, so this is a proposed contract. I would measure primary load and replica catch-up before choosing the policy.
+
+1.1. What observable signal tells you to stop pinning reads?
+A replica replay position or version comparison can show that the write is visible; absent that, a bounded time window is only an approximation. I would make the bound visible in metrics and test under induced lag. If the bound expires before catch-up, return a clear retryable response instead of silently serving an older state. The atlas audit has no runtime lag measurement, so I would not invent a safe duration.
+
+1.1.1. How do you handle a replica that never catches up?
+Alert on lag and stop routing consistency-sensitive reads to that replica while unhealthy. A service-level circuit breaker can use primary temporarily if capacity allows, otherwise reject the consistency-sensitive operation. I would set thresholds from measured replication objectives and include a degraded-mode alert. The choice depends on primary headroom; a failover policy without capacity data can turn lag into a write outage.
+
+2. Which acceptance checks should be primary-backed?
+For a bid acceptance, load the bounty owner and current status and the bid status through the transaction client, then verify owner identity, OPEN bounty, and PENDING bid before changing anything. The selected bid and sibling updates then commit together. The current code repeats only the bid pending check inside the transaction. I would add the missing checks and test a status change between replica preflight and transaction start.
+
+2.1. How do you prove the check and update are atomic?
+Have two transactions race: one closes or transfers the bounty while the other attempts acceptance. The expected result is that the acceptance observes the committed current state or conflicts and retries the whole unit. Inspect database rows after both responses; controller errors alone cannot prove the invariant. I would also verify no cache/event side effect fires for a transaction that aborts.
+
+2.1.1. What if a retry sees a different owner?
+Treat it as a fresh authorization decision and reject the action; never reuse a prior permission result. The retry must not carry forward data from the replica preflight. I would log a structured denial reason and ensure it does not reveal the new owner’s private information. This is why the authorization check must sit within the same transaction boundary as the state transition.
+
+3. What is the difference between replica lag and cache staleness?
+Replica lag is delayed database replication; cache staleness is a stored value that can persist until invalidation or TTL. A cache miss can refill from a lagging replica and turn a short lag into a longer cached stale interval. I would trace detail reads through both layers and test them independently. The current detail cache uses a 300-second TTL, but expiry alone does not make a refill fresh.
+
+3.1. How would you prevent stale refill after a write?
+Use the primary as the fetcher for consistency-sensitive reads, or validate a row version before caching a replica result. Another option is to delay refill until replica catch-up, if the database exposes a trustworthy position. The existing cache helper has no version parameter. I would first scope which fields need this guarantee, since primary reads for every display request increase cost.
+
+3.1.1. Could a short TTL solve the same problem?
+It bounds how long a particular cached value may remain, but it does not guarantee the next fetched value is current. If replica lag exceeds the TTL, repeated misses can keep returning stale data. I would use TTL as a resource and staleness bound, not as a consistency protocol, and verify with a test that delays replication beyond the configured expiry.
+
+OPTIONAL PRACTICE RESOURCES
+Isolation Levels (Introduction to Big Data and Hadoop - AI-Powered Course): https://www.educative.io/courses/introduction-to-big-data-and-hadoop/isolation-levels

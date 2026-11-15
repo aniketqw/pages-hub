@@ -1,0 +1,96 @@
+VisionDev | Card 08
+Difficulty: Advanced
+
+QUESTION
+How do you prevent the report from mixing artifacts from different training runs?
+
+WHY THIS QUESTION MATTERS
+Tests artifact provenance, deterministic input selection, and whether a reported metric belongs to the same run as its images.
+
+CONTEXT
+Automatic latest-file discovery is convenient but can create a false join when each artifact family is selected independently. The saved summary already demonstrates a training log and exported failure file with different timestamps. A report should bind training data, export, image set, distortion report, and checkpoint through an explicit manifest and stop when those identities disagree.
+
+TERMS
+provenance: Recorded origin and history of an artifact
+run manifest: A record binding inputs, configuration, code, and outputs for one run
+fail closed: Stop when a required consistency check fails
+
+MECHANISM
+1. Generate a run ID and record source paths, content hashes, configuration revision, and tagger checkpoint identity.
+2. Validate each export’s declared source log and confirm the image directory and report use the same run.
+3. Add CPU-only fixtures for aligned and mismatched artifacts, and fail before inference when provenance is inconsistent.
+
+TECHNICAL EXPLANATION
+A run is a provenance boundary, not just a timestamp. Independent glob-based discovery can load a training log and export from different runs while both files remain parseable. The saved report header pairing 012558 with 005331 is a concrete symptom. A manifest should bind run ID, source-log checksum, export checksum, image-set checksum, distortion-report checksum, configuration revision, and tagger checkpoint. Validate the export’s source reference before joining sample metadata, and record resolved inputs in the output. CPU-only fixtures can prove mismatch detection without rerunning feature extraction or VLM inference. If an explicit exploratory override exists, label the report unverified and retain the mismatch; never present it as a clean run comparison. Preserve a compact audit record even when validation fails, so an operator can reproduce the attempted join and understand why report generation stopped.
+
+WORKED EXAMPLE
+If `training_log_20260317_012558.json` and `misclassified_20260317_005331.json` are selected together, a headline count from 012558 can describe examples extracted from 005331.
+
+SOURCE
+vision_dev_project/pipe/vision_reasoning_report.py:760-779
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L760-L779
+
+def main():
+    args = parse_args()
+
+    logs_dir = args.logs_dir.resolve()
+
+    # ── 1. Discover / validate input files ────────────────────────────────────
+    training_log_path = args.training_log or find_latest_file(logs_dir, "training_log_*.json")
+    if training_log_path is None or not training_log_path.exists():
+        sys.exit(f"ERROR: No training_log_*.json found in {logs_dir}. Use --training-log.")
+    logger.info(f"Training log  : {training_log_path}")
+
+    mc_path = args.misclassified or find_latest_file(logs_dir, "misclassified_*.json")
+    if mc_path is None or not mc_path.exists():
+        sys.exit(f"ERROR: No misclassified_*.json found in {logs_dir}. Use --misclassified.")
+    logger.info(f"Misclassified : {mc_path}")
+
+    report_path = args.report.resolve()
+    if not report_path.exists():
+        sys.exit(f"ERROR: distortion_report.json not found at {report_path}. Use --report.")
+    logger.info(f"Distortion report: {report_path}")
+
+Read the file operation first, then explain what identity it preserves and what it does not.
+
+LIMIT
+The `latest` files can have different timestamps, and a report can look plausible while its narrative and images refer to different populations.
+
+TEST EVIDENCE
+Create two deliberately mismatched fixtures and assert the report refuses them; then test a manifest with matching run ID, artifact hashes, and checkpoint identity. This is a metadata validation test and does not require GPU inference.
+
+SPEAKABLE ANSWER
+I would pin the training log, exported misclassified file, image directory, distortion report, and model checkpoint in one run manifest. In `vision_reasoning_report.py:main`, training and misclassified files can each be discovered independently as the latest matching file, so timestamps can disagree. The saved report header itself pairs training log `012558` with misclassified run `005331`. I would fail closed when run IDs or source hashes do not match, and record those IDs in every report. I have not rerun the GPU pipeline to repair or verify this pairing.
+
+SELF-CHECK
+If two artifacts both parse as valid JSON but their run IDs differ, should report generation proceed?
+No. Valid syntax does not establish that they describe the same population. I would stop before image loading, identify the mismatch, and require an explicit reviewed override that the report also records.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why is choosing the latest file in each category unsafe?
+The two glob patterns are resolved independently, so the newest training log and newest exported failure file can carry different timestamps. Their schemas may both be valid while describing different populations. I would bind them with a run ID and check that the export source points to the selected training log before generating any summary.
+
+1.1. Which fields must match before two files are treated as one run?
+At minimum the run ID, source log identity, export source, image directory, tagger checkpoint, and relevant configuration need to agree. File names alone can be copied or renamed, so I would prefer checksums and explicit source references. The report should write those resolved identities into its output header for later audit.
+
+1.1.1. Would timestamps be enough as a run identity?
+No. Timestamps can collide, drift across machines, or reflect a copied file. A generated run ID plus hashes of inputs and configuration provides stronger identity. Timestamps remain useful context, but they should not be the join key that determines whether artifacts belong together.
+
+2. What would you put in a run manifest?
+At minimum I would record a run ID, source log hash, exported sample hash, selected distortion report hash, configuration revision, and tagger checkpoint identity. The generator should verify those links before loading images. This also makes the report auditable later without requiring a GPU to reconstruct which files were used.
+
+2.1. How should the program fail when a mismatch is found?
+Fail before loading images or calling the model, name the mismatched paths and expected source relationship, and explain how to pass an explicit consistent set. This keeps the error cheap and actionable. If the user overrides the check for exploration, the report should visibly label itself as mixed or unverified rather than silently proceed.
+
+2.1.1. What should be retained for a forensic audit?
+Store the attempted input paths, hashes, validation result, and override flag in a small run record even when report generation stops. That makes repeated failures diagnosable and prevents someone from mistaking a partially generated output for a validated report. Do not write final recommendations when provenance validation failed.
+
+3. How can you test mismatch detection cheaply?
+Use small fixture manifests: one with aligned stems and hashes and one with a deliberately mismatched export. Assert that the aligned set proceeds and the mixed set fails before report rendering. That tests provenance logic independently of model loading, so a reviewer can run it on CPU and catch accidental latest-file joins.
+
+3.1. How can report tests prove the images and numbers came from one source?
+Make fixtures with synthetic records and explicit run IDs, then assert the summary count, extracted image set, and report header all reference the same manifest. Add a negative fixture with a deliberately mismatched export. Those tests exercise the join and count logic on CPU without loading ResNet or Qwen, and they can run on every code change.
+
+3.1.1. Could a valid manifest still point to altered files?
+Yes, if it records paths but not content hashes. Check each file checksum at load and compare with the manifest. For mutable directories, hash a canonical manifest of member paths and bytes. Then the report can distinguish a missing file from a file that changed after the run was recorded.

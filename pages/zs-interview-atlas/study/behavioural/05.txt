@@ -1,0 +1,74 @@
+Behavioural & Experience | Card 05
+Difficulty: Advanced
+
+QUESTION
+Tell me about a debugging failure you can explain honestly, including a check that would prevent recurrence.
+
+WHY THIS QUESTION MATTERS
+Required failure/debugging story with concrete evidence and explicit ownership markers.
+
+CONTEXT
+A debugging story needs a real chronology, a reproducible symptom, a diagnostic step, and a verified outcome. The sandbox audit provides an authentic technical finding: `retry_count` is written by graph nodes but absent from `AgentState`, and an isolated schema probe showed it was not retained. The user still must distinguish whether they personally found it originally or learned of it during this audit.
+
+TERMS
+minimal reproduction: A small example that isolates the suspected failure.
+regression test: A check intended to catch the same failure after later changes.
+
+MECHANISM
+1. State the observed behavior and exact evidence before assigning a cause or blame.
+2. Trace the boundary between node output and declared graph state, and reproduce the smallest failing case.
+3. Propose a schema and reset-policy fix, then define isolated and graph-level regression checks without claiming they ran.
+
+TECHNICAL EXPLANATION
+Tell the story in the order an engineer could verify it: symptom, minimal reproduction, cause, fix proposal, and test that would establish the repair. Keep ownership and chronology separate. If the audit exposed the issue rather than you finding it during project work, say so; learning from an audit is still evidence of technical reasoning. Do not turn a proposed fix into a shipped fix. The technical point is strong enough without a dramatic incident: undeclared state can be dropped even when a node returns it. Be ready to explain why a returned dictionary is not proof of persisted graph state and how reset semantics differ from field declaration. A useful regression test observes the next routing decision, not just a function return.
+
+WORKED EXAMPLE
+Observed isolated probe: the first call outputs step_count 1 without retry_count; the next call still sees retry_count zero. This is narrower and stronger evidence than saying a retry loop looked fine in a code review.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Do not invent a personal discovery narrative, a production incident or a shipped fix.
+
+TEST EVIDENCE
+Existing sandbox_state_probe.log supports the schema observation. The user must fill personal discovery and action history; the proposed repair remains unimplemented.
+
+SPEAKABLE ANSWER
+A concrete issue the current audit exposed is in the sandbox agent. agent/graph.py returns a retry counter, but agent/state.py does not declare retry_count. The isolated schema experiment shows the field does not persist, so the intended three-retry policy is not established by the constant alone. [FILL BEFORE INTERVIEW: say whether you personally discovered this originally or learned it from this audit; describe the true sequence and your exact contribution.] I would explain the failure as a mismatch between returned data and the graph's state contract. The proposed repair is an explicit persisted counter with tested per-turn reset semantics. I would add a small failing test first and then a multi-step graph test after the change. No repository fix was made during this preparation, so I should describe the repair as proposed rather than something already shipped.
+
+SELF-CHECK
+If the isolated probe passes after a local change but the Docker integration suite is still 12/14 saved, what can you claim?
+Only that the focused probe supports the state-schema behavior under its conditions. It does not show the full graph fix or integration suite is green. I would report the exact scope of each check and keep the two saved integration failures unresolved until reproduced.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you reproduce the retry-state issue?
+Use the actual AgentState schema in a small graph, return an undeclared retry_count from a node, and inspect both the emitted state and the next invocation. The isolated probe already showed that field does not persist in the installed environment. I would keep that evidence distinct from a full-agent test.
+
+1.1. What would an end-to-end regression test assert?
+Trigger repeated failing tool results and verify retry_count advances at each routing decision, terminates at the configured limit, and resets only at the documented turn boundary. Also test one success and a new checkpoint thread. The test should fail before the schema fix and pass after it.
+
+1.1.1. How would you avoid testing only the proposed fix?
+Write the regression against observable graph behavior, not an implementation-specific reducer detail. Assert the run terminates after the allowed attempts and that a later turn behaves according to the policy. Then retain the isolated schema test as a narrow diagnostic. I would not call either test run until actually executed.
+
+2. What should the regression test observe after an error?
+It should inspect state at the next routing decision, not just the node’s returned dictionary. A returned value can be dropped by the state schema. Assert the counter is present and incremented, the reflection path is taken, and the run stops at the configured bound. That tests the behavior the product relies on.
+
+2.1. How would you prove reset semantics?
+Run a second turn under the intended thread/checkpoint policy and assert the counter is reset while conversational context is preserved if that is the requirement. Test both same-thread and new-thread behavior. The exact expected value depends on the chosen scope, so document that policy before writing assertions.
+
+2.1.1. What if the retry field persists but never resets?
+Then a later request may inherit an exhausted budget or a misleading attempt number. Persistence and reset are separate requirements. I would define the counter scope, successful completion behavior, and turn boundary explicitly, then test each transition rather than treating a durable field as sufficient.
+
+3. How do you describe a bug discovered during preparation?
+I would distinguish when the issue was introduced, when I first noticed it, and what the audit reproduced. [FILL BEFORE INTERVIEW: state whether this was your original discovery or a later review, and give the true sequence.] The honest technical point is the mismatch between the declared state schema and the returned retry value; I should not claim a shipped fix.
+
+3.1. Would you call this your personal debugging story?
+Only if the actual chronology supports that description. Otherwise I would frame it as an audit finding in the project and explain the investigation method, without claiming I discovered it earlier. An interview story can still show sound reasoning while accurately separating my action from prior or shared work.
+
+3.1.1. What result would make your fix complete?
+A reproduced failure before the change, a fix to the declared state and reset policy, and passing graph-level regression tests would support completion. Until then, the repair is proposed. [FILL BEFORE INTERVIEW: name only checks you personally ran and their actual results.]
+
+OPTIONAL PRACTICE RESOURCES
+Using Pytest (Quick Start Full Stack Web Development - AI-Powered Course): https://www.educative.io/courses/quick-start-full-stack-web-development/using-pytest

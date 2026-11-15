@@ -1,0 +1,84 @@
+VisionDev | Card 07
+Difficulty: Advanced
+
+QUESTION
+Does SHA-1 dedup catch two visually near-identical failures?
+
+WHY THIS QUESTION MATTERS
+Tests data identity, duplicate semantics, and whether counts mean exact repeats or semantic equivalence.
+
+CONTEXT
+Exact hash dedup and near-duplicate detection answer different questions. The callback hashes raw tensor bytes, so it preserves a stable identity for exact repeats but does not group resized, recompressed, or lightly altered versions. Approximate similarity can help review or sampling, yet any threshold creates false merges and missed matches that can distort denominators.
+
+TERMS
+SHA-1: A cryptographic hash that changes when input bytes change
+perceptual hash: A compact representation intended to stay similar for visually similar images
+false merge: Two distinct records incorrectly treated as one
+
+MECHANISM
+1. Keep SHA-1 as the canonical exact key and add candidate-neighbor scores as separate metadata rather than replacing records.
+2. Build a labeled pair set containing exact repeats, transformations, and visually similar but distinct failures.
+3. Measure precision and recall across thresholds, inspect false merges, and publish exact and approximate counts separately.
+
+TECHNICAL EXPLANATION
+Exact identity and visual similarity are separate data relations. SHA-1 over tensor bytes is deterministic for exact repeats, but normalization, dtype, channel order, or one changed pixel can alter the key. A perceptual hash is more tolerant to resizing and compression but can merge distinct low-texture failures; an embedding can group semantic content while ignoring the precise artifact. I would preserve the exact hash as the immutable record ID and store approximate neighbors with method version, score, and threshold. Evaluate them on labeled pairs spanning exact duplicates, recompression, crops, same-class scenes, and distinct distortion mechanisms. Report precision and recall plus false-merge examples; never silently rewrite the exact unique-image denominator. I would also check whether duplicates cross train and validation splits, because grouping affects leakage analysis as well as presentation.
+
+WORKED EXAMPLE
+A single altered pixel changes the SHA-1 key, so the current exact deduper can retain two visually indistinguishable failures as separate unique images.
+
+SOURCE
+vision_dev_project/pipe/debug_logger.py:221-228
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L221-L228
+
+                # Compute a hash so we can count repeated misclassifications
+                img_bytes = img.cpu().numpy().tobytes()
+                img_hash = hashlib.sha1(img_bytes).hexdigest()
+
+                # Convert to base64
+                buffer = BytesIO()
+                img_pil.save(buffer, format='PNG')
+                img_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+Read the file operation first, then explain what identity it preserves and what it does not.
+
+LIMIT
+Exact dedup can overcount near repeats; perceptual dedup can undercount distinct inputs if its threshold is too aggressive.
+
+TEST EVIDENCE
+Build a small hand-labeled pair set with exact copies, resized/recompressed variants, and genuinely different images. Measure precision and recall at several pHash or embedding thresholds, inspect false merges, and keep exact-hash counts as the baseline.
+
+SPEAKABLE ANSWER
+No. `DebugLogger.on_validation_batch_end` in `pipe/debug_logger.py` hashes the raw tensor bytes with SHA-1. The save path in `DebugLogger.on_train_end` collapses equal hashes and keeps a repeat count. That catches exact byte repeats, but a one-pixel or encoding change creates a different key even if a person sees the same scene. It also hashes the normalized tensor bytes while the saved PNG is separately encoded. I would preserve exact identity and add a separate perceptual-neighbor flag, then validate that threshold against labeled duplicate and non-duplicate pairs before merging anything.
+
+SELF-CHECK
+Would you merge all images above a high embedding-similarity score into one record?
+No. Similarity can connect different failure mechanisms, and thresholded edges may not be transitive. I would preserve every artifact and use neighbors for review until a task-specific merge policy is validated.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why keep an exact hash if it misses visual near-duplicates?
+I would keep exact SHA-1 as immutable identity and add a second, explicitly approximate relationship. The exact key is deterministic and useful for repeat counts; perceptual similarity is a different claim and should not silently collapse records. I would store candidate neighbors and let the report show both exact unique images and reviewed near-duplicate groups.
+
+1.1. How would you measure similarity without changing the canonical record count?
+Keep the exact hash as the unique record key and attach an optional neighbor list from a separate similarity pass. The report can show exact unique counts and near-duplicate suggestions side by side. This makes the approximation auditable and reversible; it also prevents a changed threshold from rewriting historical denominators without an explicit migration.
+
+1.1.1. How would you avoid one large near-duplicate cluster swallowing distinct cases?
+Use pairwise review around cluster boundaries, not only connected components of thresholded edges, because similarity is not always transitive. Preserve each pair score and algorithm version. If the cluster is used for sampling, select representatives but retain access to all members and disclose the selection rule.
+
+2. How would you choose a near-duplicate threshold?
+I would create a labeled pair set containing exact copies, resized or recompressed versions, crops, and genuinely different images from the same class. I would measure precision and recall across candidate thresholds and inspect false merges separately. Until that review is done, the similarity score should be a flag for inspection, not a replacement identity key.
+
+2.1. What transformation set would your labeled pairs include?
+Include exact copies, recompressed PNG/JPEG versions, resize and crop variants, mild color changes, and different images with similar shapes or class labels. Annotators should decide whether each pair represents the same underlying failure example for this task, not simply similar semantics. I would report agreement and keep ambiguous pairs out of threshold tuning.
+
+2.1.1. Would you use the same threshold for every distortion category?
+Not automatically. Blur, compression artifacts, and noise change different image statistics, so a single similarity measure may behave differently by category. I would evaluate per distortion and set category-specific thresholds only if there is enough labeled evidence, otherwise mark the uncertainty and avoid merging.
+
+3. Could semantic embeddings improve on perceptual hashes?
+Possibly, but semantic similarity can merge two different failure cases that share content while differing in the artifact being diagnosed. I would compare pHash and embedding neighbors against the same labeled pairs, report the trade-off, and preserve the original hash and image path so the approximate layer remains reversible.
+
+3.1. Why not deduplicate semantically similar images outright?
+Semantic embeddings may place two distinct failure mechanisms close together because they share objects or scene context. For this project, retaining the defect evidence matters more than reducing the file count. I would use semantic similarity to surface review candidates, compare distortion tags and predictions, and let a validated policy decide whether records can be grouped.
+
+3.1.1. What is a safe downstream use before validation?
+Use the neighbor score to prioritize human review or choose a diverse report sample, while retaining the original per-image records and denominators. Do not use it to erase examples or claim fewer unique failures. That gives immediate utility with a visible audit trail while the duplicate policy is still being evaluated.

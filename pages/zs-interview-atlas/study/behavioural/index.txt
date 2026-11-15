@@ -1,0 +1,33 @@
+BEHAVIOURAL & EXPERIENCE
+
+Open one text card at a time.
+
+01. Walk me through your resume in two minutes, and distinguish what you implemented from what you designed.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/01.txt
+
+02. Why this ZS role, and how would your agent projects help a client rather than just demonstrate a framework?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/02.txt
+
+03. Your Marvell bullet says a production-safe digital twin. What exactly was demonstrated, and what remained a vision?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/03.txt
+
+04. For the telemetry and workload-identification bullets, what did you design, and did you actually train a model?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/04.txt
+
+05. Tell me about a debugging failure you can explain honestly, including a check that would prevent recurrence.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/05.txt
+
+06. What did mentoring 99+ AI students involve, and how did you define data quality across modalities?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/06.txt
+
+07. Describe a disagreement about a technical choice. How did you use evidence and share credit?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/07.txt
+
+08. How do you learn an unfamiliar tool quickly while staying accountable for quality and deadlines?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/08.txt
+
+09. Tell me about a time you had to communicate a technical risk and negotiate what to prioritize.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/09.txt
+
+10. Explain a technical issue to a stakeholder who does not work in machine learning.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/10.txt

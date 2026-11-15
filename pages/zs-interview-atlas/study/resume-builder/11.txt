@@ -1,0 +1,93 @@
+Resume Builder Agent | Card 11
+Difficulty: Advanced
+
+QUESTION
+How does V2 turn a long GitHub import into progress the browser can follow?
+
+WHY THIS QUESTION MATTERS
+Tests job lifecycle, synchronous callback constraints, SSE replay, generated-off merge behavior, and credential/error boundaries.
+
+CONTEXT
+Importing repositories can take longer than a browser wants to wait without feedback. The job ID tells the browser which work to watch. Progress events are messages about work already happening. They are not the work itself or a durable record of it.
+
+TERMS
+job: An in-process unit of asynchronous work with status and updates.
+progress mapping: The association between graph-stage names and displayed messages.
+merge candidate: A suggested bullet added without necessarily enabling it in the active document.
+
+MECHANISM
+1. The start route creates a job and schedules its runner, then returns an ID before generation completes. The browser connects to the SSE endpoint or polls for status.
+2. The pipeline consumes graph updates and values, translating known node names through NODE_PROGRESS. A dedicated contract should catch renamed stages missing from that mapping.
+3. After success, merge suggestions under session.lock, keep prior baseline intent, advance revision and retain facts, claims and exclusions for review.
+4. Keep failure and cancellation semantics distinct from connection loss. An event stream ending is not enough evidence that work committed or that it can be resumed after restart. The route stores claims and the repo index for the Evidence tab; the SSE stream remains a progress channel.
+
+TECHNICAL EXPLANATION
+The revised importer preserves more than a tuple of document and counts: ImportResult carries facts, summaries, claims, repositories and exclusion information. The route retains those on the session after merging. With an existing resume, generated candidates are merged disabled so merely importing suggestions need not change the active score until the user enables them. With an empty session, the generated document becomes the initial content. The lock protects the merge and revision update inside one process. The session can change while an import is running, so understand which state was used for selection and which current document receives the merge. JobStore and SSE update history are in-memory; they are not a durable log. A reconnect can observe only what that process still retains. Partial per-repository errors must remain visible, and cancellation requires checking actual task/cleanup behavior rather than assuming closing the browser stops the provider request. After merge the route also saves session.claims and session.repo_graph. The browser can query them independently through repo-graph. Progress updates do not carry the whole index, and the evidence tab does not rerun the graph. Without an import the endpoint returns no repositories. After a process restart the in-memory data is gone.
+
+WORKED EXAMPLE
+The browser sees selected repositories, then indexing, then summarization progress. If its tab closes, the job may continue in the server. If the server restarts, the job record is gone. Those two failures require different messages and cannot both be solved by reconnecting the SSE stream.
+
+SOURCE
+resume-builder-agent/v2/src/rba_api/routes/github.py:115-126
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba_api/routes/github.py#L115-L126
+
+        session.doc = merged
+        session.baseline_doc = base
+        session.bump()          # bumps rev and drops derived artefacts
+
+        # Everything the pipeline used to throw away.
+        session.facts = result.facts
+        session.summaries = result.summaries
+        session.repos = result.repos
+        session.excluded = result.excluded
+        session.stats = result.stats
+        session.claims = result.claims
+        session.repo_graph = result.repo_graph
+
+The merge writes the editable document and its baseline. bump advances the revision and drops derived results. Claims and the AST index become session fields for the Evidence endpoint. Progress events remain a separate channel.
+
+LIMIT
+SSE and local jobs are not durable queues; partial failures and restart loss remain relevant.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+V2 starts GitHub import as an in-process job and gives the browser a job ID. The pipeline streams graph node updates and maps the nine browser-stage names to progress messages. SSE carries those messages while the job runs. When it completes, the route merges the generated document into the session under its lock, preserves existing work, records evidence and advances revision. SSE does not make the job durable or guarantee exactly-once processing; a disconnected browser and a failed worker are different events. I would distinguish accepted, running, completed, failed and unknown-after-restart states, and keep partial repository errors visible rather than presenting every import as complete.
+
+SELF-CHECK
+Does receiving a job ID establish that the editable document has been committed to the session?
+No. It establishes that a job record was created and work scheduled. Document mutation happens after the pipeline result is available and the merge runs under the session lock. Observe the completed result and revision separately.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What has happened when the browser receives that ID?
+The server has created a local job record and scheduled its runner. It has not necessarily fetched evidence, generated summaries or merged a document. Separate accepted from running and completed. The status endpoint and events describe later outcomes, and their availability depends on that process retaining the job.
+
+1.1. What does a completed event need to distinguish from a merely closed connection?
+It needs an explicit final status and relevant result or error, not just end-of-stream. A proxy, network or browser can close the connection while work continues. Conversely, a worker can fail before producing a final frame. Use authoritative job status where available and represent an unknown outcome honestly when the record is gone.
+
+1.1.1. Can SSE reconnection recover a job after the server restarts?
+Not from this in-memory JobStore. A reconnect can observe retained state only while the process still owns it. Durable replay would require persisted job identity and event or status history. Explain this limit to users instead of implying that the streaming protocol itself supplies restart recovery.
+
+2. Why are imported candidates disabled when merging into an existing resume?
+That preserves the active baseline until the user selects a suggestion. Existing bullet IDs and order can remain stable while additional options are visible. It separates discovery from acceptance. Verify the actual enabled flags and score inputs, since merely marking a bullet as a candidate is not enough if export still includes it.
+
+2.1. How does an empty session differ?
+The route adopts the generated document rather than merging disabled additions into an existing baseline. Since document conversion can retain unresolved claims, inspect their verified and enabled flags explicitly. An empty-session import should not be described as producing only guaranteed facts merely because the pipeline completed successfully.
+
+2.1.1. What policy should govern unresolved claims at final export?
+Define whether they must be disabled, reviewed, edited with evidence or explicitly acknowledged. Test the actual export boundary rather than assuming a visual warning blocks publication. This is a proposed product policy, separate from the current conversion rules. A truthful status should remain attached throughout the workflow until the user resolves the claim.
+
+3. Why retain facts and exclusions after import instead of only the document?
+They explain why a suggestion exists, why another project was omitted and which source snapshot supports the wording. Discarding them would require another GitHub pass or leave the UI unable to answer those questions. The evidence is still bounded and session-local, so retention does not imply permanent audit storage.
+
+3.1. What if the user edits the resume while selection is still running?
+Selection uses the resume text supplied when the import starts, while the merge later operates on session state under its lock. Those can represent different moments. Preserve current edits during merge and disclose or re-evaluate stale selection context if it materially changes relevance. A lock around the final merge does not freeze the entire user workflow.
+
+3.1.1. How would you test that overlap without a real provider?
+Pause a fake import with a controlled event, mutate the session, then release the import result. Assert that the documented merge preserves current work, advances revision correctly and retains evidence. Also inspect which resume text reached selection. This reproduces the timing boundary deterministically instead of relying on manual clicking or paid latency.
+
+OPTIONAL PRACTICE RESOURCES
+Encapsulation (Learn Object-Oriented Programming in Python - AI-Powered Course): https://www.educative.io/courses/learn-object-oriented-programming-in-python/encapsulation
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run

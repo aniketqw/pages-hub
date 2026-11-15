@@ -1,0 +1,100 @@
+Multi University Bounty System | Card 10
+Difficulty: Advanced
+
+QUESTION
+How do pagination grain and search indexes affect this bounty endpoint, and what would you measure before tuning it?
+
+WHY THIS QUESTION MATTERS
+Tests read/write routing and freshness guarantees using the actual repository boundary.
+
+CONTEXT
+A paginated search response has a result grain, a matching rule, a sort order, and a count. Optimizing the SQL before agreeing on these can make a fast endpoint semantically wrong.
+
+TERMS
+result grain: What one row in a result represents; here it should be one bounty.
+
+MECHANISM
+1. Confirm each result is one bounty, even when related bids or submissions exist.
+2. Inspect the actual predicate and generated SQL; substring `contains` differs from token search.
+3. Measure page query and exact count separately, especially at large offsets.
+4. Compare trigram, full-text, or cursor alternatives with relevance, p95, write cost, and index size.
+
+TECHNICAL EXPLANATION
+The Mongo path uses text search, while PostgreSQL fallback uses substring matching; result sets and order can differ. The repository comment calls it full text, but `contains` is not PostgreSQL full-text search. A normal B-tree may not help arbitrary substring patterns. I would inspect generated SQL, indexes in Prisma schema, and EXPLAIN ANALYZE on representative data. Then measure page latency, count latency, cardinality, and write overhead before selecting trigram, full-text, or a cursor design. A normal B-tree often cannot accelerate a leading-wildcard substring predicate. pg_trgm can support substring operators, while tsvector supports token semantics and ranking; neither should be added without comparing generated SQL and query plans. Offset pagination can become more expensive at depth, and the separate count may dominate. Cursor order should include a unique tie-breaker such as id with createdAt, but cursor pagination does not promise a frozen snapshot.
+
+WORKED EXAMPLE
+For page 400, `skip` may force the database to walk past many rows even if the returned page has ten items. That is a workload hypothesis to validate with query plans, not a measured latency claim.
+
+SOURCE
+BountyHub-main/server/src/repositories/bountyRepository.js:55-79
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/repositories/bountyRepository.js#L55-L79
+
+  // Full-text search using PostgreSQL
+  async search(query, skip, take) {
+    const where = {
+      status: { notIn: ['CANCELLED'] },
+      OR: [
+        { title: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+      ],
+    };
+
+    const [bounties, total] = await Promise.all([
+      prismaRead.bounty.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          creator: {
+            select: { id: true, name: true, avatarUrl: true, university: { select: { name: true } } },
+          },
+        },
+      }),
+      prismaRead.bounty.count({ where }),
+    ]);
+    return { bounties, total };
+
+The fallback is case-insensitive substring search plus a separate count and offset page. The source comment does not make it a tsvector query.
+
+LIMIT
+Deep offsets and exact counts can be costly; Mongo and PostgreSQL have different matching and ranking semantics.
+
+TEST EVIDENCE
+No performance test ran. Capture generated SQL, load representative records, compare EXPLAIN ANALYZE before/after candidate indexes, and report page versus count latency separately.
+
+SPEAKABLE ANSWER
+`bountyController.search` parses page and limit, then `bountyService.search` may query Mongo and fall back to `bountyRepository.search`. That repository filters non-cancelled rows with case-insensitive `contains` on title or description, orders by `createdAt`, applies `skip`/`take`, and runs a separate count. I would confirm the grain is one bounty per result and define relevance separately from recency. Offset depth, exact counts, and substring predicates may dominate cost. I did not inspect production plans or benchmark this endpoint.
+
+SELF-CHECK
+One bounty has five bids and matches the query. How many results and what total contribution should it make?
+One bounty result and one increment to a bounty-grain total. A join that expands each bid could duplicate the row and inflate count, so the query and API contract need a fixture with multiple related records.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would joins accidentally change that grain?
+Including one-to-many relations in a raw SQL join can duplicate a bounty row for each bid or submission. Prisma’s relation include may hydrate nested records without changing the top-level bounty count, but generated SQL and pagination semantics still need inspection. I would assert distinct bounty IDs per page and compare `total` to a count of matching bounty IDs. I would measure it.
+
+1.1. Would you count bids as the search total?
+Only if the endpoint contract is explicitly bid-level. This route returns bounty objects, so the total should count matching bounties, not joined child rows. I would name the response field clearly and test a bounty with multiple bids to ensure it contributes one result. Grain confusion can corrupt page counts and downstream analytics even when the SQL executes successfully. I would include a bounty with several bids to catch duplicate top-level rows and an incorrect total. I would include a bounty with several bids to catch duplicate top-level rows and an incorrect total. The fixture should include two related child records but only one bounty identity.
+
+1.1.1. How do you align analytics with the endpoint grain?
+Use an explicit bounty-level key in the event or reporting model and aggregate child metrics separately. If the business asks for number of bid opportunities, count bounty IDs; if it asks for bids, count bid IDs. I would document the denominator in dashboard queries and add a small fixture with multiple children so the metric cannot silently change grain. The denominator should be explicit in the API contract and in any dashboard built from this response. The denominator should be explicit in the API contract and in any dashboard built from this response.
+
+2. What index would you evaluate for the PostgreSQL fallback?
+For arbitrary substring matching, evaluate pg_trgm with GIN or GiST rather than assuming a plain B-tree can use a leading-wildcard pattern. If the product wants token-based search, PostgreSQL full-text with a tsvector index may fit better but changes matching semantics. I would inspect the emitted SQL and compare both candidate designs against judged queries and representative text lengths. I would compare the plan against the current query and include realistic title and description lengths before accepting the index cost. I would compare the plan against the current query and include realistic title and description lengths before accepting the index cost.
+
+2.1. How would you decide between trigrams and full-text?
+Trigrams help substring and fuzzy matches, while full-text tokenizes and supports language-aware terms and ranking. The right choice depends on whether users expect partial-word matching, stemming, and typo tolerance. I would build a query set from actual search behavior, measure relevance and p95 latency, and include index size and write amplification. The code’s current `contains` behavior is the baseline contract to discuss before replacing it.
+
+2.1.1. What if the candidate index improves reads but slows writes?
+Measure insert/update cost and total index footprint alongside search latency. Bounties are write-light or write-heavy depending on usage, so a faster search plan may still be a poor tradeoff. I would compare under mixed read/write load, set a latency target, and keep the index only if it meets the product objective without exhausting storage or delaying mutations. A controlled mixed workload reveals whether write amplification erases the read-side gain. A controlled mixed workload reveals whether write amplification erases the read-side gain.
+
+3. What would a cursor encode for stable pagination?
+A cursor could encode the last row’s `(createdAt,id)` pair, with sort direction and relevant filters. The unique tie-breaker matters because several bounties can share a timestamp. Cursor pagination reduces deep-offset work and movement caused by new rows at the front, but it does not automatically provide a frozen snapshot. I would validate cursor integrity and keep the query predicate aligned with the sort order.
+
+3.1. How do you test pagination while new bounties arrive?
+Fetch page one, insert a newer bounty, then fetch page two using the returned cursor. Assert no duplicate IDs and determine whether the contract allows newly inserted rows to appear only after refresh. Repeat with equal timestamps and filter changes. Offset pagination can shift rows between requests; a cursor should make the intended behavior explicit rather than claim snapshot consistency without a transaction.
+
+3.1.1. Would you keep the exact count with cursor pagination?
+Not necessarily. A `hasMore` query fetching `limit + 1` can support navigation without a costly total count. If the UI requires exact totals, I would measure the count separately or maintain a precomputed aggregate with a freshness label. The current handler returns total through `paginatedResponse`; changing that is an API contract decision, not merely a query optimization. I would retain an API-level test for the cursor contract even if the SQL plan changes. I would retain an API-level test for the cursor contract even if the SQL plan changes.

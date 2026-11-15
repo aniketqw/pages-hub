@@ -1,0 +1,90 @@
+Multi University Bounty System | Card 09
+Difficulty: Advanced
+
+QUESTION
+What does the JWT middleware authenticate, and where is ownership or role authorization actually enforced?
+
+WHY THIS QUESTION MATTERS
+Tests read/write routing and freshness guarantees using the actual repository boundary.
+
+CONTEXT
+Authentication verifies identity from a signed token. Authorization decides whether that identity may perform a specific action, based on role, ownership, and current business state.
+
+TERMS
+authorization: A policy decision about whether an authenticated identity may perform an action.
+
+MECHANISM
+1. Check that the Bearer token exists and verifies; note which claims are copied into `req.user`.
+2. Trace the service method to see whether ownership is checked for the specific bounty or submission.
+3. Do not equate a role claim in the token with an enforced role policy; enumerate action-role pairs.
+4. Revalidate mutable ownership in the primary transaction and test denied requests cause no writes.
+
+TECHNICAL EXPLANATION
+JWT verification establishes that the token signature and expiry satisfy the configured verifier; the middleware then exposes claims to downstream code. Ownership checks happen in service functions using a loaded bounty relationship. A role claim being present does not mean any route checks it. Mutable authorization facts should be revalidated against the authoritative store when needed, and role assignment needs a trusted issuance path. The audit does not prove a vulnerability exploit; it identifies a policy boundary that requires an explicit matrix and tests. JWT `verify` validates token properties against configured secret and expiry, then middleware copies id/email/role. It does not check whether the role has since changed or whether the actor owns the target record. Service-level checks provide business authorization; mutable ownership belongs inside the transaction. A role matrix should include action, role, owner, and non-owner combinations. Token-version or short expiry can address revocation, but the reviewed path does not establish immediate revocation.
+
+WORKED EXAMPLE
+A valid STAFF token may pass authentication, but that alone does not prove the request has permission to review a particular submission; the service checks bounty ownership.
+
+SOURCE
+BountyHub-main/server/src/middleware/auth.js:5-19
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/middleware/auth.js#L5-L19
+
+function authenticate(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const token = header.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret);
+    req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+The middleware rejects missing or invalid Bearer tokens and maps verified claims to req.user. Services still decide whether that identity may perform a specific operation.
+
+LIMIT
+Role claims can be stale or unused; identity verification and business authorization are different checks.
+
+TEST EVIDENCE
+No auth test suite was run in this audit. Add route tests for missing/expired token, owner, non-owner, and role combinations; verify denied requests cause no writes.
+
+SPEAKABLE ANSWER
+`authenticate` in `server/src/middleware/auth.js` verifies a Bearer token, then copies its id, email, and role into `req.user`. Services such as `bidService.acceptBid` and `submissionService.reviewSubmission` compare the bounty creator with that user ID for ownership. I found role included in the JWT, but could not trace a role-enforcement middleware in the reviewed routes and services. So I separate identity, ownership policy, and role policy. I would test each action as owner, non-owner, and each supported role; token validity alone is not authorization.
+
+SELF-CHECK
+A valid STAFF token calls submission review on a bounty owned by another user. What should decide the request?
+The service’s ownership policy should deny it; a valid signature only establishes identity. The audit found ownership checks but did not trace a general role enforcement layer, so role behavior needs an explicit route/service matrix.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. How would you test each layer separately?
+At middleware level, test missing, malformed, expired, and valid tokens and assert only verified claims reach `req.user`. At service level, test owner and non-owner against the same bounty. Then test each role against actions that explicitly require that role. Assertions should include unchanged database rows on denial. I would keep these suites separate enough that a token parsing failure is not mistaken for an ownership-policy success.
+
+1.1. Would you mock the JWT verifier in every test?
+For service policy tests, injecting a trusted user identity is reasonable because the JWT boundary is not under test. For middleware integration tests, sign real test tokens with a test secret and exercise the actual verification path. I would not mock authorization decisions themselves. This split gives fast service coverage and still catches claim mapping, expiry, and signature handling regressions.
+
+1.1.1. What would you include in a role matrix?
+Rows are actions such as create, accept bid, review submission, and read global search; columns are STUDENT, STAFF, owner, and non-owner. Some actions combine role and ownership. I would mark expected allow/deny for each cell and require an explanation for public or optional-auth routes. The current audit found role claims but no general role gate, so the matrix may expose missing policy rather than confirm it.
+
+2. What happens if someone changes role after a token was issued?
+A signed token preserves the claim until expiry unless the service checks current account state or revokes sessions. The reviewed middleware trusts the verified claim and copies it to req.user. I would shorten token lifetime or perform a current-role lookup for sensitive operations, depending on revocation needs. I did not find a full revocation design in this audit, so I would avoid claiming immediate role changes take effect.
+
+2.1. How do you revoke a token before expiry?
+Possible approaches include a token-version field checked against the user record, a denylist keyed by token ID, or short-lived access tokens with refresh rotation. Each adds lookup or state-management cost. For a small platform, a token version may be simpler, but it still requires primary-backed role state. I would define threat and revocation requirements before selecting one; this repository audit did not verify revocation behavior.
+
+2.1.1. What test checks role revocation reaches the service?
+Issue a token under one role, change the account role or token version, then attempt a protected operation before token expiry. Assert denial and no state mutation. If the chosen design permits existing tokens until expiry, encode that expected window in the test and documentation. Do not describe a token as immediately revocable unless the request path consults revocation state.
+
+3. Why check ownership in the service if the route already requires authentication?
+Authentication tells us who sent the request; it does not tell us whether that user owns this bounty. The service has the loaded bounty and can enforce ownership close to the business operation. I would keep the check in the authoritative transaction when the ownership relationship can change concurrently. The current accept preflight checks on a replica, which is weaker than a primary transaction check.
+
+3.1. Could a controller check be enough?
+A controller check can improve response organization, but it is easy for another entry point or background task to bypass it. The domain service should enforce the business invariant, and the database transaction should revalidate mutable ownership where necessary. I would add a regression test that calls the service directly as a non-owner, not only through the HTTP route. The service-level test should call the domain method directly and confirm an unauthorized caller cannot mutate a bounty. The service-level test should call the domain method directly and confirm an unauthorized caller cannot mutate a bounty.
+
+3.1.1. What if ownership changes during the request?
+Read ownership in the same transaction as the mutation, or define ownership as immutable for the lifecycle. If the relationship is mutable, a preflight value can go stale before commit. I would test a concurrent ownership transfer and acceptance, then specify which transaction wins. The current code map shows the preflight caveat for bid acceptance, so I would not claim this race is closed.

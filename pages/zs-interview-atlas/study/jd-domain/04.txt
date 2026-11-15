@@ -1,0 +1,75 @@
+JD / Domain | Card 04
+Difficulty: Advanced
+
+QUESTION
+A stakeholder asks for an agent, RAG and fine-tuning. How do you decide which capability the problem actually needs?
+
+WHY THIS QUESTION MATTERS
+JD: agent loops, RAG/fine-tuning trade-offs and structured problem solving.
+
+CONTEXT
+Architecture names are useful only after the business requirement is clear. Distinguish supplying knowledge, adapting behavior and choosing actions; each has a different failure surface and evaluation burden.
+
+TERMS
+agent: A system where a model chooses some actions using feedback and tools.
+fine-tuning: Further training a model on examples to adapt its behavior.
+
+MECHANISM
+1. Write a concrete task and an acceptable result, then try the smallest deterministic baseline. Identify whether the missing capability is evidence access, output behavior or dynamic control flow.
+2. Use retrieval for changing external evidence, consider adaptation for recurring behavior supported by representative examples, and use an agent when intermediate results genuinely determine the next permitted action.
+3. Keep permission checks and durable state changes in deterministic services. Compare the added component with the baseline on the same outcomes, including failure and abstention cases.
+
+TECHNICAL EXPLANATION
+The distinction is knowledge access, behavior adaptation and dynamic control flow. A fixed workflow can call a language model without becoming an unconstrained agent, while an agent can use retrieval as one tool. Fine-tuning changes model parameters and requires curated supervision and held-out evaluation; retrieval changes the evidence available for a request. Neither should be used to bypass application authorization. An action-capable system needs typed tool inputs, bounded attempts, observable outcomes and a safe recovery path for partial failure. Ask whether a simpler branch in deterministic code would solve the same routing problem. Extra autonomy creates additional trajectories to test, so evaluate both task success and forbidden actions under adversarial or ambiguous inputs before expanding the tool set.
+
+WORKED EXAMPLE
+Illustrative requirement: answer a policy question from yesterday's document needs freshness, so retrieve that document. Extracting the same three fields from thousands of examples may justify supervised adaptation. Refund execution still needs a server-side policy check.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Choosing the most flexible architecture first increases failure modes without proving business benefit.
+
+TEST EVIDENCE
+Proposed comparison: fixed workflow, retrieval baseline and agent on the same labeled tasks; compare success, unsupported actions, latency, cost and recovery. No client deployment is implied.
+
+SPEAKABLE ANSWER
+I start with the required behavior and failure cost. If a deterministic query or fixed workflow solves the task, I prefer that small baseline. RAG is useful when answers depend on changeable external evidence. Fine-tuning can adapt behavior, style or task patterns using representative examples, but is not a reliable database for frequently changing facts. An agent is useful when the next action depends on intermediate results and tools must be selected dynamically. That flexibility adds permission, budget and recovery concerns. These approaches can combine, but each added component needs an evaluation reason. For a read-only policy question I would begin with retrieval and grounded answers. For updating an account after checks, I would keep authorization and the final state transition in deterministic application logic even if a model helps interpret the request.
+
+SELF-CHECK
+Would fine-tuning alone solve a requirement to cite a policy published this morning?
+It does not supply a dependable current source or citation trail. Retrieve the policy and validate support; adaptation may separately help output behavior if evaluation justifies it.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What baseline would you try before building a dynamic agent?
+Start with the simplest deterministic lookup, query or fixed workflow that can satisfy the acceptance example. It provides a comparison for correctness, cost, latency and maintenance. If the user needs a known sequence of checks, a fixed workflow may already be sufficient. Add dynamic model-selected actions only when intermediate results genuinely require flexible routing, then evaluate whether that flexibility improves outcomes enough to justify its new failure modes.
+
+1.1. What evidence would justify replacing that fixed workflow with an agent?
+Use examples where the next useful action depends on earlier results and cannot be expressed reasonably by the existing fixed path. Compare task completion and forbidden-action rates under the same permissions and budgets. A demonstration with one happy path is weak evidence because the fixed workflow may solve it equally well. The agent should earn its complexity on relevant trajectories, including partial failures and ambiguous requests.
+
+1.1.1. If the agent is useful, which responsibilities should remain deterministic?
+Keep authentication, resource authorization, typed input validation, budget enforcement and final state-transition rules in application services. A model can propose the next action, but it should not define who is allowed to perform it. A tool request is an untrusted command candidate. Check the caller and current state immediately before execution, and make repeatable side effects safe through idempotency or reconciliation appropriate to the operation.
+
+2. Why is fine-tuning a poor substitute for a current factual database?
+A parameter update does not provide a straightforward source record for each generated fact, and newly changed data may not be reflected until another adaptation. Retrieving a current version makes the evidence path more explicit and can be updated independently of model weights. Retrieval still requires permissions, freshness and support checks. Fine-tuning may improve repeated behavior, but it should not be described as a guaranteed factual memory or citation system.
+
+2.1. When could adaptation complement retrieval rather than compete with it?
+If the task repeatedly needs a specialized output pattern or domain instruction behavior, representative supervised examples may help the model use retrieved evidence consistently. Keep the retrieved source as the authority for changing facts and evaluate both components separately. Compare against a prompt-only baseline and inspect whether adaptation causes omissions or unsupported additions. The justification is measured task behavior, not simply that a model offers a fine-tuning interface.
+
+2.1.1. What would a fair comparison between the combined and simpler systems require?
+Use the same held-out questions, permitted source versions and acceptance rubric. Record the adaptation data so overlap or near duplicates can be inspected, and include missing-evidence and conflicting-source cases. Report factual support, task completion, latency and operational effort separately. A better average on familiar formatting examples does not establish better handling of current facts or access restrictions, which are independent requirements of the complete system.
+
+3. Why keep the final account update outside model judgment?
+The update depends on authenticated identity, current database state and business invariants that need authoritative enforcement. A model can interpret intent or propose structured arguments, but those arguments still require validation. If a balance changes between interpretation and execution, the service must recheck it atomically. This keeps a plausible generated request from becoming an unauthorized or stale write and makes the outcome reviewable through deterministic state and audit records.
+
+3.1. How does retrying a tool request create a new problem at that boundary?
+A timeout can occur after the server committed the update but before the client saw the result. Repeating the request may apply the effect again unless the service recognizes a stable operation identity or can reconcile the existing outcome. Retrying is therefore not just a model reliability technique. Define the operation's idempotency contract and preserve result lookup across attempts before allowing an agent to repeat consequential tools automatically.
+
+3.1.1. What should the agent do when execution success is uncertain?
+Represent an unknown outcome explicitly and ask the authoritative service for operation status or route to review. Do not infer success from a confident natural-language response or blindly repeat the command. Preserve the operation identity and relevant audit reference so reconciliation can find the actual state. The correct recovery depends on the service contract; an agent should stay within that contract rather than inventing a compensating action.
+
+OPTIONAL PRACTICE RESOURCES
+When to Fine-Tune vs. When to Use RAG (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/when-to-fine-tune-vs-when-to-use-rag
+What Is an LLM Agent? (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/what-is-an-llm-agent

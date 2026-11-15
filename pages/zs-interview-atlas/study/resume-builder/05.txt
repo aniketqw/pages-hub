@@ -1,0 +1,106 @@
+Resume Builder Agent | Card 05
+Difficulty: Advanced
+
+QUESTION
+What does V2 keep in its cache, session and job state, and what survives a restart?
+
+WHY THIS QUESTION MATTERS
+Tests understanding of cache identity versus durable graph state and resumability.
+
+CONTEXT
+Imagine refreshing a page after a server restart. A response cache can save an earlier model answer. A session holds your working document. A job tracks one import. Each answers a different question; saving one does not save the other two.
+
+TERMS
+durability: State surviving the relevant process or storage failure boundary.
+TTL: A lifetime after which in-memory records may be expired; it is not persistence.
+replay: Repeating work from a known boundary with explicit duplicate-effect semantics.
+
+MECHANISM
+1. Start with the response cache. It reuses previously generated model text for a matching request key and model. It does not store the user's entire job. Whether it survives restart depends on the SQLite file and its volume.
+2. Inspect SessionStore and JobStore separately: their TTL and dictionaries organize in-process state, but neither is a durable job queue or document database. The session stores claim statuses, the repo index, and a separate chunk-vector memo.
+3. On restart, identify what is lost before offering recovery. Reusing a cached completion can save work during a fresh import, but does not restore a session revision, SSE history or graph position.
+4. If durability becomes a requirement, design persisted job identity, state versioning and safe replay before adding checkpoints or multiple web workers.
+
+TECHNICAL EXPLANATION
+Cache, session and job identity answer different questions. A cache key asks whether an earlier provider result is reusable; a session ID identifies a current working document; a job ID identifies observed import progress. They should not be interchangeable. Cache uses a SQLite connection protected for thread access, but the default path still needs an appropriate persistent volume in deployment. Session mutations use an asyncio lock and revision within one process. That does not coordinate two independent app instances. JobStore schedules local work and retains updates for SSE; a browser reconnect cannot recover a job record after the process that owned it disappears. Removing graph checkpointing simplifies state serialization and makes plain dataclasses convenient, while sacrificing node-level restart continuation. If the product later requires durable imports, externalize job state and define duplicate-attempt behavior. A durable store alone would not make every external provider call exactly once. There is also a separate dense-vector memo in a session. It is bounded, in memory, and used by scoring. It is not the SQLite provider-response cache. Session claims and the stored AST index are similarly lost with the session. They are enough to read the Evidence tab without another import during that session.
+
+Both Groq and Ollama can receive the shared SQLite response cache, but the browser scoring cache keeps embedding vectors inside its session. Those are two different caches with different keys and lifetimes. Keep the file on persistent storage if replaying cached model output matters; that still does not restore the job or edits.
+
+WORKED EXAMPLE
+An import finishes summarizing a repository, then the server restarts before the document is merged. Its cache row may remain on disk, but the session and job IDs no longer identify live state. A new import may reuse cached text; that is a new workflow, not a resumed old job.
+
+SOURCE
+resume-builder-agent/v2/src/rba/cache.py:36-59
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/cache.py#L36-L59
+
+    """
+
+    def __init__(self, path: str | Path | None = None, enabled: bool = True):
+        self.enabled = enabled
+        self.path = Path(path) if path else DEFAULT_PATH
+        self._conn: sqlite3.Connection | None = None
+        self._lock = threading.Lock()
+        if self.enabled:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._conn = sqlite3.connect(self.path, check_same_thread=False)
+            self._conn.execute(
+                "CREATE TABLE IF NOT EXISTS responses ("
+                " key TEXT, model TEXT, content TEXT, created REAL,"
+                " PRIMARY KEY (key, model))"
+            )
+            self._conn.commit()
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key: str, model: str) -> str | None:
+        if not self._conn:
+            return None
+        with self._lock:
+            row = self._conn.execute(
+
+Trace the data entering this boundary, the state it returns, and the conditions that limit its guarantee.
+
+LIMIT
+No durable job/session recovery or cross-process coordination is established by the current in-memory stores.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+V2 separates response reuse from interactive state. SQLite caches provider output by request key and model, so a matching request can avoid another generation. A session holds the editable document, target, revision, evidence and derived scoring state in memory. A job holds import progress and completion state in memory, and SSE exposes those updates. A process restart can preserve the SQLite file if its storage persists, but loses the in-memory sessions, jobs and limiter windows. The graph is compiled without a checkpointer, so it cannot restore an import at a saved node. I would describe restart recovery as limited and distinguish a cache hit from resuming the user’s workflow.
+
+SELF-CHECK
+If the SQLite cache survives, can the browser reconnect to the old import job after a process restart?
+Not from that cache alone. The job and session records are in-memory, and the graph has no checkpointer. Cache reuse can reduce repeated work in a new import but cannot restore the old workflow position or revision.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What must be true for cached output to survive a deployment restart?
+The database file must remain on storage retained across that deployment, and the relevant transaction must have committed. A SQLite API alone says nothing about container-volume lifetime. Check configured path and mounts, then test the intended restart. Cache persistence does not imply document sessions or job progress are stored in the same database.
+
+1.1. What is the risk of several processes opening the same cache file?
+A thread lock only coordinates threads using one Cache instance. Independent processes need to respect SQLite’s locking and timeout behavior, and deployment must define connection and contention handling. Do not infer distributed application coordination from check_same_thread=False or a Python lock. Test the actual process model before claiming shared-cache behavior under load.
+
+1.1.1. How would cache retention differ from user-document retention?
+Cached provider text can often be regenerated and invalidated by input or prompt version, while a user-edited document may contain unique work and require stronger recovery and deletion rules. Set separate identities, access policies and lifetimes. Persisting one does not satisfy the other’s needs, even if both could eventually use database storage.
+
+2. What does the in-memory session lock protect?
+It serializes participating mutations within the app process, including document merge and revision changes. It does not protect a separate worker process’s dictionary or preserve the document after restart. The guarantee also depends on every mutation using the lock and appropriate revision checks. Name that scope before calling it transaction isolation.
+
+2.1. Could sticky routing alone make those sessions durable?
+No. Sticky routing can keep requests reaching the process that currently owns a session, but that process can still restart or fail. It may simplify an explicitly single-owner deployment, yet provides no persistent state or failover reconstruction by itself. Durability needs stored state and a defined recovery contract.
+
+2.1.1. What should be designed before persisting sessions?
+Define which document version, target, evidence metadata and derived results are authoritative. Version the schema, separate regenerable caches and specify expiration and deletion. Use an atomic conflict mechanism for writes if multiple workers can mutate state. Merely serializing the current dataclass does not resolve migration, privacy or concurrent-update behavior.
+
+3. What happens to the current graph position when the process exits?
+It disappears with the process. A new Runner and graph invocation start a new execution unless an external durable mechanism reconstructs state. The response cache can help avoid some repeated provider work but does not encode the graph’s completed transitions or the old job’s progress. The absence of a saver is an explicit recovery limit.
+
+3.1. Why would adding a checkpointer still not guarantee exactly-once provider calls?
+A remote call can finish before its result is checkpointed, leaving a crash window in which replay repeats it. Durability preserves recorded state, not an atomic transaction with an external provider. Define operation identities, cached-result semantics and uncertain-outcome handling. Checkpointing is useful but not a substitute for side-effect recovery design.
+
+3.1.1. What is a reasonable recovery improvement if users later require durable imports?
+Persist job identity and status, make stage replay explicit and keep evidence/configuration versions with the run. Define whether interrupted work resumes or restarts, and test crash windows around remote calls and document publication. Choose a durable saver only as part of that contract, rather than adding a database and assuming the user-visible problem is solved.
+
+OPTIONAL PRACTICE RESOURCES
+Structured Outputs and Validation (LangGraph: From LangChain User to Agent Builder - AI-Powered Course): https://www.educative.io/courses/langgraph-from-langchain-user-to-agent-builder/structured-outputs-and-validation

@@ -1,0 +1,90 @@
+Resume Builder Agent | Card 13
+Difficulty: medium
+
+QUESTION
+How does V2 recover rows and columns from an uploaded resume PDF?
+
+WHY THIS QUESTION MATTERS
+Explain why PDF text extraction can lose table structure and where V2 chooses a fallback.
+
+CONTEXT
+Imagine the uploaded resume has a table and a project list. On screen they look clean. A PDF text reader can still put a date on a new line or lose the spacing between columns. This question asks how the importer reconstructs an editable document from those fragments.
+
+TERMS
+Text layer: The extractable characters already embedded in the PDF.
+Grid: A detected sequence of rows, where each row has ordered cells.
+Fallback: The text heuristic used when the intended grid cannot be matched.
+
+MECHANISM
+1. Read prose and candidate tables separately. pypdf supplies text. pdfplumber checks page geometry for visible lines, then text alignment if that page had no detected table.
+2. Use the expected BITS layout. Look for the header in the first three grid rows. A section label may appear one row before the real column headings.
+3. Build the editable table from the chosen grid. If no grid matches, fall back to the text-based table heuristic.
+4. Repair split lines before parsing entries. _merge_split_dates joins a title to a date at the start of the next line. _join_wrapped treats an explicit bullet marker as a new item even with no final period.
+5. Review the parsed result. These are observed formatting cases. New layouts can still need correction and the path does not perform OCR.
+
+TECHNICAL EXPLANATION
+A PDF stores positioned content. Its extracted text can interleave columns or put a value on another line. The parser therefore reads prose and grids separately. read_pdf_tables tries detection with line boundaries; if nothing is found on that page, it tries aligned text. _pick_table checks up to three leading rows for expected whole header cells, requires at least two matches, and removes the selected grid so it cannot be assigned twice. Looking beyond the first row matters when the PDF detector joins a section banner with the actual header. parse_bits converts the winning grid into headers and rows and can preserve additional text. If matching fails, it uses the text parser for that section. Other layouts still use the generic text path. This is not general-purpose OCR; low quality text layers, irregular tables or mixed layouts can require review.
+
+After reading grid geometry, entry parsing still works on lines. _parse_entries calls _merge_split_dates before _join_wrapped. This ordering matters: a standalone title could otherwise be lost because it did not carry a date. Separately, a marker can start a new bullet even when the previous line does not end in a period. These are targeted fixes for observed PDF extraction behavior, not a general layout guarantee.
+
+WORKED EXAMPLE
+Suppose a grid's first row says ACADEMIC DETAILS and the second contains the column names. The parser inspects up to three rows instead of treating the label as a header. Separately, “Internship” followed by “May 2026 – Jul 2026” can become one entry heading. Two distinct lead markers keep two bullets apart even if neither ends in a period.
+
+SOURCE
+resume-builder-agent/v2/src/rba/resume/ingest.py:146-155
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/resume/ingest.py#L146-L155
+
+    best_idx, best_row, best_score = -1, -1, 1
+    for i, grid in enumerate(grids):
+        for row_idx, row in enumerate(grid[:_HEADER_SEARCH_DEPTH]):
+            header_cells = {c.strip().upper() for c in row}
+            score = sum(1 for t in tokens if t in header_cells)
+            if score > best_score:
+                best_idx, best_row, best_score = i, row_idx, score
+    if best_idx < 0:
+        return None
+    return grids.pop(best_idx), best_row
+
+Start at a score of one so a candidate needs two matches. Look at only the first three rows in each grid. Keep the best row and its grid index. Pop that grid to prevent a second section from reusing it.
+
+LIMIT
+The detector can miss a grid or match the wrong layout. This is a BITS-format rule with a text fallback, not a guarantee for scanned or arbitrary PDFs.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+V2 uses two readers for a PDF upload. pypdf extracts prose and headings. pdfplumber detects tables from page geometry. It tries ruled lines first and uses text alignment if a page has no detected table. For a recognized BITS layout, the parser looks for a matching header in the first three rows of a grid. It converts those cells into an editable table and keeps text heuristics as a fallback. This avoids guessing every column from flattened prose. It still depends on the document layout and a usable text layer. It also joins a heading to a date on the next line and keeps explicit bullet markers separate even without a final full stop.
+
+SELF-CHECK
+Why can the parser check row one or two instead of only row zero?
+A section heading can appear as the first detected grid row. The actual column names may follow it. Looking at up to three rows lets the selector find the header without treating the banner as column names.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why not use the prose reader for the tables too?
+The prose reader gives a linear text stream. Cell boundaries and column order can be unclear once the positions are lost. pdfplumber uses page geometry to return rows and cells. Keeping the prose reader still makes sense for headings and normal paragraphs; the two outputs solve different parts of ingestion.
+
+1.1. What happens with a borderless table?
+The detector tries the default line strategy first. If it finds no grid on that page, it tries vertical and horizontal text alignment. That can recover cells when positions line up but borders do not exist. A page with a detected ruled grid does not necessarily get the second pass for a different borderless grid.
+
+1.1.1. How would you verify that with a small PDF fixture?
+Generate one page with a ruled table and one page with aligned borderless cells. Assert the recovered rows and column positions, not just the presence of some text. Add a layout with no matching header to exercise the text fallback. Keep those fixtures separate from claims that arbitrary scanned PDFs can be parsed.
+
+2. Why choose the header by matching cells?
+The detected grid can start with a section title, and the code needs to identify which row actually labels columns. It compares normalized whole cells with the expected header vocabulary. A match needs at least two hits. Selecting the winning row preserves the rows below it and avoids treating a banner as the header.
+
+2.1. Why remove a selected grid from the candidate list?
+The same grid should not fill both Academic Details and Certifications. Removing it is a simple ownership rule during section processing. It also makes selection order meaningful: a weak early match could consume a grid another section needs. A regression test should include both grids and check they land in the right sections.
+
+2.1.1. How would you extend this to another institution's format?
+Define a new set of section signals and expected headers, then test actual representative sample layouts and fallback cases. Do not just lower the match threshold until a sample passes. Define what counts as an ambiguous match and preserve the original text for review instead of guessing missing cells.
+
+3. Does table detection also fix split entry headings and bullets?
+A detected table can make cell boundaries clear, but it does not fix ordinary prose or project entry lines. The parser has separate line rules. It first puts a title and next-line date together. It then joins continuation lines while keeping a line with an explicit bullet marker separate.
+
+3.1. Why is a marker needed if sentence punctuation already separates bullets?
+Some PDF exports extract bullets without a final period, or use a marker that looks unusual in the extracted text. A period-only rule can merge all of those lines into one. At this boundary the code recognizes configured leading markers, removes them from stored text, and treats each marker as the start of a new line.
+
+3.1.1. How would you reproduce these two failures without a private PDF?
+Give the entry parser a short fixture with a title and date on adjacent lines. Then include two marker-prefixed bullet lines without end punctuation. Assert that the parsed entry has the expected nonempty title and exactly two bullets. Add a separate PDF fixture for grid geometry; a text fixture alone cannot prove the table extractor.

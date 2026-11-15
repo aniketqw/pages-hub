@@ -1,0 +1,42 @@
+RESUME BUILDER AGENT
+
+Open one text card at a time.
+
+01. How would you explain the Resume Builder’s architecture, and what actually runs when I click Build?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/01.txt
+
+02. How does a repository fact become a claim that the system is willing to use?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/02.txt
+
+03. You describe one model call per repository. Does that mean one HTTP request or a fixed token cost?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/03.txt
+
+04. The generated resume is checked a second time. How strong is that numeric provenance check?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/04.txt
+
+05. What does V2 keep in its cache, session and job state, and what survives a restart?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/05.txt
+
+06. How would you defend the test-count claim and describe the container security boundary accurately?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/06.txt
+
+07. Which resume score should a user trust, and how do you explain what the number means?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/07.txt
+
+08. How does V2 use one graph for both browser import and CLI, and what does full_run change?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/08.txt
+
+09. How does V2 keep `/score` and `/score/batch` numerically consistent?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/09.txt
+
+10. What concurrency guarantee does a V2 session revision provide?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/10.txt
+
+11. How does V2 turn a long GitHub import into progress the browser can follow?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/11.txt
+
+12. Why does V2 use app-scoped limiters and a single scoring worker?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/12.txt
+
+13. How does V2 recover rows and columns from an uploaded resume PDF?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/13.txt

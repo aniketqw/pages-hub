@@ -1,0 +1,104 @@
+Sandboxed Code-Execution Agent | Card 01
+Difficulty: Advanced
+
+QUESTION
+Trace one tool call from the model through execution and back; where does reflection re-enter?
+
+WHY THIS QUESTION MATTERS
+Tests whether I can explain LangGraph control flow and distinguish framework edges from tool implementation calls.
+
+CONTEXT
+A tool call is a sequence across model output, schema binding, ToolNode dispatch, implementation, and a ToolMessage. Reflection is another graph node, not a direct executor. Read the graph edges before describing the path.
+
+TERMS
+ToolNode: LangGraph node that executes structured tool calls
+conditional edge: Routing function that selects the next graph node
+ToolMessage: Framework message containing a tool result
+
+MECHANISM
+1. Inspect the model response for tool-call name, arguments, and call ID.
+2. ToolNode dispatches the bound StructuredTool; implementation runs and returns a ToolMessage.
+3. `after_tools` currently examines the last ToolMessage, so a mixed batch can hide an earlier failure.
+4. Reflection prompts the model again, and its response returns to the agent node before any corrected call executes.
+
+TECHNICAL EXPLANATION
+The route after the model checks the 15-step threshold before tool calls. ToolNode invokes the StructuredTool adapter; the adapter resolves a dispatch dictionary entry, so the edge graph is not a direct Python call graph. after_tools only inspects the final ToolMessage in the state. reflect_node asks the model to produce a corrected call, but its edge targets agent, which must emit a new call before ToolNode executes it. The ToolNode boundary is important because framework routing and implementation dispatch are separate layers. A ToolMessage is correlated to a call, but the current `after_tools` predicate checks only the final message. If a batch has mixed outcomes, route based on the aggregate and define whether dependent calls stop. Reflection returns a prompt plus model response to the agent node; it does not itself guarantee the response is a tool call. Test that exact graph sequence with a stub model.
+
+WORKED EXAMPLE
+A Python tool call is emitted, wrapped as a ToolMessage, and if that final result has success:false, reflection supplies a correction prompt; the model then decides whether to call the tool again.
+
+SOURCE
+sandbox-agent/agent/graph.py:133-156
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/agent/graph.py#L133-L156
+
+    def after_agent(state: AgentState):
+        if state.get("step_count", 0) >= MAX_STEPS:
+            return END
+        last_msg = state["messages"][-1]
+        if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+            return "tools"
+        return END
+
+    def after_tools(state: AgentState):
+        last_msg = state["messages"][-1]
+        if isinstance(last_msg, ToolMessage) and _has_error(last_msg.content):
+            if state.get("retry_count", 0) < MAX_RETRIES:
+                return "reflect"
+            else:
+                return END
+        return "agent"
+
+    workflow.add_conditional_edges("agent", after_agent, {"tools": "tools", END: END})
+    workflow.add_conditional_edges("tools", after_tools, {"reflect": "reflect", "agent": "agent", END: END})
+    workflow.add_edge("reflect", "agent")
+
+    _checkpointer = MemorySaver()
+    _graph = workflow.compile(checkpointer=_checkpointer)
+    return _graph, _checkpointer
+
+Read the conditional edges top to bottom: an exhausted step budget ends the run; otherwise tool calls enter ToolNode. Tool errors may route to reflection, but reflection returns to the agent, leaving the model in control of the next call.
+
+LIMIT
+Checking only the last ToolMessage can miss an earlier failure in a multi-tool batch, and the retry counter is not retained in the declared state.
+
+TEST EVIDENCE
+I traced the declared edges and adapter statically; the integration log is saved evidence, not a fresh graph run.
+
+SPEAKABLE ANSWER
+In `agent/graph.py:get_agent_graph`, I build an agent, tools, and reflection graph. The adapter in `tools/langchain_adapter.py:get_tools` turns schemas and `tools/dispatch.py:TOOL_DISPATCH` into callable tools. After a tool result, `after_tools` checks the last ToolMessage; errors go to reflection, which adds guidance and calls the model, then returns to the agent. One subtlety is that the corrected call does not jump straight to execution: the agent runs again first. I also checked the actual state behavior: the intended retry counter is missing from AgentState, so I would not claim three retries are enforced.
+
+SELF-CHECK
+The model asks for two tools; the first fails and the second succeeds. What should the graph do?
+It should preserve both results and route into reflection because at least one required operation failed. The current predicate checks only the final ToolMessage, so ordering can affect routing; that is a source-level risk, not a reproduced run.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What happens if a single model response requests three tools and the first one fails?
+The current predicate can miss that earlier error if the final message succeeds. I would aggregate status across the whole batch and define whether to reflect once per batch or per failed tool.  I would check every ToolMessage rather than only the final one: a parallel batch can contain one failed write and one successful lookup. Routing on the last result can send the graph back to the agent without reflection. The audit did not run a live graph test, so this is a source-level control-flow risk.
+
+1.1. How would you aggregate a mixed tool batch?
+Collect success and error state for every ToolMessage, keyed by tool-call ID, then route to reflection if any required action failed. Preserve successful results so the model can reason about them, but do not present the batch as fully successful. I would define whether independent calls continue after a failure and test a batch whose first call fails and last succeeds. That catches the current final-message blind spot.
+
+1.1.1. Would you stop later tools as soon as one fails?
+Only when later actions depend on the failed result or create additional risk. For independent reads, completing the batch may save a model turn; for a write followed by a dependent read, execution should respect the dependency. The graph should represent those relationships explicitly rather than treating the batch as an unordered list. I would test both independent and dependent tool groups and retain per-call outcomes for the final answer.
+
+2. Why let the model run again instead of executing the correction directly?
+The model response is the source of the next structured tool call, and the graph routes through the agent node. I would make that transition explicit and test it; the current code does not guarantee the correction itself is executed.  The reflection node constructs a correction prompt and calls the model, then the graph edge returns to `agent`. That means reflection’s response is a suggestion in the message history; only a later agent response with a tool call reaches ToolNode. I would inspect that next AIMessage and verify it targets the failed operation.
+
+2.1. Why not execute the reflection response directly?
+The model may return text, a changed tool call, or another tool batch, so routing through the agent decision point lets the graph inspect what it produced. A direct edge to ToolNode would need a clear guarantee that the response contains valid tool calls. The current architecture chooses another agent node, which costs a model invocation and can still terminate without executing the correction.
+
+2.1.1. What assertion proves the correction actually ran?
+Capture graph events and assert the sequence is failed ToolMessage, reflection model response with a tool call, then a ToolMessage whose tool-call ID matches that response. Also assert no execution occurs when reflection returns plain text. This is a graph-routing test, not an assertion about prompt wording. The code map says the response returns to agent; I did not execute a live model flow.
+
+3. Can the graph still make a bounded number of retry attempts?
+The code expresses an intended MAX_RETRIES limit, but the declared state omits retry_count. An isolated schema probe showed the undeclared value is not retained, so I cannot defend a reliable three-attempt cap.  A framework call graph is not enough to prove runtime order because ToolNode and message reducers mediate dispatch. I would inspect the compiled graph edges and a trace with message IDs, especially when multiple tools are emitted together.
+
+3.1. What data would you log to debug a missed tool call?
+Log run ID, node name, tool-call ID, tool name, state transition, and sanitized outcome class. Do not log secret arguments or full source code by default. Correlating the AIMessage tool call with the following ToolMessage reveals whether dispatch happened, failed, or was skipped. I would validate log redaction and retention because tool inputs may contain private workspace data. I would preserve per-call identifiers in the trace.  I would attach those IDs to the final user-visible result.
+
+3.1.1. Could logs alone prove the tool effect happened?
+No. A ToolMessage may report a result, but durable state is the stronger evidence: inspect the output file, database mutation, or other expected side effect. For an execution tool, capture the exit code and a bounded artifact pointer, then verify the artifact from a separate read operation. I would distinguish call trace, returned message, and external effect in the test report.
+
+OPTIONAL PRACTICE RESOURCES
+LLM Tool Calling Architectures for AI Agents (Grokking the Generative AI System Design Interview - AI-Powered Course): https://www.educative.io/courses/generative-ai-system-design/llm-tool-calling-architectures-for-ai-agents

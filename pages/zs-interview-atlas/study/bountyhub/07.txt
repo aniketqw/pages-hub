@@ -1,0 +1,104 @@
+Multi University Bounty System | Card 07
+Difficulty: Advanced
+
+QUESTION
+What does the Docker Compose topology establish, and what can you honestly claim about failure behavior?
+
+WHY THIS QUESTION MATTERS
+Tests the implementation boundary, failure modes, and whether I can separate code evidence from assumptions.
+
+CONTEXT
+A Compose file describes intended local wiring, while runtime evidence comes from launching services and observing them under failure. Keep topology, readiness, security configuration, and recovery as distinct claims.
+
+TERMS
+health check: Configured probe used to decide whether a service appears ready.
+replica lag: Delay between a primary write and its appearance on a replica.
+fault injection: Deliberately cause dependency failure to observe behavior.
+
+MECHANISM
+1. Read declared service dependencies and distinguish `depends_on` from data consistency.
+2. Inspect each health check and state exactly what that probe proves.
+3. In an isolated stack, record a known write, interrupt one dependency, restore it, and verify data converges.
+4. Review development credentials and mounts before discussing any shared deployment.
+
+TECHNICAL EXPLANATION
+`depends_on: service_healthy` gates startup on configured checks, but these probes are shallow. PostgreSQL replica health does not guarantee replay of a particular write; Mongo ping does not prove auth, indexes, or application query behavior. The config has development credentials and should not be treated as production hardening. Validation needs health semantics, migration/seed safety, restart behavior, backup/recovery, and fault injection. The honest boundary is “topology declared”; this audit did not run containers or measure availability. `depends_on: service_healthy` helps order startup but does not coordinate a database write with replica replay. Liveness should answer whether a process is stuck; readiness should answer whether it should receive traffic, and optional search degradation may not require restarting the API. Test failure and convergence separately: a process becoming healthy again does not prove Mongo has caught up. The Compose credentials are development values, not production secret management.
+
+WORKED EXAMPLE
+A possible test would stop Redis after commit and inspect catalog freshness; I did not perform it and cannot claim recovery.
+
+SOURCE
+BountyHub-main/docker-compose.yml:1-24
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/docker-compose.yml#L1-L24
+
+# ─── Docker Compose: Full Stack ───────────────────────────────
+# Spins up PostgreSQL (master + read replica), Redis, MongoDB (primary + replica), API server, and client
+
+services:
+  # ── PostgreSQL Master ──────────────────────────────────────
+  postgres-master:
+    image: bitnamilegacy/postgresql:16
+    container_name: bounty-postgres-master
+    environment:
+      POSTGRESQL_REPLICATION_MODE: master
+      POSTGRESQL_REPLICATION_USER: repl_user
+      POSTGRESQL_REPLICATION_PASSWORD: repl_password
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: postgres123
+      POSTGRESQL_DATABASE: bounty_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-master:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bounty_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+I would call this a declared local stack: stateful services, API/client, and Nginx edge. The configuration shows wiring; the audit did not exercise startup or failover, so those claims require integration tests.
+
+LIMIT
+Compose is not proof of production deployment or failover. Health checks prove only their probe; development credentials need review before shared use.
+
+TEST EVIDENCE
+No Docker or distributed-stack test ran. Start an isolated project, verify readiness and migrations, inject one dependency failure at a time, and assert API behavior and projection recovery.
+
+SPEAKABLE ANSWER
+`docker-compose.yml` declares PostgreSQL master/replica, Redis, Mongo replica set, API, client, Nginx, and a one-shot database initializer. The API receives separate primary and read URLs, and Nginx exposes the app at port 8080. That is evidence of a development topology, not proof I launched it or validated failover. The code map records no Docker run, concurrency test, or distributed failure test in this audit. Health checks show a probe succeeds, not that a replica has replayed a write or that the application handles outages. Before claiming resilience, I would start a disposable stack and test startup, replica lag, Redis failure after commit, Mongo unavailability, and worker recovery. I would review development credentials before shared deployment. I would keep configuration facts separate from run evidence in my explanation. For example, a declared replica is an architectural choice; proving failover requires a controlled write, a dependency interruption, a recovery observation, and recorded assertions. I would also avoid using a local health check as a substitute for security or operational readiness.
+
+SELF-CHECK
+`pg_isready` succeeds for the replica. Does that prove it has replayed a particular recent write?
+No. It proves the configured connection probe succeeded, not replay position. A freshness test needs to compare a committed version with what the replica can read; no Docker or replication test was run in this audit.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What does the health check not establish?
+Only that its configured probe succeeded then. It does not prove replica position, application credentials, indexes, or end-to-end readiness. A health check only proves its configured command succeeded at that moment; it does not establish replica replay position or application readiness. I would test the dependency path the API actually uses, including credentials, schema initialization, and a write followed by a replica read. The Compose file is configuration evidence, not a recovery result.
+
+1.1. What would you assert in a readiness check?
+Keep process liveness separate from dependency readiness. A readiness probe can verify the API can serve its intended traffic, while a deeper diagnostic can report database, Redis, and Mongo states without making every temporary dependency issue restart the container. I would avoid declaring the replica ready solely from `pg_isready`; a replication-lag check needs its own measurement. The repository’s current health checks are shallower than this proposed contract.
+
+1.1.1. Could a deep readiness check cause restart loops?
+Yes, if orchestration treats every dependency issue as process failure. I would make liveness answer whether the process is stuck and readiness answer whether it should receive traffic, with thresholds and grace periods. For an optional search dependency, the API may remain ready while reporting degraded search. I would validate those decisions through staged dependency outages rather than infer behavior from `depends_on`.
+
+2. Which failure test would you start with?
+In isolation, create a known bounty, stop Redis between commit and publication, then inspect database, stream, catalog and recovery. Scope result to that commit and setup. The visible Compose credentials and local volumes are development configuration. A successful local stack would still not prove secret rotation, backup recovery, or production network restrictions. I would document the environment boundary and keep security conclusions tied to the actual deployment manifests.
+
+2.1. What deployment changes are necessary before a shared environment?
+Move credentials to a secret store, restrict exposed ports, use environment-specific identities, and review volume ownership and backup policy. Then validate that the API can reach only intended services. I would not copy local passwords into a shared environment. These are deployment recommendations, not changes made during this code audit, and they need review against the target platform’s operational model.
+
+2.1.1. Would you publish the Compose password values in an interview?
+I would describe that development credentials are present without repeating their values unless a security review requires them. The useful point is the risk and the remediation, not amplifying a secret. In a real repository I would rotate exposed credentials, inspect history and deployment use, and document the incident response. The atlas should keep the issue concrete while avoiding unnecessary secret disclosure.
+
+3. Would you call this production ready?
+Not from this evidence. Replace development secrets, define health and recovery semantics, plan migrations/backups, and run fault and security tests in target environment. To call the stack resilient, I would need an observed recovery sequence: record the baseline, interrupt one dependency, watch errors and queue state, restore it, and verify data converges. I would test Redis publication loss and worker recovery separately because they are different failure windows. No such Docker exercise was run for this audit.
+
+3.1. Which failure would you test first?
+Start with Redis failure after a PostgreSQL commit because it tests the known publication gap while keeping the authoritative database available. Record the committed row, whether an event exists, the worker’s pending state, and the final Mongo document after recovery. But current code has no outbox, so the result may reveal unrepaired staleness. This is a proposed experiment; I did not run it.
+
+3.1.1. What would count as recovery if the event was lost?
+If no durable event exists, a restarted worker may have nothing to replay. Recovery may require a full rebuild or targeted reconciliation from PostgreSQL. I would define a freshness objective, trigger repair, and assert catalog state matches the source of truth afterward. That test distinguishes service restart from data convergence, which are not the same operational outcome. A repair run should be repeatable and report how many records it added, changed, and removed. A repair run should be repeatable and report how many records it added, changed, and removed.
+
+OPTIONAL PRACTICE RESOURCES
+Create the Dockerfile (Docker Guide for Beginners - AI-Powered Course): https://www.educative.io/courses/beginners-guide-to-docker/create-the-dockerfile

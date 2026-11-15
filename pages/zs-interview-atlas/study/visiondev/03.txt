@@ -1,0 +1,106 @@
+VisionDev | Card 03
+Difficulty: Intermediate
+
+QUESTION
+Why a YOLO classifier to tag distortions, and how do you handle low-confidence detections?
+
+WHY THIS QUESTION MATTERS
+Model selection under pragmatism is a core consulting-engineer skill. The interviewer wants to see whether the candidate can defend a tool choice, name what would beat it, and explain the failure handling - rather than treating 'I used YOLO' as self-justifying.
+
+CONTEXT
+A distortion tagger is a measurement instrument whose outputs need their own validation. A retry at confidence zero increases coverage by forcing a class even when the model is uncertain. That may reduce unknown values while contaminating category counts. Classical image statistics can provide interpretable baselines, but their behavior depends on image content and cannot be treated as ground truth.
+
+TERMS
+confidence threshold: the minimum score for a detection to count; here 0.01 with a 0.0-retry, trading label coverage for label quality
+calibration: whether a model's confidence scores match empirical correctness frequencies - detection-box confidences are typically uncalibrated for classification use
+silent degradation: a missing dependency (best.pt) making the pipeline produce worse output ('unknown' tags) without any error - the opposite of fail-loud design
+
+MECHANISM
+1. Sample records across predicted classes, confidence ranges, and unknown outcomes; label them independently of the model.
+2. Report precision, recall, and coverage at candidate confidence thresholds, separating forced labels from ordinary detections.
+3. Compare YOLO with simple Laplacian or DCT baselines on the same labeled holdout and inspect content-specific errors.
+
+TECHNICAL EXPLANATION
+The mechanism in pipe/debug_logger.py L236-273: run the model at conf=0.01; _extract_best_prediction returns None unless result[0].boxes is non-empty, then argmaxes confidence and maps cls index through distortion_classes. On None, retry at conf=0.0 - which forces YOLO to emit whatever it has - and only then write 'unknown' with None confidence. Both distortion_predicted and distortion_confidence are persisted per entry (L283-284). A trap in the schema: the legacy field distortion_type is actually the predicted CIFAR class name, not a distortion - conflating the two fields would corrupt any analysis. Alternatives ladder: weaker - no tagging, just manual review of failure grids; comparable-but-simpler - classical signal measures (Laplacian variance for blur, DCT statistics for JPEG, local variance for noise) which are fast, deterministic and explainable; stronger - a small supervised classifier (ResNet head) trained on synthetically distorted CIFAR images with a held-out calibration set, giving per-class probabilities instead of detection-box confidences; strongest - that classifier plus conformal or temperature calibration so the 0.01-threshold hack becomes unnecessary. The forced-retry design biases toward over-labeling: the 40.47% blur share partially reflects the tagger's priors at near-zero confidence, which is another reason I caveat the headline number.
+
+WORKED EXAMPLE
+The exploratory ancestor makes the evolution visible: exp/helperFunc/training_analytics/debug_logger.py has the same callbacks with no distortion model at all, and its January logs have no distortion_predicted field. The YOLO tagger was added in the pipe/ version specifically so the archetype and VLM stages had groups to work with.
+
+SOURCE
+vision_dev_project/pipe/debug_logger.py:236-265
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/debug_logger.py#L236-L265
+
+                if self.distortion_model is not None:
+                    try:
+                        # models expect HWC uint8 images
+                        img_for_model = img_np
+                        res = self.distortion_model(img_for_model, conf=self.distortion_conf_threshold, verbose=False)
+
+                        def _extract_best_prediction(result):
+                            if not (len(result) > 0 and hasattr(result[0], 'boxes') and len(result[0].boxes) > 0):
+                                return None, None
+                            confs = result[0].boxes.conf.cpu()
+                            best_idx = int(confs.argmax())
+                            cls_idx = int(result[0].boxes.cls[best_idx].cpu())
+                            label = (
+                                self.distortion_classes.get(cls_idx, str(cls_idx))
+                                if isinstance(self.distortion_classes, dict)
+                                else self.distortion_classes[cls_idx]
+                            )
+                            return label, float(confs[best_idx].item())
+
+                        distortion_pred, distortion_conf = _extract_best_prediction(res)
+
+                        # If no detection, try lowering the threshold to force a prediction
+                        if distortion_pred is None:
+                            res_low = self.distortion_model(img_for_model, conf=0.0, verbose=False)
+                            distortion_pred, distortion_conf = _extract_best_prediction(res_low)
+
+                        # If still None, explicitly mark as unknown
+                        if distortion_pred is None:
+                            distortion_pred = "unknown"
+                            distortion_conf = None
+
+The slice shows the whole tagging decision: run the distortion model at the configured threshold; _extract_best_prediction guards for empty boxes, argmaxes confidence, and resolves the class label whether distortion_classes is a dict or list. Then the two-stage fallback I want you to see - a retry at conf=0.0 that forces a prediction, and only if even that returns None does the entry become 'unknown' with a None confidence. Every choice here trades label coverage against label quality, and the stored confidence is what keeps that trade-off auditable.
+
+LIMIT
+Three honest risks: the conf-0.0 retry manufactures labels the model barely believes, inflating distortion counts including the blur share; I never built a labeled evaluation set for the tagger itself, so its accuracy on real misclassifications is unmeasured; and the missing best.pt means the published pipeline cannot reproduce the tags - a silent degradation I should convert into a loud failure.
+
+TEST EVIDENCE
+From the logs: run 005331 contains 620 'unknown' entries (12.9%) proving the fallback path fires in practice, and every tagged entry carries distortion_confidence, so I can live-plot the confidence distribution and show how many blur labels sit below any sane threshold.
+
+SPEAKABLE ANSWER
+Each misclassified image gets a distortion tag from an ultralytics YOLO model loaded in DebugLogger.__init__ in pipe/debug_logger.py. Inside on_validation_batch_end I run it on the HWC uint8 image and a small helper, _extract_best_prediction, picks the highest-confidence box and maps its class index to blur, jpeg, pixelate, or noise. The confidence threshold is deliberately 0.01, and if nothing is detected I retry at conf 0.0 before falling back to 'unknown' - I chose a forced low-confidence label over missing data, but I store distortion_confidence alongside every tag so downstream analysis can filter or down-weight. Why a detection-style model for what is really image-level classification? Honestly, convenience - I had the ultralytics training workflow ready. A plain classification head would be simpler and better calibrated, and even cheap signal heuristics like Laplacian variance for blur or DCT block energy for JPEG would be strong, explainable baselines I never benchmarked against. One more caveat I volunteer: the checkpoint best.pt is not in the repo, so a fresh clone silently degrades to 'unknown' tags - in run 005331, 620 of 4,816 records are 'unknown', 12.9% of the data admitting uncertainty.
+
+SELF-CHECK
+If lowering the confidence threshold raises blur coverage but lowers precision, what should happen to the headline rate?
+I would not silently replace it with the higher-coverage value. I would state the threshold, report coverage and precision, and either use a calibrated operating point or show forced low-confidence tags separately from the headline distribution.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Doesn't that just generate noise?
+It generates low-credibility labels, yes - deliberately, because 'unknown' is useless to the downstream grouping while a weak label plus its stored confidence is at least filterable. The defensible version is to keep the retry but report headline statistics only above a calibrated confidence floor, with the forced labels shown separately. As shipped, the headline 40% includes forced labels, which is one of my stated caveats.
+
+1.1. How would you calibrate that floor?
+I would label a representative holdout containing each distortion and uncertain cases, then compare predicted confidence with correctness by class. Choose a threshold against the cost of false labels versus unknowns, and report coverage alongside precision. I would not tune the threshold on the same failures used to headline the result.
+
+1.1.1. What if the confidence scores are not calibrated probabilities?
+Then I would treat them as ranking scores until calibration is measured. Reliability plots or expected calibration error can help, but per-class precision at a chosen operating point is more directly useful here. The report should call them confidence scores, not probabilities, unless the model’s calibration supports that stronger interpretation.
+
+2. Why are classical heuristics a credible alternative?
+Blur suppresses high-frequency content, so the variance of the Laplacian drops monotonically with blur strength - a threshold on it is a one-line, fully explainable blur detector. JPEG leaves 8x8 DCT block artifacts, noise raises local variance. These run in microseconds, need no training data, and would have given me an independent check on the YOLO labels; not benchmarking against them is a real gap in the project.
+
+2.1. How would you compare a hand-built blur signal with YOLO?
+Run both on the same independently labeled holdout and compare per-class precision, recall, coverage, and runtime. A Laplacian-variance threshold is interpretable for blur but may react to texture or image content; YOLO may detect patterns outside that simple statistic. The point is to learn which errors each makes, not declare the simpler feature correct by definition.
+
+2.1.1. What failure case could fool Laplacian variance?
+A naturally smooth object or low-texture scene can have low high-frequency energy without camera blur, while fine texture can remain high despite blur. I would stratify by content and inspect examples around the threshold. That is why a scalar heuristic is a baseline to calibrate, not a causal or ground-truth annotation.
+
+3. How do you fix the missing-checkpoint problem?
+Three layers: fail loudly - if distortion_model_path does not resolve, raise unless the user passes an explicit --allow-no-tagger flag; ship reproducibility - publish the checkpoint with a hash, or the training script plus the synthetic-distortion data generator so anyone can rebuild it; and record provenance - write the tagger's model hash into every log so a tag can be traced to the exact model version that produced it.
+
+3.1. Would raising an error make exploratory use less convenient?
+It could, so I would separate modes explicitly: production analysis requires a verified tagger checkpoint, while an exploratory no-tagger mode may continue with tags marked unknown. The user should opt into that degraded mode and the report should show it prominently. A silent fallback makes two runs appear comparable when only one actually had tags.
+
+3.1.1. What provenance should accompany every predicted label?
+Record checkpoint checksum, model version, inference threshold, retry policy, and whether a label came from the confidence-zero retry. That permits later analysis to filter comparable outputs. I would test that the metadata is present in each exported record and that missing model state cannot be mistaken for a valid unknown prediction.

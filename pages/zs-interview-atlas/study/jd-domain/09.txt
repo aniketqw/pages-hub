@@ -1,0 +1,75 @@
+JD / Domain | Card 09
+Difficulty: Intermediate
+
+QUESTION
+Design a small Python API client that is testable. Where do exceptions, retries and composition belong?
+
+WHY THIS QUESTION MATTERS
+JD: Python OOP, APIs, readable testable code and version control.
+
+CONTEXT
+A testable client separates business meaning from network behavior. The goal is to control failures locally while preserving the real service contract and making retry ownership explicit.
+
+TERMS
+composition: Building behavior by combining objects with explicit responsibilities.
+idempotency: Repeating an operation has the same intended effect as performing it once.
+
+MECHANISM
+1. Define a small transport interface and inject it into the client. Tests can supply a fake that records requests and returns controlled responses without credentials or paid calls.
+2. Validate and parse responses at the boundary, then translate transport failures into useful caller-facing errors while retaining the original cause for diagnosis.
+3. Attach timeout and retry policy to the operation's semantics. A retryable connection failure on a read differs from a timeout after a server may already have committed a write.
+
+TECHNICAL EXPLANATION
+Composition makes a transport replaceable without requiring a domain client to inherit vendor behavior. A fake should assert observable request shape and response interpretation, not the private order of every helper call. Resource ownership matters: define who opens and closes connection pools and whether callers may reuse the client concurrently. Error translation should retain the original cause and distinguish invalid input, authentication failure, transient transport failure and a rejected business operation. A timeout describes what the client observed; it does not prove the remote service performed no work. Bound retries, use backoff where appropriate and require operation-specific deduplication before repeating writes. An async signature does not make a blocking HTTP implementation nonblocking; isolate or replace it based on the execution environment.
+
+WORKED EXAMPLE
+A fake transport returns a malformed response on the first call and a valid response on the second. A parser test should reject the malformed shape; it should not need credentials or a running network service to exercise that behavior.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Mocking every implementation detail can produce tests that pass while the client contract is wrong. Distinguish unit behavior from integration behavior.
+
+TEST EVIDENCE
+Proposed test matrix only; no new API-client project is claimed. The Resume Builder offline suite is an existing separate executed test result.
+
+SPEAKABLE ANSWER
+I would separate transport, domain parsing and orchestration. A small client accepts a transport interface rather than constructing a real HTTP connection everywhere, so tests can inject a fake. I prefer composition when I need interchangeable behavior; inheritance is useful when the subtype truly satisfies the same contract. I translate transport errors into a small set of meaningful failures while retaining a cause for debugging. Timeouts and bounded retries belong near the network boundary, but retry policy depends on the operation: retrying a read differs from retrying a payment or creation request. Input validation and response-schema checks remain explicit. I would test success, timeout, malformed response and unauthorized access using fakes, then have separate opt-in integration tests for a real service.
+
+SELF-CHECK
+Why can a creation request timing out be harder to retry than a read timing out?
+The server may have created the resource before the response was lost. Without deduplication or status lookup, a second request can create another resource.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. When would inheritance make a small client harder to use correctly?
+If a subclass disables required parent behavior or changes its assumptions, callers cannot safely substitute it under the original contract. A domain client that merely needs an interchangeable transport is usually clearer when it receives that transport by composition. The choice follows responsibilities, not a ban on inheritance. Keep the public interface small and make error and resource ownership explicit so tests can replace dependencies without imitating an entire vendor class hierarchy.
+
+1.1. Who should own connection setup and cleanup in that composed design?
+Define whether the application owns a shared transport or the client creates and closes its own resource. Avoid having two components both assume the other will release connections. A context manager or application lifecycle hook can make ownership explicit. Tests should check cleanup on success and failure when that behavior is part of the contract. Also state whether reuse across concurrent calls is supported by the transport.
+
+1.1.1. How can a fake verify resource behavior without mirroring private implementation?
+Assert externally meaningful outcomes: no requests after closure, resources released on the documented lifecycle boundary and useful errors after failure. Avoid asserting the exact order of private helper calls unless the sequence itself is required. The fake should model the public transport contract narrowly. Supplement it with integration evidence for real connection behavior, since a fake that always closes successfully cannot prove the actual library handles every network condition.
+
+2. Which failures should usually not be retried as identical requests?
+Invalid input and failed authorization generally require a changed request or permission, so repeating them wastes resources and obscures the real problem. Some transport or server failures may be transient, but the operation's side effects still matter. Retry a read differently from a creation request that might already have committed. Bound attempts and elapsed time, preserve a final failure reason and avoid letting several nested retry layers multiply requests unexpectedly.
+
+2.1. How do nested retry layers change the effective attempt bound?
+If an application repeats a logical operation and the transport retries each attempt, the physical request count can multiply. Record attempts at both layers and define one coherent budget rather than quoting only the outer loop count. Backoff and timeouts also affect total elapsed work. A nominal one-call application path can still make several HTTP requests, so cost and side-effect claims need the lower-level behavior attached.
+
+2.1.1. What must an idempotency key mean to make a retried write safe?
+The server must recognize the same intended operation, persist its accepted identity and return a consistent outcome without repeating the effect. Reusing the key with a different payload should fail or follow an explicit contract. A client-generated header alone does not implement idempotency. Consider concurrent duplicates, retention and crashes between committing the effect and recording the result, then test those failure windows under the actual service design.
+
+3. What should a fake transport verify?
+Verify the public request contract: method, path, relevant headers, body and how responses are interpreted. Return controlled success, timeout and malformed-response cases without credentials. Avoid coupling the test to incidental private helper calls, which can change during a harmless refactor. A useful fake makes failures reproducible and checks caller-visible behavior. It remains a simulation, so keep live compatibility tests separate and state whether they were run.
+
+3.1. How could a fake pass while the real integration fails?
+The fake may accept an invalid header, omit a required response field or model timeout behavior incorrectly. It can then confirm an invented interface rather than the real service. Base fixtures on documented or sanitized observed responses and review them when the provider contract changes. Run a small opt-in integration check where appropriate. Unit success and live compatibility are different evidence, and neither alone establishes task-level answer quality.
+
+3.1.1. How would you handle a blocking transport inside an async route?
+An async function still blocks its event loop if it directly performs a blocking network call. Use a compatible asynchronous transport or isolate the blocking work through an appropriate bounded worker mechanism. Define timeouts and concurrency limits so isolation does not create an unbounded queue. Test overlapping requests and cancellation behavior under the actual server. Changing the function declaration to async is not evidence that the work became nonblocking.
+
+OPTIONAL PRACTICE RESOURCES
+Encapsulation (Learn Object-Oriented Programming in Python - AI-Powered Course): https://www.educative.io/courses/learn-object-oriented-programming-in-python/encapsulation
+Using Pytest (Quick Start Full Stack Web Development - AI-Powered Course): https://www.educative.io/courses/quick-start-full-stack-web-development/using-pytest

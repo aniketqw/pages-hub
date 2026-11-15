@@ -1,0 +1,97 @@
+Resume Builder Agent | Card 06
+Difficulty: Intermediate
+
+QUESTION
+How would you defend the test-count claim and describe the container security boundary accurately?
+
+WHY THIS QUESTION MATTERS
+Tests evidence provenance for resume claims and precise scoping of a security improvement.
+
+CONTEXT
+The resume lists a test total and a non-root image. The first is a claim about a test run; the second is a claim about process identity. This card teaches how to defend each without borrowing evidence from a different commit or environment.
+
+TERMS
+regression test: A controlled case that detects recurrence of a known failure.
+test selection: The collected cases actually included by a command and its markers.
+non-root: A process identity property that is only part of a deployment boundary.
+
+MECHANISM
+1. Read the repository trace’s test delta as reported history, then run a separate controlled offline environment against the pinned commit. Preserve the command, dependency versions and any exclusions.
+2. Inspect what a test asserts: graph branch parity, source-location trust and shared limiter wiring cover different mechanisms. Passing them does not measure all future answer quality or production scale.
+3. Read the Dockerfile’s USER declaration as one boundary. Runtime mounts, network permissions and deployed configuration determine other capabilities; no Docker execution is implied by source inspection.
+
+TECHNICAL EXPLANATION
+Give the source-reported Iteration 16 total of 540 with the commit that reported it. The prior offline run of 532 belongs to the older 6a28f2e source snapshot. Seeing 540 in this branch trace does not reconcile the older resume figure. Name specific behaviors you can defend: selecting an alternate LLM client, checking its schema request and corrective retry, joining a split title and date, or recognizing a bullet marker with no final period. The source trace reports live checks and regression reverts; these must not become our independently reproduced assertions. The Dockerfile sets a default non-root identity. That line is not evidence of the actual runtime mounts, egress, privileges, or secret handling. Test those separately if deployment isolation is the claim.
+
+WORKED EXAMPLE
+A test can prove an unresolved claim gets no permalink without calling Groq. A passing graph test can prove the browser excludes four nodes without proving provider latency. A USER app line can exist even if an operator later mounts sensitive host files. Each artifact establishes a narrower property.
+
+SOURCE
+resume-builder-agent/v2/Dockerfile:60-77
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/Dockerfile#L60-L77
+
+    HOME=/home/app
+
+RUN useradd --create-home --uid 10001 app
+
+COPY --from=builder /install /usr/local
+
+WORKDIR /app
+COPY config.yaml ./
+COPY web ./web
+
+# dense._cache_dir() is hardcoded to Path.home()/".cache"/"rba-models", so the
+# baked model has to land exactly there, owned by the user that will read it.
+COPY --from=models --chown=app:app /models /home/app/.cache/rba-models
+
+RUN mkdir -p /app/.cache /app/out && chown -R app:app /app /home/app
+
+USER app
+EXPOSE 8000
+
+Trace the data entering this boundary, the state it returns, and the conditions that limit its guarantee.
+
+LIMIT
+No new live inference or Docker run; independent offline results may differ from source-reported results and must stay labeled.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+I give the commit, command and environment for any test count. The repo's Iteration 16 trace reports 540 passing cases, up from 532. The earlier independent offline tests were run on the previous commit, so I keep their total separate. I explain what the tests check: for example, that the Ollama client sends a schema and that the PDF parser preserves an entry title. Offline tests do not prove live provider quality. The Dockerfile sets a non-root app user. That limits default process identity; mounts, network policy and deployment configuration still matter.
+
+SELF-CHECK
+Does a source-reported test total establish that this review reran the exact same suite?
+No. This review must name its own environment, command, pass/fail count and exclusions. The repository trace is useful historical evidence, but it is not a substitute for independently recording what ran here.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why can the same test total mean something different on two commits?
+A total counts collected cases under a command on a specific version. Some tests may have been added while others were removed, or the environment may collect different cases. Cite the commit and selection first. Then name a behavior covered by a test rather than using the total to imply broad quality.
+
+1.1. How should you report the newest trace and the previous offline run?
+Say the source trace reports 540 for the newest iteration. Say the earlier local suite passed 532 at the previous pinned commit. Keep any new focused run separate, with its exact selection. Those are three observations with different scope. None should be presented as new evidence of production latency or a deployed Docker runtime.
+
+1.1.1. What makes a regression test useful for an interview bug story?
+Start from a real observable failure. Write a small test that would fail for that reason. For a missing PDF title, assert the title text, not only that parsing finishes. For a structured provider response, assert the request and the parsed fields. Mention a revert check only if a record actually shows it.
+
+2. Why is that only one part of the deployment boundary?
+Process identity limits default permissions, but mounted files, capabilities, network access and application authorization still determine what can happen. A non-root process may read sensitive data it was given or send it through allowed egress. Inspect runtime configuration and negative cases before describing the container as a complete sandbox.
+
+2.1. Does the current safety_scan inspect all fetched source for secrets?
+No. The function scans paths, README and key_files; the new source_files collection is not passed through its content loop. It also returns findings rather than establishing a universal block before every generation. This is a concrete coverage limit to review, not a claim that a leak occurred in the tested run.
+
+2.1.1. What focused improvement would address that source-evidence gap?
+Scan the bounded source content that can enter the model bundle, define which findings block or redact it, and test that sensitive fixture text never reaches the fake provider. Preserve diagnostic location without copying usable secrets. That proposal needs a privacy policy and regression checks; the architecture review does not silently implement it in the project repository.
+
+3. Why test branch visits instead of only checking the final document?
+Two implementations can produce the same small fixture while taking different stages, omitting safety checks or making extra provider calls. Assert the expected visited node set and the excluded full_run stages for browser import. Then check the resulting document. That makes shared orchestration a tested behavior rather than an inference from similar output.
+
+3.1. How can test collection order hide an import defect?
+An earlier test can import and initialize a package in an order that avoids a circular dependency. A fresh CLI process may import the same modules in the failing order. Add a subprocess or fresh-interpreter import test for the supported entry points, rather than relying only on an already initialized pytest process.
+
+3.1.1. Does passing those offline checks verify the source’s live tracing claim?
+No. Offline fakes can verify parent-child trace construction, fallback and error isolation without posting to LangSmith. The repository trace separately reports a live run and nested trace verification. Attribute that report and state that this review did not spend provider quota or independently inspect its live backend.
+
+OPTIONAL PRACTICE RESOURCES
+Create the Dockerfile (Docker Guide for Beginners - AI-Powered Course): https://www.educative.io/courses/beginners-guide-to-docker/create-the-dockerfile

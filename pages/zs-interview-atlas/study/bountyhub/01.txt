@@ -1,0 +1,111 @@
+Multi University Bounty System | Card 01
+Difficulty: Advanced
+
+QUESTION
+How does an authenticated bid acceptance move from HTTP to PostgreSQL, and what race does the transaction actually close?
+
+WHY THIS QUESTION MATTERS
+Tests the implementation boundary, failure modes, and whether I can separate code evidence from assumptions.
+
+CONTEXT
+A bid acceptance combines an authorization decision, a lifecycle transition, and several related row updates. Before answering, know which reads use the replica, which transaction uses the primary, and what the product means by one accepted bid.
+
+TERMS
+Serializable transaction: A database level that rejects some interleavings that cannot be explained as a serial order.
+preflight: A quick check before the authoritative write transaction.
+invariant: A condition that must remain true for every valid state.
+
+MECHANISM
+1. Authenticate the requester, then load bid and bounty state; a replica preflight is only an early rejection check.
+2. The actual transaction rereads the chosen bid and checks PENDING, but does not recheck bounty OPEN or creator ownership. Revalidating those mutable conditions on primary is a proposed repair.
+3. The code groups bid acceptance, sibling rejection and bounty updates in a Serializable transaction. A bounded retry of the entire transaction after a serialization abort is a proposed addition, not an audited current guarantee.
+4. After commit, treat cache invalidation and event publication as separate effects with their own failure windows.
+
+TECHNICAL EXPLANATION
+The replica preflight is an optimization and authorization check, not a freshness guarantee. Inside the transaction, code rereads only the selected bid and checks PENDING; it does not revalidate bounty OPEN or creator ownership. Serializable can abort conflicting schedules, but callers still need bounded retries. Stronger design: recheck mutable authorization and bounty invariants on primary, add a database constraint for at most one accepted bid if the model allows, and retry the whole transaction on known serialization errors. A partial unique index is not automatically simple because historical ACCEPTED rows may remain after a bounty reopens. Model whether acceptance is current state or immutable history before choosing a constraint. An alternate acceptedBidId relation can enforce one current winner, but lifecycle transitions and audit history still require explicit rules. Retry the entire transaction, including invariant checks, after serialization failure; never reuse the replica preflight as authority.
+
+WORKED EXAMPLE
+Two accept requests pass replica preflight for different pending bids. The transactions then conflict or one sees processed state. This is a scenario to test, not a result I measured.
+
+SOURCE
+BountyHub-main/server/src/services/bidService.js:19-48
+https://github.com/aniketqw/BountyHub-main/blob/6f53b673d5df0ec7bcca10b35927bdba2f23cfa4/server/src/services/bidService.js#L19-L48
+
+  async acceptBid(userId, bidId) {
+    // Pre-flight read (replica) — cheap check before acquiring locks
+    const bidCheck = await prismaRead.bid.findUnique({
+      where: { id: bidId },
+      include: {
+        bounty: { include: { creator: { select: { universityId: true } } } },
+      },
+    });
+    if (!bidCheck) throw new AppError('Bid not found', 404);
+    if (bidCheck.bounty.createdBy !== userId) throw new AppError('Not authorized', 403);
+    if (bidCheck.status !== 'PENDING') throw new AppError('Bid already processed', 400);
+    if (bidCheck.bounty.status !== 'OPEN') throw new AppError('Bounty is not open', 400);
+
+    // Serializable transaction prevents two concurrent acceptBid calls from both succeeding
+    const accepted = await prisma.$transaction(async (tx) => {
+      const bid = await tx.bid.findUnique({ where: { id: bidId } });
+      if (!bid || bid.status !== 'PENDING') throw new AppError('Bid already processed', 400);
+
+      const updated = await tx.bid.update({ where: { id: bidId }, data: { status: 'ACCEPTED' } });
+      await tx.bid.updateMany({
+        where: { bountyId: bid.bountyId, id: { not: bidId }, status: 'PENDING' },
+        data: { status: 'REJECTED' },
+      });
+      await tx.bounty.update({ where: { id: bid.bountyId }, data: { status: 'IN_PROGRESS' } });
+      return updated;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    await cacheInvalidate('bounties:*');
+    await publishEvent('BID_ACCEPTED', {
+      bountyId: bidCheck.bountyId,
+
+I point first to preflight, then the transaction. It accepts one bid, rejects pending siblings, and advances the bounty together. The hook is that creator and open-state checks remain outside, and I have not tested concurrency.
+
+LIMIT
+The replica can be stale; Serializable does not remove the need to handle aborts or validate every invariant in the transaction.
+
+TEST EVIDENCE
+I inspected the pinned implementation; no concurrency or Docker test was run. A useful test races two bid IDs and asserts one accepted, one rejected, and one IN_PROGRESS bounty while recording aborts.
+
+SPEAKABLE ANSWER
+I trace `server/src/routes/bountyRoutes.js` through `authenticate` in `server/src/middleware/auth.js` to `acceptBid` in `server/src/services/bidService.js`. The service first reads the bid and bounty through the replica and checks creator, pending status, and open bounty. It then rechecks the selected bid is pending inside the primary Serializable transaction, accepts it, rejects sibling pending bids, and moves the bounty to IN_PROGRESS. That makes those writes atomic, but the open-state and ownership checks are outside the transaction, and there is no local retry loop. I would move authoritative checks inside the transaction and add bounded retries for serialization conflicts. This was a source audit only; I did not run concurrent acceptance tests, so I cannot claim a measured race result. I would also distinguish the data-plane invariant from the HTTP response: a successful response should mean the primary transition committed, while cache invalidation and event publication are downstream effects. I would expose transaction aborts as metrics and avoid describing a stale replica preflight as a guarantee.
+
+SELF-CHECK
+Two owners issue acceptance for different bids on the same bounty at once. Which invariant must hold after both finish?
+At most one bid is ACCEPTED, the others are no longer pending, and the bounty is IN_PROGRESS. This code aims to enforce that with a Serializable transaction, but the audit has not measured the race or added a uniqueness constraint.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Which checks repeat after preflight?
+The transaction rereads the selected bid and checks PENDING, then performs the writes. It does not repeat creator ownership or bounty OPEN checks, so I would move them onto the transaction client. I would distinguish a serialization abort from an authorization rejection: only the former is a bounded retry candidate. A concrete test should synchronize two accepts for different bids on one bounty, then inspect every row after both calls. If one request aborts, retrying must rerun all checks on the primary; it must not reuse the earlier replica preflight result.
+
+1.1. If the first transaction aborts, which values should the retry reload?
+Reload the bid, bounty status, and creator relationship through the transaction client before deciding whether to accept. The earlier replica result may be stale by the time a retry starts. Then attempt the state transition and sibling rejection in one transaction. I would cap retries, record the database error class, and return a conflict only after the bound. This avoids converting a stale preflight into authority.
+
+1.1.1. Would you retry after an ownership check fails?
+No. A failed owner check is a policy rejection, not a transient serialization conflict. Retrying it adds load and risks obscuring the authorization decision. I would return the appropriate forbidden response and log the actor, bounty, and decision without sensitive payloads. The test matrix should prove that a non-owner stays rejected even while another owner accepts a bid. That separates security behavior from concurrency recovery.
+
+2. What should retry policy distinguish?
+Retry only known serialization or transient database errors, rerun the whole transaction with a small attempt limit and jitter, and do not retry authorization or validation failures. This is a recommendation, not implemented behavior. If I wanted a durable invariant, I would model a unique accepted-bid constraint or a single accepted-bid pointer on the bounty, depending on the domain. The application transaction still provides a useful workflow boundary, but a database constraint protects against future code paths that bypass this service. I would first inspect migration compatibility and how rejected bids are represented.
+
+2.1. Would a unique `(bountyId, status)` index work directly?
+Usually not as a plain unique index because many bids legitimately share PENDING or REJECTED status. I would consider a partial unique index limited to ACCEPTED rows, or a separate acceptedBidId on the bounty, after checking PostgreSQL and Prisma migration support. The invariant is one accepted bid per bounty, not one row for each status. I would test the constraint through competing transactions and document how cancellation or reopening resets it.
+
+2.1.1. How would a partial index affect a reopened bounty?
+The data model must say whether reopening permits a new accepted bid while retaining historical ACCEPTED rows. If history remains, a simple partial unique index would block reopening. I would either transition the prior bid out of ACCEPTED, store acceptance history separately, or use a current acceptedBidId relation with an explicit lifecycle. That decision should be covered by migration and state-machine tests before adding the index.
+
+3. How make the race test deterministic?
+Create one bounty and two pending bids, synchronize calls at a barrier, issue both accepts, then assert database invariants rather than only HTTP codes. I would also include an explicit response contract: a successful acceptance means the primary transaction committed, while cache invalidation and event publication are later effects. The source shows those side effects after commit, so an API success should not be described as proof that Mongo search is already current.
+
+3.1. What should the client do if it immediately reloads the bounty?
+The reload can hit a cache or read replica that has not observed the write yet. If the product requires immediate confirmation, return the committed representation from the mutation or route that follow-up read to the primary for a short consistency window. I would avoid promising that every cached detail request is read-your-write consistent. A test should assert the mutation response and separately measure eventual projection freshness.
+
+3.1.1. How would you avoid pinning every later read to primary?
+Issue a version or commit marker with the mutation response and use primary reads only until a read model reaches that version. If the stack cannot expose a replay position, a short-lived sticky-primary policy is simpler but less precise. I would make the latency and fallback behavior observable and expire the policy quickly, so one mutation does not permanently shift the user’s traffic to the write database.
+
+OPTIONAL PRACTICE RESOURCES
+Isolation Levels (Introduction to Big Data and Hadoop - AI-Powered Course): https://www.educative.io/courses/introduction-to-big-data-and-hadoop/isolation-levels
+Serializable Snapshot Isolation (Introduction to Big Data and Hadoop - AI-Powered Course): https://www.educative.io/courses/introduction-to-big-data-and-hadoop/serializable-snapshot-isolation

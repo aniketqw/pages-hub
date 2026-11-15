@@ -1,0 +1,97 @@
+Resume Builder Agent | Card 09
+Difficulty: Advanced
+
+QUESTION
+How does V2 keep `/score` and `/score/batch` numerically consistent?
+
+WHY THIS QUESTION MATTERS
+Tests server-side scoring as the source of truth, batch construction, raw deltas, exactness contracts, and variant bounds.
+
+CONTEXT
+Picture a score next to a checkbox. If you turn a bullet off, the number should tell you how the server's score would change. The single route scores one draft. The batch route scores that same draft plus alternatives. This question asks how they use the same reference point.
+
+TERMS
+candidate: A concrete edited document evaluated under the same target and scorer.
+raw delta: The difference before display rounding or percentile conversion.
+cache identity: The inputs determining whether a derived scoring result may be reused.
+
+MECHANISM
+1. Resolve the same document, job target and scoring options. In score_batch, apply base_ops first.
+2. Construct the base chunk tuple and put it before variants. _dense_values handles the first chunked candidate separately.
+3. Reuse cached vectors for unchanged chunks. Check cache keys for edits to header, headings, and non-bullet text before assuming reuse is correct.
+4. Subtract raw values and scale before display rounding. Test base-only versus base-plus-variants, and treat independent cache histories as a separate case.
+
+TECHNICAL EXPLANATION
+Sharing score_many is only the first condition. Both routes must use the same document serialization, chunk construction and target. score_batch applies base_ops and places that base before the temporary variants. The encoder can produce tiny float differences for identical text in differently padded batches. _dense_values isolates the first chunked candidate and gathers remaining chunks together, trading some batching efficiency for stable base behavior in the tested configuration. A session can reuse saved chunk vectors. Independent requests with different cache histories, especially when a variant becomes the base later, are a different comparison. Also the chunk ID is not a hash of all rendered text: the header ID is constant and section IDs omit some text fields. Do not assume every non-bullet edit is cache-safe. Compute deltas from raw fused scores; check target, cache conditions and document signature when investigating unexpected differences.
+
+Leave-one-out means compare the original with one copy that excludes one item. It measures the effect of that toggle under this scorer; it does not isolate a bullet's universal value. The repo analysis reports a tiny batch-padding artifact in its measured setup. The base-first design addresses that path, not every cache history, floating-point platform or variant. The old prefix dedup explanation applies to the flat path; structured documents use chunk identities.
+
+WORKED EXAMPLE
+Toy example: the base is 0.63; turning off one bullet gives 0.59. The server subtracts 0.63 from 0.59 before formatting: a change of −0.04, or −4 points on a 100-point display. The browser only shows the returned result. To test base consistency, score the original alone, then with five variants using the same inputs and cache conditions.
+
+SOURCE
+resume-builder-agent/v2/src/rba/ats/batch.py:264-277
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba/ats/batch.py#L264-L277
+
+        base_index = chunked[0]
+        base_vectors = _ensure_chunks_embedded([candidates[base_index].chunks], cache)
+        rest_vectors = (_ensure_chunks_embedded(
+            [candidates[i].chunks for i in chunked[1:]], cache)
+            if len(chunked) > 1 else {})
+        vectors_by_id = None
+        if base_vectors is not None and rest_vectors is not None:
+            vectors_by_id = {**base_vectors, **rest_vectors}
+        if vectors_by_id is not None:
+            for index in chunked:
+                vector = _pool_from_vectors(candidates[index].chunks, vectors_by_id)
+                if vector is not None:
+                    values[index] = max(0.0, float(np.dot(vector, jd_vector)))
+
+
+Select the first chunked candidate as base. Resolve its vectors in a separate call. Resolve the remaining candidates together. Then use the returned vectors to pool each candidate. Compare this with the base-first contract in routes/score.py.
+
+LIMIT
+Isolating the base protects the tested comparison. Cache history, chunk identity, input identity, or different channels can still affect cross-request comparisons.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+Both endpoints turn the current document into a candidate and call the same scorer. The batch endpoint puts the base first. For dense scoring, the scorer embeds the base's missing chunks separately, then batches the variants' missing chunks. This keeps variant padding from changing a freshly computed base embedding in the tested case. Cached vectors can be reused across edits. The API computes deltas from raw scores, before display rounding. I compare results only with the same base and candidate operations, job target and active channels. I would not promise bit-exact values across all cache histories or for every variant.
+
+SELF-CHECK
+Why does the base go first?
+The first chunked candidate gets a separate embedding call for misses. This avoids changing the base batch shape just because variants were added.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why could the same scorer give a slightly different base score in a batch?
+The local encoder pads inputs to match batch shape. Its floating-point computation can change slightly when other inputs change that shape. The current code sends the base's missing chunks separately. The remaining candidate chunks can still be batched. This protects the tested base comparison without requiring one model call per variant.
+
+1.1. Why can you still see differences across requests with different cache histories?
+A vector saved earlier can be reused later. Its original computation may have used a different set of batch inputs. The base-first change controls fresh base work inside the intended path; it cannot change how a previously stored vector was calculated. Compare cross-request behavior with the cache state stated and use the tolerance supported by the test.
+
+1.1.1. What would you test if an edited header gives an unchanged dense score?
+The header chunk uses a constant ID. Score a document, edit only its header, then compare a warm-cache score with a fresh-cache score. Inspect which chunk text and ID went into the scorer. If the old vector was reused for new text, use an ID derived from the full rendered text or invalidate when a relevant field changes. That is a proposed fix, not an implemented one.
+
+2. How can display rounding hide a real candidate difference?
+Two raw scores can round to the same displayed integer. Subtracting those displays yields zero even when the scorer observed a change. Compute the raw difference first and then format it with an appropriate scale and precision. The number of displayed decimals is a presentation choice, not a statement about statistical confidence.
+
+2.1. Why is a percentile difference a different quantity?
+A percentile depends on a reference distribution and its density around each score. Equal raw changes need not correspond to equal percentile changes, and the reference can be inappropriate for a new domain. Keep candidate deltas on the raw matching scale and label any percentile with the population that defines it.
+
+2.1.1. What should a user infer from a tiny positive raw delta?
+Only that this scorer ranked the edited input slightly higher under the fixed configuration. It may reflect a small lexical change, a dense effect or an approximation boundary. Inspect channels and preserve truthful meaning. A small positive proxy delta does not prove the wording is clearer, more credible or more likely to secure an interview.
+
+3. Why avoid mutating the session during an exploratory batch?
+The user may be comparing several alternatives before choosing one. Candidate operations should create concrete alternatives without silently applying each to the authoritative working document. Verify the route’s session and revision behavior when claiming read-only comparison. The final selected mutation needs its own conflict and invalidation contract.
+
+3.1. How should invalid operations behave during comparison?
+Reject them explicitly with a useful error tied to the affected candidate or base operation. A silently ignored unknown bullet ID can make the returned score describe a different document from the one the caller intended. Test the error path and confirm no authoritative edit occurred as a side effect.
+
+3.1.1. Does the variant cap prevent all overload?
+No. It bounds candidates in one request, not concurrent requests or the pending executor queue. Many allowed batches can still exceed latency or memory targets. Add measured admission limits and an explicit overload response if required. Endpoint correctness and server capacity are separate acceptance properties.
+
+OPTIONAL PRACTICE RESOURCES
+Zero-Shot vs. Few-Shot Prompting (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/zero-shot-vs-few-shot-prompting
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run

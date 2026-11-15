@@ -1,0 +1,99 @@
+Resume Builder Agent | Card 12
+Difficulty: Advanced
+
+QUESTION
+Why does V2 use app-scoped limiters and a single scoring worker?
+
+WHY THIS QUESTION MATTERS
+Tests API-key-scoped rate limits, shared process resources, CPU and memory isolation, and the consequences of horizontal scaling.
+
+CONTEXT
+This service has two different resource problems: remote model quota and local scoring work. The Groq limiter coordinates requests. The scoring worker limits how much CPU/embedding work runs at once. These are distinct from a bound on queued work or a promise about cost.
+
+TERMS
+effective key: The credential actually used after request and environment fallback.
+admission control: A policy limiting accepted or queued work before resources are exhausted.
+process scope: The server instance within which an object or lock is shared.
+
+MECHANISM
+1. Trace the import route into Runner. Groq receives the shared model-response cache and key-bucket limiter. Ollama can use the same response cache but does not receive the Groq limiter.
+2. The limiter map hashes the request key or anon. Resolve the actual effective credential consistently if explicit and environment-backed requests should share a provider quota.
+3. CPU-bound scoring runs through one executor worker, while rendering uses a separate pool. This limits concurrent scorer execution but does not bound how many requests can wait.
+4. Before scaling workers, coordinate provider budgets and durable state across processes, define overload responses, and measure the intended workload rather than treating object sharing as a throughput benchmark.
+
+TECHNICAL EXPLANATION
+The new wiring is a concrete improvement: the route supplies shared objects to the pipeline, Runner forwards them and GroqClient uses them. A same-key test can prove identity sharing within that app process. It does not establish shared accounting across independent workers or key aliases. When a body key is empty, limiter_for hashes anon, while GroqClient may later obtain the actual key from environment; an explicit request with that same effective key can land in another bucket. Normalize at a trusted boundary without logging raw secrets. On the CPU side, ThreadPoolExecutor(max_workers=1) controls active scoring tasks but ordinarily permits pending work to queue. It does not provide a total memory or latency bound under arbitrary arrival rates. Dense inference also has model-window and batch limits that are separate from server admission. Explain each control by its scope and failure behavior, and reserve performance claims for measured runs. Per-session dense caching belongs to scoring, not to the provider rate window. It can reduce the cost of toggling one bullet by reusing unaffected chunks. The first score can still require several embeddings. The source trace reports measurements for its setup; these do not define production latency.
+
+When Ollama is selected, Runner does not pass it the Groq limiter. The host still has finite memory, concurrency and throughput. The existing generation cache can be passed to either client. That does not make the limiter global or guarantee a latency figure. The source analysis reports warm and cold timings only for its measurement conditions.
+
+WORKED EXAMPLE
+Two imports with the same explicit key receive the same limiter object in one app. If one request omits its key and falls back to that key from environment, the current anon bucket can split accounting. Separately, twenty scoring requests can still queue behind one worker, so serial execution is not an overload policy.
+
+SOURCE
+resume-builder-agent/v2/src/rba_api/deps.py:38-54
+https://github.com/aniketqw/resume-builder-agent/blob/650759625ba7bd98bcdeb9438dcc42b77761c4f7/v2/src/rba_api/deps.py#L38-L54
+
+class AppState:
+    def __init__(self, *, testing: bool = False) -> None:
+        self.testing = testing
+        self.config = Config.load()
+        self.pools = Pools()
+        self.sessions = SessionStore(
+            ttl=float(os.environ.get("RBA_SESSION_TTL", "7200")))
+        self.cache = Cache(enabled=not testing)
+        self.jobs = JobStore()
+        self._limiters: dict[str, Limiter] = {}
+        self.dense_ready = False
+
+    def limiter_for(self, api_key: str) -> Limiter:
+        key = hashlib.sha256((api_key or "anon").encode()).hexdigest()[:16]
+        if key not in self._limiters:
+            self._limiters[key] = Limiter(self.config)
+        return self._limiters[key]
+
+Trace the data entering this boundary, the state it returns, and the conditions that limit its guarantee.
+
+LIMIT
+Per-process controls do not establish global quota, bounded queues or fixed latency. Ollama avoids the Groq generation quota but does not remove the host's workload limit.
+
+TEST EVIDENCE
+Current source is pinned at 6507596. The repository's Iteration 16 trace reports 540 passes; see this revision's verification report for independently run checks and their narrower scope. No production timing or live-provider quality is implied.
+
+SPEAKABLE ANSWER
+V2 now actually passes the app cache and key-bucket limiter through the import route into Runner and GroqClient. That lets concurrent imports using the same explicit key share rate accounting instead of each assuming it owns the full quota. The scoring pool has one worker to limit simultaneous CPU/ONNX work, while a separate rendering pool avoids putting PDF work behind scoring. These controls are process-local and a worker count is not a bounded request queue. I also noticed that an omitted key is bucketed as anon before environment fallback, so equivalent explicit and implicit credentials may use different buckets. I would normalize effective credential identity and define admission limits before claiming global quota control.
+
+SELF-CHECK
+Does one scoring worker guarantee that the server accepts only one scoring request at a time?
+No. It limits active worker execution, not the number of requests waiting for that executor. A bounded queue or admission policy needs an additional explicit mechanism and a user-visible overload response.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Which call chain proves the shared limiter is actually used?
+The GitHub route calls limiter_for, passes the result to build_from_github, then Runner forwards it into GroqClient. Test object identity through that real path for two imports sharing a key. A defined AppState method alone would not establish coordination if the caller created independent clients without passing its result.
+
+1.1. How can implicit and explicit credentials split one effective quota?
+limiter_for hashes the request value or anon, while the provider client can obtain a missing key from environment. An explicit request carrying that same effective key can therefore use another bucket. Normalize effective identity before choosing the limiter, without exposing secret values. The same-explicit-key test does not cover this alias case.
+
+1.1.1. Why is that still not a cross-process quota guarantee?
+Each app instance owns its own limiter map and time windows. Two processes can each believe they have the remaining provider budget even when key normalization is correct. Coordinate at a shared rate service or constrain deployment deliberately. Report the actual scope rather than turning a useful single-process improvement into a global guarantee.
+
+2. Why can serializing scoring reduce resource contention?
+Only one scoring task runs in that executor at a time, avoiding several large inference batches competing for the same process resources. The model can still use internal threads, and rendering has a separate pool. This design choice should be evaluated under its workload; it is not proof of a particular memory peak or throughput number.
+
+2.1. Where can work accumulate despite one active worker?
+Incoming requests can wait in the executor’s pending queue or at other server boundaries. A fixed worker count controls active execution, not accepted demand. Long inputs and repeated batches can increase queueing latency. Define queue or admission limits and cancellation behavior if overload matters, instead of calling serial execution a hard workload bound.
+
+2.1.1. What should the caller see when admission is denied?
+A clear overload or retryable response under a documented policy, with enough information to avoid blind repeated work. Decide whether waiting is bounded and whether cancellation stops pending expensive work. Test saturation and recovery. A user-facing contract is necessary so resource protection does not become an unexplained frozen progress indicator.
+
+3. What does sharing the cache add beyond sharing a rate limiter?
+A matching cached provider response can avoid remote generation, while the limiter coordinates permitted request rate on misses and retries. They solve different problems and both need correct identity. Shared cache access also needs safe connection ownership and cleanup. Reuse does not automatically validate output under a changed evidence or schema policy.
+
+3.1. How does the new tracing help inspect those behaviors?
+GroqClient can attach LLM calls under the active graph run and trace cache hits with zero-token usage. That makes one import’s structure easier to inspect than disconnected roots. Offline tests can verify constructed parent-child behavior, while the source trace reports a separate live verification. Observability does not itself enforce rate limits or correctness.
+
+3.1.1. What privacy boundary should be reviewed before enabling tracing?
+Inspect which prompts, evidence and outputs are sent to the trace service, who can access them and how long they persist. Source evidence can contain sensitive data even when credentials are not printed. Define redaction and opt-in policy appropriate to the task. Trace completeness is valuable only within an intentional data boundary.
+
+OPTIONAL PRACTICE RESOURCES
+EC2 - Elastic Compute Cloud (Learn the A to Z of  Amazon Web Services  (AWS) - AI-Powered Course): https://www.educative.io/courses/learn-the-a-to-z-of-amazon-web-services-aws/ec2-elastic-compute-cloud

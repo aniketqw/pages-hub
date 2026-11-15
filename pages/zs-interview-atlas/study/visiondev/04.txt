@@ -1,0 +1,111 @@
+VisionDev | Card 04
+Difficulty: Advanced
+
+QUESTION
+You call it retrieval over past failures - is this actually RAG, and what would real similarity search look like?
+
+WHY THIS QUESTION MATTERS
+RAG is the most over-claimed word on 2026 resumes. The interviewer is testing terminology honesty: can the candidate distinguish offline selection from query-time retrieval, and design the real thing if asked?
+
+CONTEXT
+The current archetype stage extracts ResNet features, reduces them with PCA and t-SNE, then chooses items nearest to or farthest from a centroid in two dimensions. This is an offline sampling strategy over known labels. It is not a queryable index, and global distances in a t-SNE plot are not reliable enough to support similarity claims.
+
+TERMS
+RAG: retrieval-augmented generation - fetching relevant context from an index at query time to ground a model's output; requires a query, an index, and inference-time retrieval
+t-SNE: a nonlinear projection preserving local neighborhoods for visualization; global distances and cluster separations in its output are not meaningful metrics
+archetype selection: choosing representative (near-centroid) and extreme (far-from-centroid) examples per group - an offline sampling policy, not retrieval
+recall@k: the standard retrieval metric: fraction of true matches found in the top k results - what I would use to evaluate a real similarity index
+
+MECHANISM
+1. Name the operation accurately: feature extraction, visualization, and centroid-based exemplar selection are separate stages.
+2. If query-time retrieval is needed, retain original-space vectors, build an index, and define what makes a returned failure relevant.
+3. Evaluate the selected neighbors with judged query pairs and avoid using 2D projection distance as a retrieval score.
+
+TECHNICAL EXPLANATION
+Precise pipeline: _extract_images_from_log writes per-label image folders from the training log; _extract_features runs torchvision ResNet18 (pretrained, fc head removed) to get 512-d vectors; module-level code applies PCA(50) then t-SNE(2, seed 42); _select_archetypes partitions by label, computes the 2D centroid, sorts by Euclidean distance, and slices order[:k] and order[-k:][::-1]. Why each piece is defensible for its actual purpose: ResNet18 features capture semantic content far better than raw pixels (raw-pixel PCA exists in the repo only for a debug plot); the fixed t-SNE seed makes selection reproducible; and typical-plus-outlier sampling gives the VLM both the modal failure and the weird tail. Why it is not RAG: RAG retrieves context for a query at generation time from an index; here selection happens once, offline, keyed by known labels - the VLM never asks for neighbors. What breaks if you pretend otherwise: t-SNE's non-metric 2D layout means 'outliers' can be artifacts of embedding crowding; distances between clusters are meaningless; and adding one new image requires re-running t-SNE on everything - no incremental index. The real build: CLIP image embeddings (or the ResNet features) in FAISS/HNSW at full dimensionality, cosine similarity, evaluated with recall@k on labeled duplicate/same-failure-mode pairs; then a true failure-retrieval workflow - given a new failure, pull its nearest historical failures and their resolutions - becomes possible, and that is when the word retrieval is earned.
+
+WORKED EXAMPLE
+The output artifact is pipe/reports/distortion_report.json: for each of blur/jpeg/pixelate/noise, 3 typical and 3 outlier entries each with a file path and its centroid distance. vision_reasoning_report.py's gather_images_for_distortion then consumes typical first, outliers second, random fill third - so the selection policy directly shapes which images Qwen ever sees.
+
+SOURCE
+vision_dev_project/pipe/distortion_diagnostic_report.py:135-164
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/distortion_diagnostic_report.py#L135-L164
+
+def _select_archetypes(
+    embeddings: np.ndarray,
+    labels: List[str],
+    categories: List[str],
+    paths: List[Path],
+    choose_k: int = 3,
+) -> Dict[str, Dict[str, List[Tuple[str, float]]]]:
+    report = {}
+    for cat in categories:
+        idx = [i for i, l in enumerate(labels) if l == cat]
+        if len(idx) == 0:
+            report[cat] = {
+                'typical': [],
+                'outlier': [],
+            }
+            continue
+
+        cat_embeddings = embeddings[idx]
+        centroid = np.mean(cat_embeddings, axis=0)
+        dists = np.linalg.norm(cat_embeddings - centroid[None, :], axis=1)
+        order = np.argsort(dists)
+
+        # handle limited case
+        n = len(order)
+        k = min(choose_k, n)
+
+        typical_idx = order[:k]
+        outlier_idx = order[-k:][::-1]
+
+        report[cat] = {
+
+The function takes the 2D embeddings, the YOLO labels, and the category list. For each category it collects member indices - note labels are given, not discovered; this is grouping, not clustering. It computes the centroid as the mean embedding, gets Euclidean distances with np.linalg.norm, argsorts, and slices: the k nearest become 'typical', the k farthest (reversed, so most-extreme first) become 'outlier'. The entire 'retrieval' claim reduces to these argsort slices - which is exactly why I stopped calling it RAG.
+
+LIMIT
+The risk is reputational more than technical: if I let an interviewer believe this is RAG and they then read the code, every other claim I make loses credibility. Technically, the t-SNE-space distances could be selecting 'outliers' that are embedding artifacts, so the VLM may be analyzing the projection's quirks rather than the model's true tail failures - I have no evaluation separating those.
+
+TEST EVIDENCE
+Static source review confirms the centroid-distance sorting and three-nearest/three-farthest selection. A proposed reproducibility check would pin image order, model weights and library versions and compare picks across reruns; random_state=42 alone is not proof of identical artifacts. No feature extraction, GPU inference or t-SNE rerun was performed during this preparation.
+
+SPEAKABLE ANSWER
+My resume phrase 'retrieval over past failures' oversells what the code does, so let me describe it exactly. pipe/distortion_diagnostic_report.py embeds each failure image with a pretrained ResNet18 minus its head, reduces with PCA to 50 dimensions, then t-SNE to 2. _select_archetypes then groups images by their already-known YOLO labels, computes each group's centroid in that 2D space, measures every point's distance to it with np.linalg.norm, and takes the 3 nearest as 'typical' and the 3 farthest as 'outlier' archetypes per distortion. That is offline archetype selection by centroid distance - not a vector store, not query-time k-NN, and I should not call it RAG; there is no query, no index, no retrieval at inference time. It is also statistically fragile: t-SNE preserves local neighborhoods, not global distances, so 'farthest from the centroid in 2D' is partly a visualization artifact. For true similarity search I would index the original high-dimensional feature vectors - CLIP embeddings in FAISS - query at runtime, and actually evaluate retrieval quality against labeled pairs. The honest summary: it is good enough to pick representative images for a VLM report, and it is not a retrieval system.
+
+SELF-CHECK
+A 2D plot shows two points far apart. Can you conclude their original feature vectors are dissimilar?
+No. t-SNE primarily preserves local neighborhoods and can distort global distances. I would calculate similarity in the original feature space and evaluate relevance on labeled query pairs before using it for retrieval.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What specifically does a vector store add?
+Three things this pipeline lacks: an index structure (HNSW/IVF) making nearest-neighbor queries sublinear; incremental writes so new failures join without recomputing the space; and query-time semantics - embed an arbitrary new image and retrieve neighbors on demand. My pipeline computes one static layout and slices it; a vector store answers questions it has never seen.
+
+1.1. How would you evaluate nearest neighbors for these failures?
+Create query examples with human judgments about whether a retrieved failure is diagnostically useful, then measure precision at k or recall at k against those judgments. Keep the split grouped by source image or session so near-duplicates cannot leak into both query and reference sets. Without relevance labels, an index can return neighbors without establishing retrieval value.
+
+1.1.1. Would nearest-neighbor similarity prove the same root cause?
+No. Visual similarity can suggest related cases but does not establish shared cause. I would return the neighbor’s label, confidence, run provenance, and known diagnosis as context, then ask a human or validated downstream step to compare them. Retrieval quality and causal diagnosis should be evaluated as different outcomes.
+
+2. Why centroid distance rather than density or clustering?
+Simplicity and interpretability: the centroid of a labeled group is a stable reference, and near/far gives a clean typical/outlier story for the report. Density-based methods (LOF, isolation forest) would find outliers more robustly in multimodal groups - if blur failures form two sub-modes, the centroid sits between them and 'typical' picks can be atypical of both. That is a known limitation I would state in any writeup.
+
+2.1. How would a second mode affect the selected typical examples?
+If a label combines two visual subtypes, the arithmetic centroid can lie between them, so the closest items may represent neither subtype well. I would inspect neighborhood structure in the original embedding space, cluster only if there is evidence for multiple modes, and select exemplars within each mode. The report should preserve the known distortion label separately from any inferred subgroup.
+
+2.1.1. How do you avoid calling a projection cluster a real class?
+Treat the 2D map as an exploratory view and validate any proposed group in the original feature space and on held-out examples. Report stability across seeds and dimensionality choices. Here the classes are already-known YOLO labels; the t-SNE plot does not discover a new causal taxonomy.
+
+3. Why CLIP over the ResNet18 features you already have?
+CLIP embeddings are trained for semantic similarity across a vast distribution, so visually-different-but-semantically-similar failures land near each other; ResNet18 ImageNet features are a decent free substitute but weaker on 32x32 CIFAR images, which are far from ImageNet's distribution. Either way the key change is the same: index at full dimensionality and never measure distances in a t-SNE projection.
+
+3.1. Could a pretrained ResNet feature be enough instead of CLIP?
+It may be a sensible baseline because it is already in the pipeline and cheap to reuse. I would compare ResNet and CLIP on the same judged retrieval pairs, including distortion-specific relevance, because CLIP’s semantic training does not guarantee sensitivity to low-level artifacts. For 32-by-32 images, preprocessing and upscaling choices also need to be fixed and documented.
+
+3.1.1. What would make you keep the simpler ResNet feature?
+If it matches or exceeds the retrieval quality needed for the use case with less memory and operational cost, I would keep it. The key comparison is task performance under a fixed query set, not model prestige. I would also inspect failure cases where semantic neighbors ignore the visual defect that matters to the diagnosis.
+
+OPTIONAL PRACTICE RESOURCES
+What Is RAG and Why Use It? (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/what-is-rag-and-why-use-it
+Popular Vector Database Solutions (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/popular-vector-database-solutions

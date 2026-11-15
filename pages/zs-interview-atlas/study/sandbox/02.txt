@@ -1,0 +1,86 @@
+Sandboxed Code-Execution Agent | Card 02
+Difficulty: Advanced
+
+QUESTION
+The graph says “15 steps.” What exactly counts, and does a new REPL turn get a fresh budget?
+
+WHY THIS QUESTION MATTERS
+Tests state reducers, checkpoint semantics, and whether a stated execution limit matches actual work.
+
+CONTEXT
+The graph’s MAX_STEPS is a model-node budget, while each model response may request zero, one, or several tools. The harness also reuses a thread and merges step_count with a max reducer.
+
+TERMS
+reducer: A function that combines old state with a node update
+checkpoint: Saved graph state used when a thread resumes
+budget scope: The unit of work to which a limit applies
+
+MECHANISM
+1. Follow the increment in `agent_node`; the counted unit is a model invocation.
+2. Follow the conditional edge in `after_agent`; it checks the updated step count.
+3. Read `merge_max` and compare it with the harness sending zero at each turn.
+4. Design separate counters for model calls, tool calls, elapsed time, and per-turn reset semantics.
+
+TECHNICAL EXPLANATION
+The conditional route checks `step_count >= MAX_STEPS` after agent execution. A multi-tool batch can therefore contain multiple operations under one model invocation. MemorySaver checkpoints by thread, and the harness uses a fixed thread ID. With a max reducer, incoming zero cannot lower the checkpointed value; reset semantics need to be designed rather than assumed. The harness keeps `main-user-session` and sends `step_count=0` at each turn, but `merge_max` returns the maximum of old and new values. Therefore the supplied zero cannot reset a persisted larger count for that thread. MAX_STEPS counts model-node runs, including reflection, not every tool operation. A batch can fan out while consuming one step. Add separate counters and explicit overwrite semantics; the isolated probe established reducer behavior, not a full REPL run.
+
+WORKED EXAMPLE
+If one model invocation requests four tools, the counter advances once; if reflection calls the model too, that is another model step. A later zero update cannot reset a stored count of 14.
+
+SOURCE
+sandbox-agent/agent/state.py:4-9
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/agent/state.py#L4-L9
+
+def merge_max(left: int, right: int) -> int:
+    return max(left, right)
+
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+    step_count: Annotated[int, merge_max]
+
+The reducer returns max(left, right), then the TypedDict applies it to step_count. That gives monotonic state, which is useful for cumulative counts but conflicts with resetting the value at a turn boundary.
+
+LIMIT
+The counter does not measure each tool call, and a retained thread can carry the prior maximum into the next turn.
+
+TEST EVIDENCE
+The isolated state probe exercised reducer behavior with the actual LangGraph schema; it did not run a full agent turn.
+
+SPEAKABLE ANSWER
+In `agent/graph.py:agent_node`, step_count advances on model-node invocations, including reflection, not on each tool operation. `agent/state.py:merge_max` keeps the maximum value, so when `harness.py:main` supplies zero at the next turn, that zero does not reset a saved larger count for the same thread. The isolated state probe reproduced that behavior; it did not run the complete agent. I therefore describe 15 as an intended model-step ceiling, not a fresh per-turn tool budget. I would use explicit per-turn state or a deliberate overwrite/reset policy.
+
+SELF-CHECK
+One model response requests four independent tools. How many units does the current 15-step counter represent?
+One model-node invocation, not four tool executions. A separate tool-call or resource budget is needed if the goal is to cap fan-out, cost, or side effects.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Would a model call that returns no tools still consume one of the 15 steps?
+Yes, the increment occurs in the agent node before routing, so the unit is model-node invocations, not successful tool actions.  The 15-step check occurs in `after_agent` after `agent_node` increments state, so it counts model-node runs, including reflection, rather than each tool call. A model can request several tools in one batch without one budget unit per tool. I would call it a model-step ceiling, not a tool-execution quota.
+
+1.1. What budget would you add for a batch of tools?
+Track tool calls separately from model invocations, with limits on count, wall time, output bytes, and perhaps cumulative resource cost. A single model step could request several expensive tools, so one counter does not protect the host from fan-out. I would reject or truncate excess calls before ToolNode execution and emit a clear budget result. The current MAX_STEPS constant does not enforce those per-tool limits.
+
+1.1.1. How should a rejected call appear to the model?
+Return a structured ToolMessage saying the per-turn tool budget was exhausted, including the allowed count and whether retrying is possible. That lets the agent explain a limit without pretending the tool ran. I would ensure the denial itself does not route into an unbounded reflection loop; budget exhaustion should be terminal or consume a separate bounded recovery allowance. The denial should be a terminal result, not a new retry opportunity.  A clear terminal message also prevents the model from treating the denial as a tool error.
+
+2. How would you reset the budget safely while keeping conversational history?
+I would separate turn_budget from conversation history and use an explicit turn identifier or overwrite reducer for the budget. The current shared checkpoint and max reducer do not provide that reset.  In `harness.py:main`, each turn supplies zero, but the same `main-user-session` checkpoint and `merge_max` reducer preserve the larger saved count. So the input reset does not reset the reducer’s stored maximum. I would give each turn an explicit ID or separate overwrite semantics from conversation history.
+
+2.1. Could a new thread ID solve the reset?
+It would create separate checkpoint state, but it would also split conversation history unless that history is copied deliberately. The user asked for a new turn budget while retaining the thread, so budget state should have its own lifecycle. I would keep messages under the conversation thread and use a turn counter or overwrite reducer for step_count, then test two turns with the same history.
+
+2.1.1. What did the isolated probe actually establish?
+It used the actual AgentState schema and installed LangGraph version to show an incoming zero did not replace the stored maximum. It did not run the Docker agent, provider, or REPL end to end. I would keep the evidence narrow: reducer semantics are reproduced; end-to-end per-turn behavior still needs a graph-level test with the real checkpoint configuration. The same state key should be checked at every node boundary.  That test should inspect both the retained message list and the reducer value.
+
+3. What did you actually execute to verify it?
+Only an isolated probe against the actual AgentState schema and installed LangGraph behavior. I did not rerun the real agent or claim an end-to-end sandbox test.  A fixed thread ID is useful for preserving a single REPL conversation, but it couples all turns to one checkpoint namespace. If multiple users share the process, the constant can also create cross-user state collision unless the harness is single-user by design.
+
+3.1. What should the thread ID be scoped to?
+Derive it from an authenticated user and conversation identifier, not a global literal. If the CLI is intentionally single-user, make that assumption explicit and still distinguish separate conversations. I would avoid embedding raw PII in the ID; use an opaque stable identifier. Then test that two sessions cannot observe one another’s messages or step counters. That behavior comes from the reducer, not from prompt instructions.
+
+3.1.1. Does a unique thread ID make MemorySaver durable?
+No. It separates in-process checkpoint keys, but MemorySaver still loses checkpoint data when the process exits. If restart continuity matters, use a durable checkpointer and define retention, encryption, and deletion policy. I would test restart recovery separately from session isolation, because those are different guarantees and one does not imply the other. I would test expiration and deletion independently.  I would verify cleanup after the retention period.
+
+OPTIONAL PRACTICE RESOURCES
+Encapsulation (Learn Object-Oriented Programming in Python - AI-Powered Course): https://www.educative.io/courses/learn-object-oriented-programming-in-python/encapsulation

@@ -1,0 +1,71 @@
+Behavioural & Experience | Card 03
+Difficulty: Advanced
+
+QUESTION
+Your Marvell bullet says a production-safe digital twin. What exactly was demonstrated, and what remained a vision?
+
+WHY THIS QUESTION MATTERS
+Audit a strong internship claim without inventing confidential deployment details.
+
+CONTEXT
+A digital-twin question probes the boundary between collecting a state snapshot and predicting a system’s response. The accessible Marvell work map supports state capture and design reasoning, not an implemented or validated production model. A credible answer should explain what the source state represented, how freshness and behavior would be checked, and what remains unknown without inventing internal details.
+
+TERMS
+proof of concept: A limited demonstration of a mechanism, not a complete production service.
+fidelity: How closely a model matches the system it represents.
+
+MECHANISM
+1. Separate observed controller data, inferred system behavior, and the intended validation use.
+2. Name an independent source of actual behavior and a replay or configuration set that could compare prediction with reality.
+3. State operational exit criteria such as freshness, scenario coverage, error tolerance, and safe handling of mismatch.
+
+TECHNICAL EXPLANATION
+Answer with a ladder of evidence: snapshot, model, validation, and deployment. State which rung the work reached and what evidence would be needed to move up. This shows technical judgment without inflating the project. If the interviewer asks for a failure case, discuss the general risk that controller state and actual behavior diverge, but mark it as a design concern unless it truly occurred. Do not invent a live deployment, prediction accuracy, or an incident. The fill marker should identify your actual artifact, environment, and result. A good answer can be confident about the design reasoning while being precise about what the source material cannot establish. A reviewer should be able to trace each claim to a captured state or a proposed test.
+
+WORKED EXAMPLE
+Hypothetical: a controller says a path is installed but a switch has not applied it. A twin initialized only from intended state could predict success incorrectly. This illustrates a limitation; it is not a claimed production incident.
+
+SOURCE
+No code shown (confidential)
+
+LIMIT
+Do not turn a proof of concept into a production deployment or treat the project goal as an achieved outcome.
+
+TEST EVIDENCE
+Scope checked against the existing authorized Marvell work map and the fixed resume. User must fill actual ownership, environment and observed outcome; no private system was queried.
+
+SPEAKABLE ANSWER
+I would separate state capture from a full prediction or simulation engine. The accessible work map describes a state-capture proof of concept and a design for a runtime twin, not evidence of a production validation service. The phrase production-safe pre-deployment validation describes the intended use; I should not present that as a measured deployment result. My resume says the input came from controller state, so I would explain which true data artifact I owned and how its freshness was checked. [FILL BEFORE INTERVIEW: identify your actual owned component, the real test environment, and an observed result you can disclose.] I would then state what was not demonstrated: production-scale fidelity, a complete failure-prediction model and deployment impact are not established by the accessible evidence. That boundary is important because a current controller view can still disagree with the actual data plane.
+
+SELF-CHECK
+If a controller snapshot is complete but several minutes old, can it support a current validation decision?
+Only if the decision’s freshness requirement permits that age and the data-plane behavior has not changed. I would show timestamp and age, block or qualify a current-state claim when stale, and rely on a verified observation path. No particular freshness check is claimed here.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why does state capture alone not establish a digital twin?
+Captured controller state is an input snapshot. A twin also needs a behavioral model and evidence that its predicted behavior matches a target system under relevant changes. I would describe the accessible work as state capture and design reasoning, then name which validation component is not established. [FILL BEFORE INTERVIEW: identify the true artifact and what it represented.]
+
+1.1. What experiment would test whether the twin predicts behavior?
+Choose a set of known configurations, predict outcomes before observing them, and compare predictions with an independent data-plane or replay observation. Define error metrics and a holdout set. Without that comparison, the result is a modeled view or proof of concept, not demonstrated predictive fidelity.
+
+1.1.1. Which failure would make you stop trusting the model?
+A systematic mismatch on a high-impact scenario, stale input state, or a prediction that cannot be reproduced should block a safety claim. I would log the input snapshot, model version, prediction, and actual observation, then identify whether the issue is data freshness, model assumptions, or evaluation coverage.
+
+2. What evidence would establish the freshness of a controller snapshot?
+I would look for timestamps, update cadence, sequence numbers, or a replay record linking the capture to the event being analyzed. [FILL BEFORE INTERVIEW: name the actual check you performed, if one exists.] If none is available, I would say freshness is unverified rather than infer it from the data being readable.
+
+2.1. How would you represent stale or incomplete state?
+Attach source time and completeness metadata to each snapshot, define an age limit for decisions, and surface missing fields rather than filling them silently. A consumer can then reject a snapshot that is too old or incomplete. This is a design recommendation unless I can point to an implemented check.
+
+2.1.1. What should an operator see when freshness validation fails?
+Show which source and timestamp failed, the age threshold, and what decision is blocked. Do not present a stale graph as current. [FILL BEFORE INTERVIEW: if the original work had a real alert or fallback, describe it; otherwise say that it was not implemented.]
+
+3. How would you communicate the prototype boundary to an executive?
+I would distinguish what was demonstrated from the intended use: the accessible work supports a state-capture proof of concept and design, not an audited production validation service. Then I would name evidence needed to advance, such as replay fidelity, coverage of failure scenarios, and operational ownership. I would avoid using “production-safe” as an achieved result.
+
+3.1. What are sensible exit criteria before a pilot?
+Agree on supported scenarios, prediction error limits, freshness requirements, failure behavior, and who reviews mismatches. Run the checks on representative configurations and record exceptions. The criteria should be set with the system owner; I should not imply those thresholds were part of the original project unless verified.
+
+3.1.1. How would you preserve trust if a pilot finds a mismatch?
+Report the mismatch with input provenance and impact, suspend the affected recommendation, and make the correction path visible. A safe pilot is allowed to discover limits. [FILL BEFORE INTERVIEW: state whether any such event actually occurred; do not fabricate a pilot story.]

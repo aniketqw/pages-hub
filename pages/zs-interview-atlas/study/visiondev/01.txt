@@ -1,0 +1,90 @@
+VisionDev | Card 01
+Difficulty: Advanced
+
+QUESTION
+Audit your 40% blur number: which run, which denominator, and what does it actually prove?
+
+WHY THIS QUESTION MATTERS
+ZS consultants put numbers in front of clients. An interviewer probes whether a resume statistic survives contact with its own data - can the candidate name the source, the denominator, and the limits of the claim, or does the number dissolve under one follow-up?
+
+CONTEXT
+The percentage is meaningful only with the artifact, run, and unit of counting attached. This project has both per-image deduplicated records and repeated observations across validation epochs. A tagger predicts a distortion label after a sample is already known to be a model failure, so the analysis is descriptive. It cannot show that the tag caused the failure, and the two runs have different populations and unknown handling.
+
+TERMS
+denominator discipline: always stating which population a percentage is computed over - here unique hashes (4,816 or 4,935) vs repeated observations (10,012)
+attribution vs causation: a classifier labeling failures 'blur' attributes a pattern; proving blur caused the failure needs an intervention like deblurring and re-evaluating
+run provenance: tying every quoted number to a named artifact - file, timestamp, hash - so it can be recounted on demand
+
+MECHANISM
+1. Open the exact run artifact first; read its timestamp, sample list, and summary fields instead of copying a rounded report-table value.
+2. Choose whether the question is breadth or recurrence: count unique hashes for distinct images, or observation counts for repeated failures.
+3. Recompute the numerator and denominator from one run, keep unknown tags visible, and state that a predicted label is not causal evidence.
+
+TECHNICAL EXPLANATION
+The full provenance chain: on_validation_batch_end in pipe/debug_logger.py tags each misclassified image via YOLO and stores distortion_predicted; on_train_end dedups by exact sha1 and writes training_log_*.json; pipe/export_misclassified.py produces the standalone misclassified_*.json with n_misclassified as the unique count. The audited numbers: run 005331 has distortion counts blur 1,949, jpeg 1,434, pixelate 708, unknown 620, noise 105 over 4,816 unique records (sha256 c5bd8b8f27c6...); run 012558 has blur 2,402 of 4,935 unique (48.67%) with summary total_misclassified 10,012 pre-dedup observations (sha256 f9c756e23c57...). Three distinct failure modes hide in a casual '40%': run drift (40.47 vs 48.67 between runs of the same pipeline), denominator confusion (4,935 unique vs 10,012 observed), and label-vs-cause conflation (the YOLO tagger asserts 'this failure looks blurred', not 'blur caused this failure' - the 620 'unknown' tags in run 005331 are the tagger admitting uncertainty). The saved ai_reasoning_summary.md even pairs training log 012558 with misclassified file 005331 because main() auto-discovers latest files independently - a concrete mixing bug I can point to.
+
+WORKED EXAMPLE
+Hypothetical interviewer probe: 'Does blur cause 40% of your errors?' The precise answer is: blur is the predicted label on 40.47% of unique failures in run 005331; run 012558 says 48.67%. Establishing cause would require a controlled intervention and re-evaluation, not just counting distortion labels.
+
+SOURCE
+vision_dev_project/pipe/vision_reasoning_report.py:652-662
+https://github.com/aniketqw/vision_dev_project/blob/94e88d7ead6ba275e0c40872426cc1ff27e1dca4/pipe/vision_reasoning_report.py#L652-L662
+
+        "## 6. Actionable Recommendations",
+        "",
+        "Based on the failure distribution and VLM visual analysis above:",
+        "",
+        "| Priority | Recommendation | Addresses |",
+        "|----------|---------------|-----------|",
+        "| 🔴 High | **Multi-distortion augmentation** — add blur (σ=0.5–3), JPEG sim (q=10–70), pixelation (block 2–8px), Gaussian noise (σ=0.05–0.25) to training dataloader | Blur (40%), JPEG (30%), Pixelate (15%) |",
+        "| 🔴 High | **Dual-pathway backbone** — add a low-pass feature stream (shape/silhouette) alongside the standard high-freq stream; merge with channel attention (SE-Net/CBAM) | Blur, Pixelate |",
+        "| 🟡 Medium | **Gradient-reversal distortion-adversarial head** — auxiliary head predicts distortion type with GRL; forces backbone to learn distortion-invariant features | All types |",
+        "| 🟡 Medium | **Fine-grained contrastive loss** — add SupCon or NT-Xent loss for the cat/dog/deer/bird confusion cluster; enforce larger embedding margins between visually similar classes | JPEG, Blur |",
+        "| 🟢 Low | **Train longer + cosine LR decay** — current 3-epoch run shows monotonically falling loss; model has not converged. Val loss > train loss indicates early overfitting | All types |",
+
+This is render_report in pipe/vision_reasoning_report.py around line 658: the 'Actionable Recommendations' table is literal Markdown strings in source code. The 'Blur (40%), JPEG (30%), Pixelate (15%)' cell is typed by me, not computed from the run and not generated by Qwen. I show this slice deliberately - it is the strongest evidence that the report's numbers must be audited against the JSON logs, and admitting it preempts the gotcha.
+
+LIMIT
+If I quote '40%' bare, one follow-up ('which file? why does the later log say 48.67?') makes the whole project look unexamined. There is also real risk the number is partly an artifact of the YOLO tagger itself: its threshold is 0.01 with a conf-0.0 retry, so low-confidence blur labels inflate the count, and 620 'unknown' records sit in the denominator.
+
+TEST EVIDENCE
+Recount live: a five-line python over pipe/logs/misclassified_20260317_005331.json counting distortion_predicted values reproduces 1,949/4,816 = 40.4693%; the same over training_log_20260317_012558.json gives 2,402/4,935 = 48.6727% and summary.total_misclassified == 10012. File identities are pinned by sha256 (c5bd8b8f... and f9c756e2...) in my audit notes.
+
+SPEAKABLE ANSWER
+On my resume I say clustering showed blur behind 40% of failures, and I want to be precise about where that number lives. It comes from one specific artifact, pipe/logs/misclassified_20260317_005331.json, where 1,949 of 4,816 unique misclassified records carry the blur label - 40.47%. A later run, training_log_20260317_012558.json, shows 2,402 of 4,935 unique records, which is 48.67%, and that same file's summary reports 10,012 total misclassified observations because it counts repeats before dedup - a different denominator entirely. So I name the run and the denominator before quoting any percentage, and I never mix unique-hash counts with observation counts. Two caveats I volunteer without being asked: these are labels from a distortion classifier applied to failures, not causal proof that blur caused the errors - attribution is not causation; a controlled test would re-evaluate on deblurred inputs. And the 'Blur (40%)' string that appears in render_report in pipe/vision_reasoning_report.py is hardcoded into the recommendations table, so I treat the JSON logs, not the rendered report, as the source of truth.
+
+SELF-CHECK
+If a stakeholder asks whether blur caused 40% of the errors, what can you say from this artifact alone?
+Only that the tagger labeled 1,949 of 4,816 unique failures in run 005331 as blur, about 40.47%. The artifact alone does not establish causation; I would propose a paired perturbation experiment.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Why did the two runs differ by 8 points?
+Different training runs produce different failure sets: the 012558 run misclassified more images overall (4,935 unique vs 4,816) and the YOLO tagger labeled a larger share blur, with no 'unknown' bucket recorded in that log's counts. I have not root-caused the shift - honestly, that is an open item - which is itself the reason I refuse to quote one number as 'the' blur rate.
+
+1.1. Which source artifacts establish whether the denominator counts unique images or repeat observations?
+The denominator has to be read from the selected JSON artifact, not inferred from the rendered table. In run 005331 the unique sample list contains 4,816 records, while the later training log’s 10,012 field counts repeated observations. I would label the metric with the artifact stem and denominator type in the table itself. File identities are pinned by sha256 (c5bd8b8f... and f9c756e2...) in my audit notes.
+
+1.1.1. How would you handle records that appear multiple times across validation epochs?
+I would retain the image identity and an observation count, then publish two separate measures: distinct images with the tag and total tagged observations. That preserves breadth and recurrence without treating them as interchangeable. Before comparing runs, I would also confirm that both count fields use the same callback and dedup rules.
+
+2. How would you establish causation?
+Intervention: take the blur-tagged failures, apply deblurring or re-render clean versions where possible, and measure the flip rate to correct predictions; or synthetically blur correctly-classified images and measure induced error. If accuracy recovers or degrades with the intervention, that is causal evidence. The current pipeline only observes correlational labels on failures.
+
+2.1. What evidence would make blur a cause rather than a label correlated with failure?
+A controlled perturbation gives a stronger test than a histogram: apply synthetic blur to correctly classified held-out images and compare their predictions with the unmodified versions. For recovery, test a documented deblur transform on the same tagged failures. I would report paired changes, class strata, and transformation artifacts; the current 40.47% observation alone answers none of those causal questions. File identities are pinned by sha256 (c5bd8b8f... and f9c756e2...) in my audit notes.
+
+2.1.1. What result would weaken the claim that blur is a major cause?
+If controlled blur barely changes error rates, or deblurring rarely recovers predictions while the tagger remains accurate, then blur is not a strong causal explanation for this model’s failures. I would also check whether effects disappear after stratifying by class or source. I would revise the narrative rather than preserve a headline based only on the failure subset.
+
+3. Why ship a hardcoded table at all?
+It was a prototype shortcut: I wanted the report to always contain actionable guidance even when the VLM was down, and I froze one run's rounded numbers into the template. The right fix is a typed recommendations structure computed from the selected run's actual distribution, with the VLM contributing evidence per recommendation - and I would flag the template clearly as static until then.
+
+3.1. How would you stop a static recommendation from being read as a run-specific result?
+I would generate the distribution table from the exact selected run object and attach its run ID, denominator, and tag-confidence policy. Static guidance could remain as a clearly labeled general note, but it should not contain a frozen percentage that looks measured for the current run. The report should show whether the VLM was unavailable and which sections came from code versus generated analysis.
+
+3.1.1. What validation would catch a stale percentage before publication?
+A report test can compare each displayed count and percentage with a calculation from the manifest-selected sample records, including rounding tolerance. A fixture with a changed distribution should change the rendered table automatically. I would also search for hardcoded numeric recommendations in templates so a future edit cannot reintroduce a stale run value unnoticed.
+
+OPTIONAL PRACTICE RESOURCES
+What Kinds of LLM Evaluations Should You Run (LLM Evaluation: Building Reliable AI Systems at Scale - AI-Powered Course): https://www.educative.io/courses/llm-evaluation/what-kinds-of-llm-evaluations-should-you-run

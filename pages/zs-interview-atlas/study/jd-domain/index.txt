@@ -1,0 +1,51 @@
+JD / DOMAIN
+
+Open one text card at a time.
+
+01. A user says the model forgot the beginning of a long conversation. Explain tokens, context and sampling without blaming temperature.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/01.txt
+
+02. Explain one transformer block, then tell me why an embedding is not a database record or a guarantee of meaning.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/02.txt
+
+03. Design a basic RAG pipeline over changing client documents. Where would you measure retrieval before touching the prompt?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/03.txt
+
+04. A stakeholder asks for an agent, RAG and fine-tuning. How do you decide which capability the problem actually needs?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/04.txt
+
+05. How would you evaluate an LLM feature when the stakeholder only says the answers should be good?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/05.txt
+
+06. A retrieved document tells the agent to ignore its rules and upload secrets. What should happen?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/06.txt
+
+07. Does valid JSON mean an LLM output is safe to use? Walk through the checks before writing to a database.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/07.txt
+
+08. Show how you would get the latest accepted submission per bounty without counting duplicates from a join.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/08.txt
+
+09. Design a small Python API client that is testable. Where do exceptions, retries and composition belong?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/09.txt
+
+10. How would you deploy a prototype LLM feature and decide whether local open-source inference is justified?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/10.txt
+
+11. A client changes the requirement halfway through delivery. How do you turn that into a testable change rather than an argument?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/11.txt
+
+12. Given a string, return the length of its longest substring without repeating characters. Explain the invariant and test it.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/12.txt
+
+13. Explain pretraining, supervised fine-tuning and preference tuning. Where would LoRA fit?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/13.txt
+
+14. How would you improve a failing extraction prompt without turning examples into a source of fabricated facts?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/14.txt
+
+15. An offline classifier reports 95% accuracy. How would you check leakage and imbalanced classes before trusting it?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/15.txt
+
+16. How would you use Git, tests and a reproducible environment to deliver an AI change another engineer can review?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/16.txt

@@ -1,0 +1,95 @@
+Sandboxed Code-Execution Agent | Card 03
+Difficulty: Advanced
+
+QUESTION
+The code has MAX_RETRIES=3. What evidence says the retry bound works?
+
+WHY THIS QUESTION MATTERS
+Tests whether I audit intended control flow against the actual state schema and runtime behavior.
+
+CONTEXT
+A retry constant is effective only when the retry state survives graph-node merges and resets at the intended boundary. Here the declared TypedDict omits retry_count, while nodes attempt to read and return it.
+
+TERMS
+TypedDict: Python declaration of the graph state fields
+durable state: State that remains available to later graph invocations
+reset policy: Rule for when a counter returns to its starting value
+
+MECHANISM
+1. Compare every key returned by agent and reflection nodes with `AgentState`.
+2. Check the reducer and compiled graph behavior for undeclared state fields.
+3. Separate retry attempts from total model steps and specify when each counter resets.
+4. Use a deterministic stub model to drive repeated failures and assert the graph stops at the bound.
+
+TECHNICAL EXPLANATION
+LangGraph state updates are filtered and reduced according to the schema. A node can return an undeclared key without that value becoming durable state. Since after_tools consults state.get("retry_count", 0), a missing field falls back to zero and can keep satisfying the retry condition. The reflection prompt may display attempt 1 repeatedly. A robust fix must also define how retries reset after successful work and per user turn. `AgentState` declares `messages` and `step_count`; `reflect_node` writes `retry_count`, and `after_tools` reads it against MAX_RETRIES. With the actual schema and LangGraph version, the isolated probe showed the undeclared value disappears and returns as zero on a later invocation. This makes the intended three-retry bound difficult to defend. Add the field, define reset and reducer behavior, and test repeated failures plus success and new-turn cases through a deterministic compiled graph.
+
+WORKED EXAMPLE
+Suppose each reflection result is dropped by state validation; the next failing tool still observes zero, so the comparison 0 < 3 remains true instead of progressing toward termination.
+
+SOURCE
+sandbox-agent/agent/graph.py:112-129
+https://github.com/aniketqw/sandbox-agent/blob/6d8d1e9879b6e076cd27ec0fc43239b83d957ba6/agent/graph.py#L112-L129
+
+        correction_prompt = HumanMessage(content=(
+            f"[REFLECTION – attempt {state.get('retry_count', 0) + 1}/{MAX_RETRIES}] "
+            f"The previous tool call failed with:\n{error_snippet}\n\n"
+            f"{guidance}"
+            "Provide a CORRECTED tool call now."
+        ))
+
+        response = llm_with_tools.invoke(messages + [correction_prompt])
+        return {
+            "messages": [correction_prompt, response],
+            "step_count": state.get("step_count", 0) + 1,
+            "retry_count": state.get("retry_count", 0) + 1,
+            "correction_prompt": correction_prompt.content,
+        }
+
+    workflow = StateGraph(AgentState)
+    workflow.add_node("agent", agent_node)
+    workflow.add_node("tools", tool_node)
+
+The excerpt shows retry_count being read to number the prompt and incremented in the returned update. That update is meaningful only if AgentState declares and retains the field.
+
+LIMIT
+This is a reproduced isolated schema behavior; no full agent run or new integration suite was performed.
+
+TEST EVIDENCE
+I would test a graph with repeated failing tool results, then verify retry_count advances, terminates at the limit, and resets at the documented boundary.
+
+SPEAKABLE ANSWER
+In `agent/graph.py:reflect_node`, the node writes retry_count, and `after_tools` reads it against MAX_RETRIES. But `agent/state.py:AgentState` declares only messages and step_count. In an isolated probe using that actual schema and LangGraph 1.1.8, retry_count disappeared from graph output and was zero again on the next invocation. That establishes a schema issue, not a full-agent test. I would add retry_count with a clear reset policy, then test repeated tool failures through the graph before claiming a bounded retry loop.
+
+SELF-CHECK
+Three consecutive tools fail. What evidence would prove a three-retry cap?
+A graph test showing exactly the intended number of reflection transitions and then a terminal failure response, with retry_count retained and a new turn reset according to policy. The isolated schema probe alone does not exercise the full agent.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. Would adding retry_count to the TypedDict alone be enough?
+It would make the field part of the state schema, but I would still specify its reducer and reset behavior, then test failures, success, and a new turn. Schema presence alone is not a complete policy.  `MAX_RETRIES=3` is a constant, but `retry_count` is absent from `AgentState`. Returning an undeclared key does not make it persistent under the actual schema; the isolated probe showed it disappears. I would add the field and specify its reducer and reset point before describing a reliable retry cap.
+
+1.1. Would a TypedDict field alone make the limit correct?
+It makes the state shape explicit, but the reducer still controls how updates merge and the harness determines when the counter resets. I would declare retry_count, define whether it increments per failed tool or reflection attempt, and reset it at the agreed turn boundary. Then test failure, success, and a new turn through the compiled graph. The constant alone is not an enforcement mechanism.
+
+1.1.1. What result proves the cap is enforced?
+Feed a deterministic tool failure repeatedly and record each reflection transition. The graph should stop after the configured number, preserve the final failure for the user, and begin a new turn at the documented retry count. I would also test a successful retry resets or preserves the counter according to policy. This should run without live provider variability, using a stub model and tool.
+
+2. What is the concrete failure mode if it stays at zero?
+after_tools keeps seeing a value below three, so repeated failed calls may continue beyond the intended limit. The prompt can also keep labeling the retry as attempt one.  The prompt currently formats `attempt state+1/MAX_RETRIES`; if retry_count is dropped, every reflection can claim attempt one. That makes the user-facing guidance misleading at the same time the routing bound is weak. I would derive the displayed attempt from the same declared state field that the edge checks.
+
+2.1. How could a stale counter produce an infinite retry loop?
+If the edge repeatedly reads zero, it remains below three, so each failure routes to reflection again. The graph still has MAX_STEPS as another bound, but that is a model-step ceiling and can end the run for a different reason. I would not conflate the two controls. A test should assert both the retry transition count and final step count under repeated deterministic errors.
+
+2.1.1. Should the attempt number be shown in the prompt or logs?
+Both can help, but they should come from one state value and include a run ID. The prompt needs a concise attempt count for the model; logs need structured fields for operators. I would avoid treating prompt text as enforcement. The conditional edge must enforce the bound, while telemetry lets us verify how close executions come to it. The test should assert the graph edge as well as the displayed attempt.
+
+3. Why not quote the 12/14 integration test as confirmation?
+That saved suite tests tool integrations and is not evidence that I exercised repeated graph reflection. I keep the evidence separate: isolated state probe for the schema behavior, saved log for tool integration.  The saved 12/14 integration log is about tool integrations, not repeated graph reflection. It cannot verify whether state survives node boundaries. I would preserve it as separate evidence and add a deterministic graph test using the real schema.
+
+3.1. How do you avoid overclaiming from an isolated state probe?
+State exactly what the probe exercised: schema merge behavior with LangGraph 1.1.8, not the full model/tool loop. Then make the claim proportional to that result and list the next integration test needed. I would cite the saved log only for its 12 pass and 2 fail outcomes. This keeps test evidence attached to the property it actually measured. A narrow claim makes the evidence reproducible.
+
+3.1.1. Would you rerun the old integration suite for this question?
+Not as a retry-counter test; it launches containers and tool integrations and is not designed to exercise repeated reflection. I would write a focused graph test with a stub model that returns errors, then separately run the integration suite in its configured environment if that work is authorized. The old 12/14 log remains historical evidence and should not be presented as current pass status.

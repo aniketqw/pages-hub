@@ -1,0 +1,18 @@
+ZS INTERVIEW ATLAS — PLAIN-TEXT STUDY INDEX
+
+Use the coach prompt to start. Read one question file at a time.
+These files do not require JavaScript or a local repository.
+
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/coach-prompt.txt
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/01.txt
+
+TOPICS
+Resume Builder Agent (13 cards): https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/resume-builder/index.txt
+Sandboxed Code-Execution Agent (10 cards): https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/sandbox/index.txt
+VisionDev (9 cards): https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/index.txt
+Multi University Bounty System (10 cards): https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/bountyhub/index.txt
+JD / Domain (16 cards): https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/jd-domain/index.txt
+Behavioural & Experience (10 cards): https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/behavioural/index.txt
+
+INTERACTIVE ATLAS
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/

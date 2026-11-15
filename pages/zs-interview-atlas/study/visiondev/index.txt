@@ -1,0 +1,30 @@
+VISIONDEV
+
+Open one text card at a time.
+
+01. Audit your 40% blur number: which run, which denominator, and what does it actually prove?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/01.txt
+
+02. Walk me through the misclassification callback: how do you capture failures without derailing training?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/02.txt
+
+03. Why a YOLO classifier to tag distortions, and how do you handle low-confidence detections?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/03.txt
+
+04. You call it retrieval over past failures - is this actually RAG, and what would real similarity search look like?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/04.txt
+
+05. How do you validate the VLM's output? The resume says Pydantic - show me.
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/05.txt
+
+06. Why self-host Qwen2.5-VL on vLLM instead of calling a hosted API?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/06.txt
+
+07. Does SHA-1 dedup catch two visually near-identical failures?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/07.txt
+
+08. How do you prevent the report from mixing artifacts from different training runs?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/08.txt
+
+09. How would you separate a distortion tag from evidence that the distortion caused a model error?
+https://aniketqw.github.io/pages-hub/pages/zs-interview-atlas/study/visiondev/09.txt

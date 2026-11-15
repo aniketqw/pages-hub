@@ -1,0 +1,75 @@
+JD / Domain | Card 02
+Difficulty: Intermediate
+
+QUESTION
+Explain one transformer block, then tell me why an embedding is not a database record or a guarantee of meaning.
+
+WHY THIS QUESTION MATTERS
+JD: attention, layers, tokenization, embeddings and deep-learning fundamentals.
+
+CONTEXT
+This question connects the model interface to its limits. You need the distinction between token identity, position, attention and learned vector similarity before deciding what an embedding-based search result actually establishes.
+
+TERMS
+attention: A learned weighted combination of information from other permitted positions.
+embedding: A numerical representation whose usefulness depends on its training and task.
+
+MECHANISM
+1. Convert tokens to vectors and attach position information. Two identical token IDs at different positions must still be interpretable in their sequence context.
+2. Queries and keys determine attention scores over permitted positions; normalized weights mix value vectors. A causal decoder masks future positions, then feed-forward, residual and normalization operations transform the representation.
+3. Separate this internal processing from a retrieval embedding API. A similarity score orders candidates under a chosen vector space; factual support still requires reading the retrieved source and checking its entities and dates.
+
+TECHNICAL EXPLANATION
+For each head, QK-transpose forms pairwise scores, scaling and masking precede a softmax, and the weights combine V. Softmax creates relative weights, not a probability that a factual statement is true. Position information is necessary because attention alone over a set would not express sequence order in the same way. Multiple heads and layers permit different learned transformations, but assigning a fixed human meaning to each head is not justified by the architecture. The score matrix for ordinary full attention has quadratic sequence dimensions, while kernels and caching change practical resource use. Retrieval requires its own embedding model, normalization policy and similarity function; a compatible dimension is not enough to mix indexes. Similarity suggests relevance, whereas source inspection establishes dates, entities and whether a claim is actually entailed.
+
+WORKED EXAMPLE
+Two documents may share words about drug sales while referring to different years. A high embedding similarity can find both; metadata filters and answer-level evidence checks must distinguish the applicable period.
+
+SOURCE
+Concept discussion (no executable code)
+
+LIMIT
+Vector proximity is task-dependent and does not establish entailment, authorization or temporal validity.
+
+TEST EVIDENCE
+Proposed check: construct relevant/irrelevant document pairs, including lexical matches with conflicting dates; measure retrieval ranks and inspect failure groups. No embedding benchmark was executed here.
+
+SPEAKABLE ANSWER
+I start with token IDs and learned vector representations plus position information. Attention lets a token mix information from permitted positions using query-key similarity and weighted value vectors. Multiple heads learn different projections, then a feed-forward sublayer transforms each position, with residual connections and normalization helping information and gradients flow. In an autoregressive decoder, causal masking prevents a position from attending to future tokens. An embedding is a vector representation used by a model or retrieval system. Similar vectors can be useful for search, but similarity is not proof that two documents make the same factual claim. I would choose an embedding model using retrieval examples from the actual task rather than comparing vector dimensions alone. I have project experience using model APIs; I would not claim that I trained a foundation transformer.
+
+SELF-CHECK
+Why could two sentences with opposite conclusions still be retrieved as near neighbors?
+They can share entities and subject matter while differing in a negation or number. Topic similarity makes them candidates; it does not establish logical agreement.
+
+FOLLOW-UP QUESTIONS AND ANSWERS
+
+1. What leaks during next-token training without the causal mask?
+A position could attend to later tokens, including information that reveals its target. The model would then optimize an easier task than left-to-right generation, where those future tokens do not yet exist. The mask makes the information available during training match the intended autoregressive direction. This is a property of the architecture and training objective, not an access-control mechanism for private documents or a guarantee of factual answers.
+
+1.1. Is this leakage the same as contamination between training and evaluation datasets?
+No. Future-token access within a training sequence and evaluation examples appearing in model development are different mechanisms. Causal masking addresses the former. Dataset separation, provenance and appropriate splitting address the latter. A model can use a correct causal mask and still have seen an evaluation question during training. State which boundary you are testing instead of using leakage as a single label for every inflated score.
+
+1.1.1. How does the same temporal reasoning apply to evaluating a retrieval application?
+An application evaluated as if it answered in January should not use a document published in March unless that future knowledge is part of the intended task. Construct retrieval evidence as of the evaluation time and preserve document versions. Otherwise the result overstates what the deployed system could have known. This is an application data boundary rather than an attention mask, but both examples require matching available information to the intended prediction setting.
+
+2. Why add a sublayer input back to its output?
+The residual path preserves an information and gradient route while the sublayer learns a modification to its input. It reduces the burden of rebuilding the entire representation at every layer and helps optimization of deep networks. This does not mean every layer is optional or that a shortcut proves the final representation remains unchanged. The learned sublayer, normalization and surrounding architecture determine how the information is transformed.
+
+2.1. If the residual path can preserve information, why use multiple layers?
+Each layer can transform representations that already incorporate earlier context, enabling successive combinations rather than one fixed lookup. Depth supplies opportunities to learn useful computations, while residual paths help those transformations train. More layers also add resource cost and do not automatically improve a particular deployed task. Evaluate the actual model and workload instead of treating layer count as a standalone measure of reasoning ability or retrieval quality.
+
+2.1.1. How would you explain this without claiming a human meaning for each layer?
+Use the computation as the explanation: vectors are mixed through attention, transformed by feed-forward components and passed along residual routes repeatedly. Avoid assigning a specific layer the role of understanding a concept unless an experiment supports that interpretation. A mechanism description can be accurate without a story about hidden mental stages. For an interview, connect the repeated transformations to context-dependent representations and then state the limits of that intuition.
+
+3. Can contradictory sentences have nearby retrieval embeddings?
+Yes. Sentences about the same entity and topic can differ only in a negation, date or amount while remaining close in a semantic vector space. The embedding model may emphasize shared subject matter more strongly than the contradiction. Retrieval therefore proposes candidate evidence; it does not decide whether a generated claim follows from it. Inspect the exact passage, entity, time period and numerical relation before treating similarity as factual support.
+
+3.1. What evaluation pairs would expose this limitation?
+Include same-topic contradictions, entity swaps, year changes and numerical changes alongside genuinely relevant paraphrases. Label relevance for the actual task, not just topical resemblance. A policy question may require the current version, making an older near-duplicate inappropriate even if it shares almost all words. Inspect ranking failures by category so improvements on easy paraphrases do not conceal weaknesses on negation, temporal validity or entity disambiguation.
+
+3.1.1. Would changing the distance function automatically fix those errors?
+Not necessarily. The embedding training objective, normalization and index compatibility all affect ranking. A new distance function cannot recover a distinction the vectors do not encode usefully. Compare compatible choices on labeled examples, consider metadata filters or reranking, and verify answer support after retrieval. A higher retrieval score under a different scale is not an improvement unless the task-relevant ordering and downstream behavior improve on the same evaluation cases.
+
+OPTIONAL PRACTICE RESOURCES
+Multi-Head Attention and Transformer Blocks (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/multi-head-attention-and-transformer-blocks
+What Are Embeddings? (LLM Bootcamp - AI-Powered Course): https://www.educative.io/courses/llm-bootcamp/what-are-embeddings
