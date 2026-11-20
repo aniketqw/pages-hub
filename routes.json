@@ -450,6 +450,25 @@
       "visibility": "public",
       "status": "live",
       "managed": true
+    },
+    {
+      "id": "zs-ebi-prep",
+      "title": "ZS AI Engineer EBI — 45-minute Practice",
+      "url": "/pages-hub/pages/zs-ebi-prep/",
+      "repo": "pages-hub",
+      "group": "Interview prep",
+      "description": "20 worked guesstimates, 25 puzzles, 18 open-ended AI research questions, three mock rounds and interactive project maps.",
+      "tags": [
+        "ZS",
+        "EBI",
+        "AI",
+        "research",
+        "guesstimates",
+        "puzzles"
+      ],
+      "visibility": "public",
+      "status": "live",
+      "managed": true
     }
   ]
 }
